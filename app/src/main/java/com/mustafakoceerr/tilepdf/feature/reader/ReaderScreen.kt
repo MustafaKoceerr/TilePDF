@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -38,9 +39,13 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mustafakoceerr.tilepdf.R
 import com.mustafakoceerr.tilepdf.core.pdf.PageSize
+import com.mustafakoceerr.tilepdf.feature.reader.components.rememberZoomState
+import com.mustafakoceerr.tilepdf.feature.reader.components.zoomable
 
 /** Drafts are rendered at a fraction of the screen width to keep them cheap. */
 private const val DRAFT_SCALE = 0.5f
+
+private val PAGE_GAP = 8.dp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -96,10 +101,21 @@ private fun PageList(
 ) {
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val draftWidthPx = (constraints.maxWidth * DRAFT_SCALE).toInt()
+        val listState = rememberLazyListState()
+        val zoomState = rememberZoomState()
         LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            state = listState,
+            modifier = Modifier
+                .fillMaxSize()
+                .zoomable(zoomState, listState),
+            // Horizontal padding scales with zoom so the whole content grows
+            // proportionally; otherwise page heights would grow by a slightly
+            // different factor than the zoom and the scroll anchor would drift.
+            contentPadding = PaddingValues(
+                horizontal = PAGE_GAP * zoomState.scale,
+                vertical = PAGE_GAP,
+            ),
+            verticalArrangement = Arrangement.spacedBy(PAGE_GAP),
         ) {
             items(count = pageSizes.size, key = { it }) { pageIndex ->
                 DraftPage(

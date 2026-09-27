@@ -1,0 +1,87 @@
+package com.mustafakoceerr.tilepdf.feature.reader.components
+
+import androidx.compose.animation.core.exponentialDecay
+import androidx.compose.ui.geometry.Offset
+import org.junit.Assert.assertEquals
+import org.junit.Before
+import org.junit.Test
+
+private const val DELTA = 0.001f
+
+class ZoomStateTest {
+
+    private lateinit var state: ZoomState
+
+    @Before
+    fun setUp() {
+        state = ZoomState(exponentialDecay()).apply { viewportWidth = 1000 }
+    }
+
+    /** Where the preview draws viewport point [p]. */
+    private fun ZoomState.preview(p: Offset) = p * previewZoom + previewOffset
+
+    @Test
+    fun pinchKeepsCentroidFixed() {
+        val centroid = Offset(300f, 500f)
+        state.onTransform(centroid, pan = Offset.Zero, zoom = 1.5f)
+        state.onTransform(centroid, pan = Offset.Zero, zoom = 1.2f)
+
+        assertEquals(1.8f, state.previewZoom, DELTA)
+        assertEquals(centroid.x, state.preview(centroid).x, DELTA)
+        assertEquals(centroid.y, state.preview(centroid).y, DELTA)
+    }
+
+    @Test
+    fun pinchIsClampedToScaleRange() {
+        state.onTransform(Offset.Zero, Offset.Zero, zoom = 20f)
+        assertEquals(5f, state.previewZoom, DELTA)
+
+        state.commit()
+        state.onTransform(Offset.Zero, Offset.Zero, zoom = 0.01f)
+        assertEquals(0.2f, state.previewZoom, DELTA) // back to 1x overall
+    }
+
+    @Test
+    fun commitMatchesPreviewAtLeftEdge() {
+        // Zoom 2x around the viewport centre: viewport x 250 moves to x 0.
+        state.onTransform(Offset(500f, 400f), Offset.Zero, zoom = 2f)
+        val result = state.commit()
+
+        assertEquals(2f, state.scale, DELTA)
+        assertEquals(2f, result.zoom, DELTA)
+        assertEquals(500f, state.panX, DELTA) // content x 250 * 2
+        assertEquals(200f, result.anchorY, DELTA) // viewport y 200 moved to top
+        assertEquals(1f, state.previewZoom, DELTA)
+        assertEquals(Offset.Zero, state.previewOffset)
+    }
+
+    @Test
+    fun commitClampsPanToContent() {
+        // Zooming around the right edge would pan past the content end.
+        state.onTransform(Offset(1000f, 0f), pan = Offset(-300f, 0f), zoom = 2f)
+        state.commit()
+
+        assertEquals(1000f, state.panX, DELTA) // maxPanX = 1000 * (2 - 1)
+    }
+
+    @Test
+    fun doubleTapTogglesAroundFocus() {
+        state.zoomTo(state.doubleTapTarget, focus = Offset(400f, 0f))
+        assertEquals(2.5f, state.scale, DELTA)
+        assertEquals(600f, state.panX, DELTA) // 400 * 2.5 - 400
+
+        state.zoomTo(state.doubleTapTarget, focus = Offset(400f, 0f))
+        assertEquals(1f, state.scale, DELTA)
+        assertEquals(0f, state.panX, DELTA)
+    }
+
+    @Test
+    fun panIsClampedAndReportsConsumedDelta() {
+        state.zoomTo(2f, Offset.Zero)
+
+        assertEquals(-300f, state.panBy(-300f), DELTA) // drag left scrolls right
+        assertEquals(300f, state.panX, DELTA)
+        assertEquals(300f, state.panBy(1000f), DELTA) // only 300 left to the edge
+        assertEquals(0f, state.panX, DELTA)
+    }
+}
