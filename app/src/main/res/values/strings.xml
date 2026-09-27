@@ -1,3 +1,9 @@
 <resources>
     <string name="app_name">TilePDF</string>
+    <string name="home_open_pdf">PDF Aç</string>
+    <string name="navigate_back">Geri</string>
+    <string name="reader_page_description">Sayfa %1$d</string>
+    <string name="reader_error_not_found">Dosya bulunamadı veya erişim izni yok.</string>
+    <string name="reader_error_password">Şifreli PDF\'ler henüz desteklenmiyor.</string>
+    <string name="reader_error_corrupt">PDF açılamadı; dosya bozuk olabilir.</string>
 </resources>
