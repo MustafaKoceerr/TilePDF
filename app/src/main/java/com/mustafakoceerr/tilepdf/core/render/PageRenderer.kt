@@ -28,11 +28,14 @@ class PageRenderer @Inject constructor(
      * Only the part of the page covered by [tile]. The page is scaled to the
      * tile's render width, then shifted so the tile's top-left corner lands
      * at the bitmap origin; PdfRenderer clips everything else.
+     *
+     * @param reuse a pooled bitmap to render into instead of allocating; it is
+     *   reconfigured to the tile size, so it must be large enough.
      */
-    suspend fun renderTile(document: PdfDocument, tile: Tile): Bitmap {
+    suspend fun renderTile(document: PdfDocument, tile: Tile, reuse: Bitmap? = null): Bitmap {
         val key = tile.key
         val scale = document.pageSizes[key.pageIndex].scaleForWidth(key.renderWidth)
-        val bitmap = whiteBitmap(tile.bounds.width, tile.bounds.height)
+        val bitmap = whiteBitmap(tile.bounds.width, tile.bounds.height, reuse)
         val transform = Matrix().apply {
             setScale(scale, scale)
             postTranslate(-tile.bounds.left.toFloat(), -tile.bounds.top.toFloat())
@@ -42,7 +45,10 @@ class PageRenderer @Inject constructor(
     }
 
     // PDF pages have a transparent background; paint it white first.
-    private suspend fun whiteBitmap(width: Int, height: Int): Bitmap = withContext(ioDispatcher) {
-        createBitmap(width, height, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.WHITE) }
-    }
+    private suspend fun whiteBitmap(width: Int, height: Int, reuse: Bitmap? = null): Bitmap =
+        withContext(ioDispatcher) {
+            val bitmap = reuse?.apply { reconfigure(width, height, Bitmap.Config.ARGB_8888) }
+                ?: createBitmap(width, height, Bitmap.Config.ARGB_8888)
+            bitmap.apply { eraseColor(Color.WHITE) }
+        }
 }
