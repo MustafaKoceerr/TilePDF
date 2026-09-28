@@ -2,6 +2,7 @@ package com.mustafakoceerr.tilepdf.data.text
 
 import android.net.Uri
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.mustafakoceerr.tilepdf.data.pdfbox.PdfBoxDocumentLoader
 import androidx.test.filters.SdkSuppress
 import androidx.test.platform.app.InstrumentationRegistry
 import kotlinx.coroutines.Dispatchers
@@ -17,7 +18,7 @@ class HybridTextProviderTest {
 
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private val context = instrumentation.targetContext
-    private val pdfBoxFactory = PdfBoxTextProvider.Factory(context, Dispatchers.IO)
+    private val pdfBoxFactory = PdfBoxTextProvider.Factory(PdfBoxDocumentLoader(context, Dispatchers.IO), Dispatchers.IO)
     private val nativeFactory = NativePdfTextProvider.Factory(context, Dispatchers.IO)
 
     private val uri: String by lazy {

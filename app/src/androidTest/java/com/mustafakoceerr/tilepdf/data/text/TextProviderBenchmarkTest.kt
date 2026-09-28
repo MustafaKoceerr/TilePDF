@@ -3,6 +3,7 @@ package com.mustafakoceerr.tilepdf.data.text
 import android.net.Uri
 import android.util.Log
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.mustafakoceerr.tilepdf.data.pdfbox.PdfBoxDocumentLoader
 import androidx.test.filters.SdkSuppress
 import androidx.test.platform.app.InstrumentationRegistry
 import com.mustafakoceerr.tilepdf.core.geometry.PdfRect
@@ -45,7 +46,7 @@ class TextProviderBenchmarkTest {
 
     @Test
     fun providersAgreeAndReportTimings(): Unit = runBlocking {
-        val pdfBoxFactory = PdfBoxTextProvider.Factory(context, Dispatchers.IO)
+        val pdfBoxFactory = PdfBoxTextProvider.Factory(PdfBoxDocumentLoader(context, Dispatchers.IO), Dispatchers.IO)
         val nativeFactory = NativePdfTextProvider.Factory(context, Dispatchers.IO)
         val pdfBox = measure("PdfBox", pdfBoxFactory)
         val native = measure("Native", nativeFactory)

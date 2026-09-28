@@ -2,6 +2,7 @@ package com.mustafakoceerr.tilepdf.data.text
 
 import android.net.Uri
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.mustafakoceerr.tilepdf.data.pdfbox.PdfBoxDocumentLoader
 import androidx.test.platform.app.InstrumentationRegistry
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
@@ -26,7 +27,7 @@ class PdfBoxTextProviderTest {
         instrumentation.context.assets.open("sample.pdf").use { input ->
             file.outputStream().use { input.copyTo(it) }
         }
-        provider = PdfBoxTextProvider.Factory(context, Dispatchers.IO).create(Uri.fromFile(file).toString())
+        provider = PdfBoxTextProvider.Factory(PdfBoxDocumentLoader(context, Dispatchers.IO), Dispatchers.IO).create(Uri.fromFile(file).toString())
     }
 
     @After

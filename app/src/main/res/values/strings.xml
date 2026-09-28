@@ -24,6 +24,8 @@
     <string name="reader_go_to_page">Sayfaya git</string>
     <string name="reader_go_to_page_range">1 ile %1$d arasında bir sayfa</string>
     <string name="reader_go_to_page_confirm">Git</string>
+    <string name="reader_toc">İçindekiler</string>
+    <string name="reader_more_options">Diğer seçenekler</string>
     <string name="reader_error_not_found">Dosya bulunamadı veya erişim izni yok.</string>
     <string name="reader_error_password">Şifreli PDF\'ler henüz desteklenmiyor.</string>
     <string name="reader_error_corrupt">PDF açılamadı; dosya bozuk olabilir.</string>

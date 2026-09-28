@@ -7,12 +7,14 @@ import androidx.navigation.toRoute
 import com.mustafakoceerr.tilepdf.core.render.PageRenderer
 import com.mustafakoceerr.tilepdf.core.render.TiledPageImageSource
 import com.mustafakoceerr.tilepdf.data.library.LibraryRepository
+import com.mustafakoceerr.tilepdf.data.outline.DocumentOutlineRepository
 import com.mustafakoceerr.tilepdf.data.preferences.ReaderPreferencesRepository
 import com.mustafakoceerr.tilepdf.data.text.TextSearchRepository
 import com.mustafakoceerr.tilepdf.di.ApplicationScope
 import com.mustafakoceerr.tilepdf.domain.OpenDocumentUseCase
 import com.mustafakoceerr.tilepdf.domain.OpenedDocument
 import com.mustafakoceerr.tilepdf.feature.reader.navigation.ReaderRoute
+import com.mustafakoceerr.tilepdf.model.OutlineEntry
 import com.mustafakoceerr.tilepdf.model.ReadingPosition
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
@@ -47,6 +49,7 @@ class ReaderViewModel @Inject constructor(
     private val libraryRepository: LibraryRepository,
     private val preferencesRepository: ReaderPreferencesRepository,
     private val textSearchRepository: TextSearchRepository,
+    private val outlineRepository: DocumentOutlineRepository,
     @param:ApplicationScope private val applicationScope: CoroutineScope,
 ) : ViewModel() {
 
@@ -55,13 +58,15 @@ class ReaderViewModel @Inject constructor(
     private val documentState = MutableStateFlow<DocumentState>(DocumentState.Loading)
     private val searchState = MutableStateFlow(SearchUiState())
     private val searchQuery = MutableStateFlow("")
+    private val outline = MutableStateFlow<List<OutlineEntry>>(emptyList())
     private val positionUpdates = MutableSharedFlow<ReadingPosition>(extraBufferCapacity = 1)
 
     val uiState: StateFlow<ReaderUiState> = combine(
         documentState,
         preferencesRepository.nightMode,
         searchState,
-    ) { document, nightMode, search ->
+        outline,
+    ) { document, nightMode, search, outline ->
         when (document) {
             DocumentState.Loading -> ReaderUiState.Loading
             is DocumentState.Failed -> ReaderUiState.Error(document.reason)
@@ -72,6 +77,7 @@ class ReaderViewModel @Inject constructor(
                 initialPosition = document.opened.position,
                 nightMode = nightMode,
                 search = search,
+                outline = outline,
             )
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ReaderUiState.Loading)
@@ -81,6 +87,7 @@ class ReaderViewModel @Inject constructor(
             documentState.value = try {
                 val opened = openDocument(uri)
                 prepareSearch()
+                loadOutline()
                 DocumentState.Opened(
                     opened = opened,
                     pageImages = TiledPageImageSource(opened.document, pageRenderer, viewModelScope),
@@ -157,6 +164,16 @@ class ReaderViewModel @Inject constructor(
                     }
                 searchState.update { it.copy(isSearching = false) }
             }
+    }
+
+    private fun loadOutline() = viewModelScope.launch {
+        // Optional extra: a PDF PdfBox can't parse simply shows no contents.
+        try {
+            outline.value = outlineRepository.outline(uri)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+        }
     }
 
     private fun prepareSearch() = viewModelScope.launch {

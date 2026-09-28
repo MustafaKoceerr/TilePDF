@@ -94,6 +94,8 @@ fun PdfPageList(
     onPositionChanged: (ReadingPosition) -> Unit,
     goToPageOpen: Boolean,
     onGoToPageOpenChange: (Boolean) -> Unit,
+    pageJump: PageJump?,
+    onPageJumpHandled: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val matchesByPage = remember(matches) { matches.groupBy { it.pageIndex } }
@@ -132,6 +134,13 @@ fun PdfPageList(
         }
 
         TrimMemoryEffect(pageImages)
+
+        LaunchedEffect(pageJump) {
+            val jump = pageJump ?: return@LaunchedEffect
+            val pageIndex = jump.pageIndex.coerceIn(0, pageSizes.lastIndex)
+            scrollToPage(listState, zoomState, pageIndex, jump.topPt, pageSizes[pageIndex], density)
+            onPageJumpHandled()
+        }
 
         LaunchedEffect(currentMatch) {
             val match = currentMatch ?: return@LaunchedEffect
@@ -235,6 +244,31 @@ private suspend fun requestVisibleTiles(
         .distinctUntilChanged()
         .debounce(TILE_REQUEST_DEBOUNCE_MS)
         .collect(pageImages::requestTiles)
+}
+
+/** Leaves a little room above a jump target such as a chapter heading. */
+private val JUMP_MARGIN = 16.dp
+
+/**
+ * Scrolls so the page starts at the top of the screen or, with [topPt], so
+ * that point on the page does. Uses the renderer's points-to-pixels factor
+ * for the page's current laid-out width, like search highlights do.
+ */
+private suspend fun scrollToPage(
+    listState: LazyListState,
+    zoomState: ZoomState,
+    pageIndex: Int,
+    topPt: Float?,
+    pageSize: PageSize,
+    density: Density,
+) {
+    val paddingPx = with(density) { (PAGE_GAP * zoomState.scale).roundToPx() }
+    val pageWidth = pageLayout(zoomState, paddingPx).pageWidth
+    val offset = topPt?.let {
+        val marginPx = with(density) { JUMP_MARGIN.roundToPx() }
+        (it * pageSize.scaleForWidth(pageWidth) - marginPx).roundToInt().coerceAtLeast(0)
+    } ?: 0
+    listState.scrollToItem(pageIndex, offset)
 }
 
 /**

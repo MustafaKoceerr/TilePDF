@@ -1,23 +1,18 @@
 package com.mustafakoceerr.tilepdf.data.text
 
-import android.content.Context
-import androidx.core.net.toUri
 import com.mustafakoceerr.tilepdf.core.geometry.PdfRect
 import com.mustafakoceerr.tilepdf.core.text.TextSearcher
+import com.mustafakoceerr.tilepdf.data.pdfbox.PdfBoxDocumentLoader
 import com.mustafakoceerr.tilepdf.di.IoDispatcher
 import com.mustafakoceerr.tilepdf.model.PageText
 import com.mustafakoceerr.tilepdf.model.SearchMatch
-import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
-import com.tom_roush.pdfbox.io.MemoryUsageSetting
 import com.tom_roush.pdfbox.pdmodel.PDDocument
 import com.tom_roush.pdfbox.text.PDFTextStripper
 import com.tom_roush.pdfbox.text.TextPosition
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import java.io.FileNotFoundException
 import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 
@@ -103,17 +98,11 @@ class PdfBoxTextProvider private constructor(
     }
 
     class Factory @Inject constructor(
-        @param:ApplicationContext private val context: Context,
+        private val loader: PdfBoxDocumentLoader,
         @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher,
     ) : PdfTextProvider.Factory {
 
-        override suspend fun create(uri: String): PdfBoxTextProvider = withContext(ioDispatcher) {
-            PDFBoxResourceLoader.init(context)
-            val document = context.contentResolver.openInputStream(uri.toUri())?.use {
-                // Buffer the file on disk rather than the heap: PDFs can be large.
-                PDDocument.load(it, MemoryUsageSetting.setupTempFileOnly())
-            } ?: throw FileNotFoundException("Cannot open $uri")
-            PdfBoxTextProvider(document, ioDispatcher)
-        }
+        override suspend fun create(uri: String): PdfBoxTextProvider =
+            PdfBoxTextProvider(loader.load(uri), ioDispatcher)
     }
 }

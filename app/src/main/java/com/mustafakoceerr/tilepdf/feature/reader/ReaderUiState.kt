@@ -2,6 +2,7 @@ package com.mustafakoceerr.tilepdf.feature.reader
 
 import com.mustafakoceerr.tilepdf.core.pdf.PageSize
 import com.mustafakoceerr.tilepdf.core.render.PageImageSource
+import com.mustafakoceerr.tilepdf.model.OutlineEntry
 import com.mustafakoceerr.tilepdf.model.ReadingPosition
 import com.mustafakoceerr.tilepdf.model.SearchMatch
 
@@ -18,6 +19,8 @@ sealed interface ReaderUiState {
         val initialPosition: ReadingPosition,
         val nightMode: Boolean,
         val search: SearchUiState,
+        /** Table of contents; empty until loaded, or if the PDF has none. */
+        val outline: List<OutlineEntry>,
     ) : ReaderUiState
 }
 

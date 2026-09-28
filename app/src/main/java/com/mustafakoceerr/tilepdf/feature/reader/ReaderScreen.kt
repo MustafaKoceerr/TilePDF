@@ -11,7 +11,9 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconToggleButton
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -19,6 +21,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -31,8 +34,10 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mustafakoceerr.tilepdf.R
+import com.mustafakoceerr.tilepdf.feature.reader.components.PageJump
 import com.mustafakoceerr.tilepdf.feature.reader.components.PdfPageList
 import com.mustafakoceerr.tilepdf.feature.reader.components.SearchTopBar
+import com.mustafakoceerr.tilepdf.feature.reader.components.TableOfContentsSheet
 import com.mustafakoceerr.tilepdf.model.ReadingPosition
 import com.mustafakoceerr.tilepdf.ui.theme.TilePDFTheme
 
@@ -82,6 +87,9 @@ internal fun ReaderScreen(
     val ready = uiState as? ReaderUiState.Ready
     val search = ready?.search
     var goToPageOpen by rememberSaveable { mutableStateOf(false) }
+    var tocOpen by rememberSaveable { mutableStateOf(false) }
+    var menuOpen by remember { mutableStateOf(false) }
+    var pageJump by remember { mutableStateOf<PageJump?>(null) }
     BackHandler(enabled = search?.isActive == true, onBack = searchActions.onClose)
 
     Scaffold(
@@ -113,11 +121,13 @@ internal fun ReaderScreen(
                     },
                     actions = {
                         if (ready != null) {
-                            IconButton(onClick = { goToPageOpen = true }) {
-                                Icon(
-                                    painter = painterResource(R.drawable.ic_tag),
-                                    contentDescription = stringResource(R.string.reader_go_to_page),
-                                )
+                            if (ready.outline.isNotEmpty()) {
+                                IconButton(onClick = { tocOpen = true }) {
+                                    Icon(
+                                        painter = painterResource(R.drawable.ic_toc),
+                                        contentDescription = stringResource(R.string.reader_toc),
+                                    )
+                                }
                             }
                             IconButton(onClick = searchActions.onOpen) {
                                 Icon(
@@ -125,15 +135,13 @@ internal fun ReaderScreen(
                                     contentDescription = stringResource(R.string.reader_search),
                                 )
                             }
-                            IconToggleButton(
-                                checked = ready.nightMode,
-                                onCheckedChange = { onToggleNightMode() },
-                            ) {
-                                Icon(
-                                    painter = painterResource(R.drawable.ic_dark_mode),
-                                    contentDescription = stringResource(R.string.reader_night_mode),
-                                )
-                            }
+                            OverflowMenu(
+                                expanded = menuOpen,
+                                onExpandedChange = { menuOpen = it },
+                                nightMode = ready.nightMode,
+                                onGoToPage = { goToPageOpen = true },
+                                onToggleNightMode = onToggleNightMode,
+                            )
                         }
                     },
                 )
@@ -167,8 +175,59 @@ internal fun ReaderScreen(
                     onPositionChanged = onPositionChanged,
                     goToPageOpen = goToPageOpen,
                     onGoToPageOpenChange = { goToPageOpen = it },
+                    pageJump = pageJump,
+                    onPageJumpHandled = { pageJump = null },
                 )
             }
+        }
+    }
+
+    if (tocOpen && ready != null) {
+        TableOfContentsSheet(
+            outline = ready.outline,
+            onSelect = { entry ->
+                tocOpen = false
+                pageJump = PageJump(entry.pageIndex, entry.topPt)
+            },
+            onDismiss = { tocOpen = false },
+        )
+    }
+}
+
+/** Less frequent actions, so the title keeps its room in the top bar. */
+@Composable
+private fun OverflowMenu(
+    expanded: Boolean,
+    onExpandedChange: (Boolean) -> Unit,
+    nightMode: Boolean,
+    onGoToPage: () -> Unit,
+    onToggleNightMode: () -> Unit,
+) {
+    Box {
+        IconButton(onClick = { onExpandedChange(true) }) {
+            Icon(
+                painter = painterResource(R.drawable.ic_more_vert),
+                contentDescription = stringResource(R.string.reader_more_options),
+            )
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { onExpandedChange(false) }) {
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.reader_go_to_page)) },
+                leadingIcon = { Icon(painterResource(R.drawable.ic_tag), contentDescription = null) },
+                onClick = {
+                    onExpandedChange(false)
+                    onGoToPage()
+                },
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.reader_night_mode)) },
+                leadingIcon = { Icon(painterResource(R.drawable.ic_dark_mode), contentDescription = null) },
+                trailingIcon = { Checkbox(checked = nightMode, onCheckedChange = null) },
+                onClick = {
+                    onExpandedChange(false)
+                    onToggleNightMode()
+                },
+            )
         }
     }
 }

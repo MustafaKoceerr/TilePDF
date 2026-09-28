@@ -23,6 +23,8 @@ minSdk 29
   highlights drawn over the page
 - Fast-scroll thumb and a page indicator while scrolling; jump to any page
   by number
+- Table of contents from the PDF outline: nested entries, jumps to the
+  exact heading position (XYZ, named and GoTo destinations)
 - Night mode by colour inversion (no re-rendering)
 - Reopens a document exactly where you left it: page, offset within the page,
   zoom and horizontal pan
