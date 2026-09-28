@@ -19,7 +19,11 @@ class LibraryViewModel @Inject constructor(
 ) : ViewModel() {
 
     val uiState: StateFlow<LibraryUiState> = libraryRepository.observeDocuments()
-        .map(LibraryUiState::Success)
+        .map { documents ->
+            LibraryUiState.Success(
+                documents.map { LibraryItem(it, documentRepository.hasAccess(it.uri)) }
+            )
+        }
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5_000),

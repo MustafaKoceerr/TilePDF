@@ -96,10 +96,14 @@ fun PdfPageList(
 
     BoxWithConstraints(modifier.fillMaxSize()) {
         val draftWidthPx = (constraints.maxWidth * DRAFT_SCALE).toInt()
-        // TODO: also restore pageOffsetFraction and zoom.
-        val listState = rememberLazyListState(initialFirstVisibleItemIndex = initialPosition.pageIndex)
-        val zoomState = rememberZoomState()
         val density = LocalDensity.current
+        val zoomState = rememberZoomState(initialScale = initialPosition.zoom)
+        val listState = rememberLazyListState(
+            initialFirstVisibleItemIndex = initialPosition.pageIndex,
+            initialFirstVisibleItemScrollOffset = remember {
+                initialScrollOffset(initialPosition, pageSizes, constraints.maxWidth, zoomState.scale, density)
+            },
+        )
 
         LaunchedEffect(listState, zoomState) {
             snapshotFlow {
@@ -152,6 +156,25 @@ fun PdfPageList(
             }
         }
     }
+}
+
+/**
+ * Pixel offset into the saved page, computed before the first layout. The
+ * page height is derived exactly as the list will lay it out: list width
+ * `round(W * zoom)`, minus the zoomed horizontal padding, at the page's
+ * aspect ratio.
+ */
+private fun initialScrollOffset(
+    position: ReadingPosition,
+    pageSizes: List<PageSize>,
+    viewportWidth: Int,
+    zoom: Float,
+    density: Density,
+): Int {
+    val pageSize = pageSizes.getOrNull(position.pageIndex) ?: return 0
+    val paddingPx = with(density) { (PAGE_GAP * zoom).roundToPx() }
+    val pageWidth = (viewportWidth * zoom).roundToInt() - 2 * paddingPx
+    return (position.pageOffsetFraction * pageWidth / pageSize.aspectRatio).roundToInt()
 }
 
 /**

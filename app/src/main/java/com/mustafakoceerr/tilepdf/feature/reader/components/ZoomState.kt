@@ -52,10 +52,13 @@ private const val DOUBLE_TAP_SCALE = 2.5f
  * All positions are in viewport pixels. The preview maps a viewport point `p`
  * to `p * previewZoom + previewOffset` (transform origin at the top-left).
  */
-class ZoomState(private val flingDecay: DecayAnimationSpec<Float>) {
+class ZoomState(
+    private val flingDecay: DecayAnimationSpec<Float>,
+    initialScale: Float = MIN_SCALE,
+) {
 
     /** Committed zoom; the content is laid out at `viewportWidth * scale`. */
-    var scale by mutableFloatStateOf(MIN_SCALE)
+    var scale by mutableFloatStateOf(initialScale.coerceIn(MIN_SCALE, MAX_SCALE))
         private set
 
     /** Horizontal scroll of the zoomed content, in `0..maxPanX`. */
@@ -146,9 +149,9 @@ class ZoomState(private val flingDecay: DecayAnimationSpec<Float>) {
 data class ZoomCommit(val zoom: Float, val anchorY: Float)
 
 @Composable
-fun rememberZoomState(): ZoomState {
+fun rememberZoomState(initialScale: Float = MIN_SCALE): ZoomState {
     val decay = rememberSplineBasedDecay<Float>()
-    return remember(decay) { ZoomState(decay) }
+    return remember(decay) { ZoomState(decay, initialScale) }
 }
 
 /**

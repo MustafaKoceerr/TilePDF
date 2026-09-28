@@ -84,7 +84,7 @@ internal fun LibraryScreen(
             when (uiState) {
                 LibraryUiState.Loading -> CircularProgressIndicator()
                 is LibraryUiState.Success ->
-                    if (uiState.documents.isEmpty()) {
+                    if (uiState.items.isEmpty()) {
                         Text(
                             text = stringResource(R.string.library_empty),
                             style = MaterialTheme.typography.bodyLarge,
@@ -92,7 +92,7 @@ internal fun LibraryScreen(
                             modifier = Modifier.padding(32.dp),
                         )
                     } else {
-                        DocumentList(uiState.documents, onOpenDocument, onRemove)
+                        DocumentList(uiState.items, onOpenDocument, onRemove)
                     }
             }
         }
@@ -101,22 +101,30 @@ internal fun LibraryScreen(
 
 @Composable
 private fun DocumentList(
-    documents: List<LibraryDocument>,
+    items: List<LibraryItem>,
     onOpenDocument: (uri: String) -> Unit,
     onRemove: (uri: String) -> Unit,
 ) {
     LazyColumn(Modifier.fillMaxSize()) {
-        items(documents, key = { it.uri }) { document ->
+        items(items, key = { it.document.uri }) { item ->
+            val document = item.document
             ListItem(
                 headlineContent = { Text(document.displayName) },
                 supportingContent = {
-                    Text(
-                        stringResource(
-                            R.string.library_page_progress,
-                            document.position.pageIndex + 1,
-                            document.pageCount,
+                    if (item.isAccessible) {
+                        Text(
+                            stringResource(
+                                R.string.library_page_progress,
+                                document.position.pageIndex + 1,
+                                document.pageCount,
+                            )
                         )
-                    )
+                    } else {
+                        Text(
+                            text = stringResource(R.string.library_no_access),
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
                 },
                 trailingContent = {
                     IconButton(onClick = { onRemove(document.uri) }) {
@@ -139,8 +147,14 @@ private fun LibraryScreenPreview() {
         LibraryScreen(
             uiState = LibraryUiState.Success(
                 listOf(
-                    LibraryDocument("content://1", "Kotlin in Action.pdf", 360, ReadingPosition(41), 0),
-                    LibraryDocument("content://2", "Clean Architecture.pdf", 432, ReadingPosition(), 0),
+                    LibraryItem(
+                        LibraryDocument("content://1", "Kotlin in Action.pdf", 360, ReadingPosition(41), 0),
+                        isAccessible = true,
+                    ),
+                    LibraryItem(
+                        LibraryDocument("content://2", "Clean Architecture.pdf", 432, ReadingPosition(), 0),
+                        isAccessible = false,
+                    ),
                 )
             ),
             onDocumentPicked = {},
