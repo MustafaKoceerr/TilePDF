@@ -1,0 +1,179 @@
+# TilePDF
+
+An ad-free PDF reader for Android with its own tile-based rendering engine.
+
+TilePDF doesn't wrap a ready-made viewer (`androidx.pdf`, `PdfViewerFragment`).
+It builds the viewer on top of the platform's low-level `PdfRenderer`:
+viewport math, 512 px tiles, a memory-bounded cache, PDF-point to screen-pixel
+mapping for search highlights, and two interchangeable text-extraction
+strategies chosen at runtime.
+
+**Stack:** Kotlin · Jetpack Compose · Material 3 · Coroutines/Flow · Hilt ·
+Room · DataStore · Navigation Compose (type-safe) · PdfBox-Android ·
+minSdk 29
+
+## Features
+
+- Open any PDF through the Storage Access Framework; recent documents are kept
+  in a local library (no cloud, no accounts)
+- Pinch-to-zoom (1x–5x), double-tap zoom, horizontal pan with fling
+- Sharp text at every zoom level via tiles, with an instant low-resolution
+  draft underneath
+- Full-text search with live results, a match counter, previous/next, and
+  highlights drawn over the page
+- Night mode by colour inversion (no re-rendering)
+- Reopens a document exactly where you left it: page, offset within the page,
+  and zoom
+
+## Architecture
+
+Single module, layered by package, following
+[Modern Android Development](https://developer.android.com/topic/architecture)
+guidance with unidirectional data flow:
+
+```
+feature/   UI layer      Screen (stateful → stateless) · ViewModel · UiState
+   │         state flows up as StateFlow<UiState>; events go down as calls
+   ▼
+domain/    OpenDocumentUseCase — open + record in library + restore position
+   ▼
+data/      Repositories behind interfaces
+             DocumentRepository     SAF access, persisted grants
+             LibraryRepository      Room
+             ReaderPreferences      DataStore
+             TextSearchRepository   PdfTextProvider strategy + text cache
+   ▼
+core/      Rendering engine and geometry, UI-framework independent
+             pdf/       PdfDocument: PdfRenderer serialized on one thread
+             render/    TileGrid, PageRenderer, TiledPageImageSource,
+                        BitmapCache, BitmapPool
+             geometry/  Viewport, PageLayout, CoordinateMapper
+             text/      TextSearcher
+model/     Plain data shared across layers
+```
+
+Each feature owns its type-safe route and `NavGraphBuilder` extension.
+Stateless screens take `UiState` plus callbacks, so they render in previews and
+tests without a ViewModel.
+
+## Rendering pipeline
+
+```
+ pinch in progress ──► graphicsLayer transform of what's already drawn (no work)
+        │ fingers up
+        ▼
+ commit zoom ──► pages re-laid out at the new width, scroll anchored in the
+        │        same frame (requestScrollToItem) so nothing jumps
+        ▼
+ visible pages (LazyListLayoutInfo + zoom + pan) ──► Viewport ──► page-local
+        │                                                         visible region
+        ▼
+ TileGrid ──► 512 px tiles covering the region + 1-tile prefetch, centre first
+        │
+        ▼
+ TiledPageImageSource ──► LRU hit? draw. Miss? render on the PDF thread.
+                          Tiles that left the screen: job cancelled.
+```
+
+- **Two layers per page.** A half-resolution draft of the whole page appears
+  immediately; sharp tiles are drawn over it as they arrive. A missing tile
+  never leaves a hole.
+- **Fixed render levels (1, 1.5, 2, 3, 4, 5x).** Tiles render at the smallest
+  level at or above the zoom, so they are only ever scaled down (always sharp),
+  and small pinch adjustments reuse cached tiles.
+- **Level changes don't flash.** The previous level's tiles stay under the new
+  ones until the new level covers the page.
+- **Tile draws happen in the draw phase.** A tile arriving redraws one page
+  without recomposition. Tile edges are rounded independently so neighbours
+  share edges exactly (no hairline seams).
+- **One PDF thread.** `PdfRenderer` isn't thread-safe and allows one open page,
+  so all access goes through a single-threaded dispatcher plus a mutex.
+
+## Memory strategy
+
+| Holder | Bound | Purpose |
+|---|---|---|
+| On-screen tiles | what's visible | Snapshot state the UI draws |
+| Tile LRU cache | `min(maxMemory / 4, 96 MB)`, by bytes | Instant scroll-back and zoom-back |
+| Draft cache | 24 MB | Whole-page placeholders |
+| Bitmap pool | 16 tiles | Reuse evicted 1 MB bitmaps instead of allocating |
+
+- An evicted bitmap that is still on screen isn't pooled until it leaves the
+  screen.
+- Pooled bitmaps wait 100 ms before reuse, so the RenderThread never samples a
+  bitmap mid-overwrite.
+- `onTrimMemory` drops everything that isn't on screen.
+
+## Coordinate spaces
+
+Search highlights must land on the rendered glyphs at any zoom. Everything
+meets in one convention: **PDF points, top-left origin, relative to the crop
+box, page rotation applied.**
+
+- Text providers produce boxes in that space. PdfBox's `*DirAdj` coordinates
+  already are; PDFium's `searchText` bounds already are.
+- `CoordinateMapper` converts points to page pixels with the same
+  points-to-pixels factor the renderer uses (`PageSize.scaleForWidth`), so
+  highlights and tiles can't drift apart.
+- Screen placement reuses the list's own rounding (`Dp.roundToPx`,
+  `round(width × zoom)`) rather than approximating it.
+
+## Text extraction: two strategies, one interface
+
+`PdfTextProvider` has two implementations, chosen in `TextModule` by API level:
+
+- **`PdfBoxTextProvider`** — works everywhere (API 29+). Extracts every
+  character with its box once, caches it, and searches with `TextSearcher`
+  (case-insensitive, Turkish İ/ı/I/i folded together, line breaks match
+  spaces).
+- **`NativePdfTextProvider`** — API 35+, `PdfRenderer.Page.searchText`
+  (PDFium). No extra library, native search.
+
+An instrumented benchmark (`TextProviderBenchmarkTest`) runs both on the same
+80-page, text-dense document with 5 queries. It also asserts that **both find
+the same 3,310 matches at the same positions**, which verifies that the
+geometry layer is independent of the text source.
+
+API 37 emulator, three runs:
+
+| Provider | Open | First search (5 queries, includes extraction) | Repeated search (5 queries) |
+|---|---|---|---|
+| PdfBox | 57–58 ms | 1157–1423 ms | **49–55 ms** |
+| Native | 29–88 ms | **259–354 ms** | 251–433 ms |
+
+Native is about 4x faster for the first search because it doesn't copy text
+into Kotlin. PdfBox's per-page cache makes every later search 5–8x faster.
+Native search also doesn't apply Turkish i-folding.
+
+## Testing
+
+```bash
+./gradlew testDebugUnitTest            # JVM: zoom math, viewport, tile grid,
+                                       # text search, coordinate mapping
+./gradlew connectedDebugAndroidTest    # device: PdfRenderer, tiles, pool,
+                                       # PdfBox extraction, benchmark (API 35+)
+```
+
+Instrumented tests to note:
+
+- **Stitched tiles match a whole-page render** pixel for pixel (within
+  anti-aliasing tolerance).
+- **The tile source's fallback, cache and pool behaviour** is tested on a real
+  PDF, including a regression test for render jobs that finish without
+  suspending.
+- **PdfBox boxes land at known positions** in the generated sample PDF.
+
+Test PDFs are generated deterministically and live in
+`app/src/androidTest/assets`.
+
+## Known limitations
+
+- Password-protected PDFs aren't supported.
+- Scanned (image-only) PDFs have no text, so search finds nothing (no OCR).
+- Horizontal pan isn't saved with the reading position.
+- Library entries have no page thumbnails yet.
+
+## Out of scope, on purpose
+
+Cloud sync, accounts, payments and EPUB. The project is meant to go deep on
+rendering rather than wide on features.
