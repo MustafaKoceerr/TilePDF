@@ -1,8 +1,15 @@
 <resources>
     <string name="app_name">TilePDF</string>
-    <string name="home_open_pdf">PDF Aç</string>
     <string name="navigate_back">Geri</string>
+
+    <string name="library_title">Kütüphane</string>
+    <string name="library_open_pdf">PDF Aç</string>
+    <string name="library_empty">Henüz bir PDF açmadın.\nBaşlamak için \"PDF Aç\"a dokun.</string>
+    <string name="library_page_progress">Sayfa %1$d / %2$d</string>
+    <string name="library_remove">Kütüphaneden kaldır</string>
+
     <string name="reader_page_description">Sayfa %1$d</string>
+    <string name="reader_night_mode">Gece modu</string>
     <string name="reader_error_not_found">Dosya bulunamadı veya erişim izni yok.</string>
     <string name="reader_error_password">Şifreli PDF\'ler henüz desteklenmiyor.</string>
     <string name="reader_error_corrupt">PDF açılamadı; dosya bozuk olabilir.</string>
