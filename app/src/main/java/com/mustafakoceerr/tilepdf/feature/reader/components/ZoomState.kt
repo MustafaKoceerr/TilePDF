@@ -68,6 +68,9 @@ class ZoomState(private val flingDecay: DecayAnimationSpec<Float>) {
     var previewOffset by mutableStateOf(Offset.Zero)
         private set
 
+    /** True mid-gesture, while the content is only transformed, not laid out. */
+    val isPreviewing: Boolean get() = previewZoom != 1f || previewOffset != Offset.Zero
+
     /** Updated from layout; not observable state since only gestures read it. */
     var viewportWidth = 0
         internal set

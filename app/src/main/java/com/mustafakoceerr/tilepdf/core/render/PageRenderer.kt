@@ -10,22 +10,39 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
-/** Renders a whole page into a single bitmap scaled to a target width. */
+/** Renders whole pages or single tiles of a page into bitmaps. */
 class PageRenderer @Inject constructor(
     @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) {
 
-    suspend fun render(document: PdfDocument, pageIndex: Int, targetWidthPx: Int): Bitmap {
+    /** The whole page, scaled to [targetWidthPx]. */
+    suspend fun renderPage(document: PdfDocument, pageIndex: Int, targetWidthPx: Int): Bitmap {
         val pageSize = document.pageSizes[pageIndex]
         val scale = pageSize.scaleForWidth(targetWidthPx)
-        val heightPx = pageSize.heightForWidth(targetWidthPx)
-
-        val bitmap = withContext(ioDispatcher) {
-            // PDF pages have a transparent background; paint it white first.
-            createBitmap(targetWidthPx, heightPx, Bitmap.Config.ARGB_8888)
-                .apply { eraseColor(Color.WHITE) }
-        }
+        val bitmap = whiteBitmap(targetWidthPx, pageSize.heightForWidth(targetWidthPx))
         document.render(pageIndex, bitmap, Matrix().apply { setScale(scale, scale) })
         return bitmap
+    }
+
+    /**
+     * Only the part of the page covered by [tile]. The page is scaled to the
+     * tile's render width, then shifted so the tile's top-left corner lands
+     * at the bitmap origin; PdfRenderer clips everything else.
+     */
+    suspend fun renderTile(document: PdfDocument, tile: Tile): Bitmap {
+        val key = tile.key
+        val scale = document.pageSizes[key.pageIndex].scaleForWidth(key.renderWidth)
+        val bitmap = whiteBitmap(tile.bounds.width, tile.bounds.height)
+        val transform = Matrix().apply {
+            setScale(scale, scale)
+            postTranslate(-tile.bounds.left.toFloat(), -tile.bounds.top.toFloat())
+        }
+        document.render(key.pageIndex, bitmap, transform)
+        return bitmap
+    }
+
+    // PDF pages have a transparent background; paint it white first.
+    private suspend fun whiteBitmap(width: Int, height: Int): Bitmap = withContext(ioDispatcher) {
+        createBitmap(width, height, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.WHITE) }
     }
 }

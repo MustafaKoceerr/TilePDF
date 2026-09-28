@@ -4,7 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.toRoute
-import com.mustafakoceerr.tilepdf.core.render.DraftPageImageSource
+import com.mustafakoceerr.tilepdf.core.render.TiledPageImageSource
 import com.mustafakoceerr.tilepdf.core.render.PageRenderer
 import com.mustafakoceerr.tilepdf.data.library.LibraryRepository
 import com.mustafakoceerr.tilepdf.data.preferences.ReaderPreferencesRepository
@@ -72,7 +72,10 @@ class ReaderViewModel @Inject constructor(
         viewModelScope.launch {
             documentState.value = try {
                 val opened = openDocument(uri)
-                DocumentState.Opened(opened, DraftPageImageSource(opened.document, pageRenderer))
+                DocumentState.Opened(
+                    opened = opened,
+                    pageImages = TiledPageImageSource(opened.document, pageRenderer, viewModelScope),
+                )
             } catch (_: FileNotFoundException) {
                 DocumentState.Failed(ReaderError.NotFound)
             } catch (_: SecurityException) {
@@ -122,7 +125,7 @@ class ReaderViewModel @Inject constructor(
         data class Failed(val reason: ReaderError) : DocumentState
         data class Opened(
             val opened: OpenedDocument,
-            val pageImages: DraftPageImageSource,
+            val pageImages: TiledPageImageSource,
         ) : DocumentState
     }
 }

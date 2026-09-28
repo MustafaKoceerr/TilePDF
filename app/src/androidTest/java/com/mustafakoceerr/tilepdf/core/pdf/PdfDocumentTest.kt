@@ -46,7 +46,7 @@ class PdfDocumentTest {
 
     @Test
     fun rendersPageAtTargetWidthWithContent() = runBlocking {
-        val bitmap = pageRenderer.render(document, pageIndex = 0, targetWidthPx = 400)
+        val bitmap = pageRenderer.renderPage(document, pageIndex = 0, targetWidthPx = 400)
 
         assertEquals(400, bitmap.width)
         assertEquals(566, bitmap.height) // 842 * (400 / 595), rounded
@@ -60,7 +60,7 @@ class PdfDocumentTest {
     @Test
     fun concurrentRendersAreSerialized() = runBlocking {
         val bitmaps = (0 until 3).map { index ->
-            async { pageRenderer.render(document, index, 200) }
+            async { pageRenderer.renderPage(document, index, 200) }
         }.map { it.await() }
 
         assertEquals(3, bitmaps.size)
