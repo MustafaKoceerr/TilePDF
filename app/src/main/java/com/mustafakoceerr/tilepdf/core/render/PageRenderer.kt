@@ -9,7 +9,6 @@ import com.mustafakoceerr.tilepdf.di.IoDispatcher
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
-import kotlin.math.roundToInt
 
 /** Renders a whole page into a single bitmap scaled to a target width. */
 class PageRenderer @Inject constructor(
@@ -18,8 +17,8 @@ class PageRenderer @Inject constructor(
 
     suspend fun render(document: PdfDocument, pageIndex: Int, targetWidthPx: Int): Bitmap {
         val pageSize = document.pageSizes[pageIndex]
-        val scale = targetWidthPx.toFloat() / pageSize.widthPt
-        val heightPx = (pageSize.heightPt * scale).roundToInt().coerceAtLeast(1)
+        val scale = pageSize.scaleForWidth(targetWidthPx)
+        val heightPx = pageSize.heightForWidth(targetWidthPx)
 
         val bitmap = withContext(ioDispatcher) {
             // PDF pages have a transparent background; paint it white first.
