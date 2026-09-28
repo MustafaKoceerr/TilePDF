@@ -27,9 +27,15 @@ abstract class DocumentDao {
 
     @Query(
         "UPDATE documents SET lastPage = :page, pageOffsetFraction = :offsetFraction, " +
-            "zoom = :zoom WHERE uri = :uri"
+            "zoom = :zoom, panFraction = :panFraction WHERE uri = :uri"
     )
-    abstract suspend fun updatePosition(uri: String, page: Int, offsetFraction: Float, zoom: Float)
+    abstract suspend fun updatePosition(
+        uri: String,
+        page: Int,
+        offsetFraction: Float,
+        zoom: Float,
+        panFraction: Float,
+    )
 
     @Query("DELETE FROM documents WHERE uri = :uri")
     abstract suspend fun delete(uri: String)

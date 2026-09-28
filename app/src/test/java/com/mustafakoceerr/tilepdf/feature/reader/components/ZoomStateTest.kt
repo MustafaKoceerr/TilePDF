@@ -84,4 +84,32 @@ class ZoomStateTest {
         assertEquals(300f, state.panBy(1000f), DELTA) // only 300 left to the edge
         assertEquals(0f, state.panX, DELTA)
     }
+
+    @Test
+    fun panFractionIsRelativeToPanRange() {
+        assertEquals(0f, state.panFraction, DELTA) // 1x: nothing to pan
+
+        state.zoomTo(3f, Offset.Zero) // pan range 0..2000
+        state.panBy(-500f)
+        assertEquals(0.25f, state.panFraction, DELTA)
+    }
+
+    @Test
+    fun savedPanIsRestoredOnceWidthIsKnown() {
+        // Width unknown at construction, as when the layout hasn't run yet.
+        val restored = ZoomState(exponentialDecay(), initialScale = 3f, initialPanFraction = 0.25f)
+        assertEquals(0f, restored.panX, DELTA)
+
+        // A different screen width than when saved: the fraction still holds.
+        restored.viewportWidth = 800
+        assertEquals(400f, restored.panX, DELTA) // 0.25 * 800 * (3 - 1)
+        restored.viewportWidth = 1000 // later layouts don't re-apply it
+        assertEquals(400f, restored.panX, DELTA)
+    }
+
+    @Test
+    fun savedPanAppliesImmediatelyWhenWidthIsKnownUpFront() {
+        val restored = ZoomState(exponentialDecay(), 2f, initialPanFraction = 1f, initialViewportWidth = 1000)
+        assertEquals(1000f, restored.panX, DELTA)
+    }
 }

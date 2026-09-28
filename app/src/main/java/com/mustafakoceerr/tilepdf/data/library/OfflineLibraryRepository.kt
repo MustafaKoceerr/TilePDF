@@ -22,7 +22,13 @@ class OfflineLibraryRepository @Inject constructor(
         dao.get(uri)?.asExternalModel()?.position
 
     override suspend fun saveReadingPosition(uri: String, position: ReadingPosition) =
-        dao.updatePosition(uri, position.pageIndex, position.pageOffsetFraction, position.zoom)
+        dao.updatePosition(
+            uri,
+            position.pageIndex,
+            position.pageOffsetFraction,
+            position.zoom,
+            position.panFraction,
+        )
 
     override suspend fun remove(uri: String) = dao.delete(uri)
 }

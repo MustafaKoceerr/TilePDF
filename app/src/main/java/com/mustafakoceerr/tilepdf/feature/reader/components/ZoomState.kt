@@ -55,6 +55,9 @@ private const val DOUBLE_TAP_SCALE = 2.5f
 class ZoomState(
     private val flingDecay: DecayAnimationSpec<Float>,
     initialScale: Float = MIN_SCALE,
+    initialPanFraction: Float = 0f,
+    /** When known up front, lets the saved pan apply before the first frame. */
+    initialViewportWidth: Int = 0,
 ) {
 
     /** Committed zoom; the content is laid out at `viewportWidth * scale`. */
@@ -74,9 +77,27 @@ class ZoomState(
     /** True mid-gesture, while the content is only transformed, not laid out. */
     val isPreviewing: Boolean get() = previewZoom != 1f || previewOffset != Offset.Zero
 
+    /** Applied once the viewport width, and so the pan range, is known. */
+    private var pendingPanFraction: Float? = initialPanFraction.takeIf { it > 0f }
+
     /** Updated from layout; not observable state since only gestures read it. */
     var viewportWidth = 0
-        internal set
+        internal set(value) {
+            field = value
+            pendingPanFraction?.let { fraction ->
+                if (value > 0) {
+                    pendingPanFraction = null
+                    panX = fraction.coerceIn(0f, 1f) * maxPanX
+                }
+            }
+        }
+
+    init {
+        viewportWidth = initialViewportWidth
+    }
+
+    /** [panX] as a fraction of the pan range; 0 when there's nothing to pan. */
+    val panFraction: Float get() = if (maxPanX > 0f) panX / maxPanX else 0f
 
     private val maxPanX: Float get() = viewportWidth * (scale - 1f)
 
@@ -149,9 +170,13 @@ class ZoomState(
 data class ZoomCommit(val zoom: Float, val anchorY: Float)
 
 @Composable
-fun rememberZoomState(initialScale: Float = MIN_SCALE): ZoomState {
+fun rememberZoomState(
+    initialScale: Float = MIN_SCALE,
+    initialPanFraction: Float = 0f,
+    initialViewportWidth: Int = 0,
+): ZoomState {
     val decay = rememberSplineBasedDecay<Float>()
-    return remember(decay) { ZoomState(decay, initialScale) }
+    return remember(decay) { ZoomState(decay, initialScale, initialPanFraction, initialViewportWidth) }
 }
 
 /**

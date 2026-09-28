@@ -23,7 +23,7 @@ minSdk 29
   highlights drawn over the page
 - Night mode by colour inversion (no re-rendering)
 - Reopens a document exactly where you left it: page, offset within the page,
-  and zoom
+  zoom and horizontal pan
 
 ## Architecture
 
@@ -179,7 +179,6 @@ Test PDFs are generated deterministically and live in
 
 - Password-protected PDFs aren't supported.
 - Scanned (image-only) PDFs have no text, so search finds nothing (no OCR).
-- Horizontal pan isn't saved with the reading position.
 - Library entries have no page thumbnails.
 
 ## Out of scope, on purpose

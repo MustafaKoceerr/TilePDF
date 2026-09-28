@@ -97,7 +97,11 @@ fun PdfPageList(
     BoxWithConstraints(modifier.fillMaxSize()) {
         val draftWidthPx = (constraints.maxWidth * DRAFT_SCALE).toInt()
         val density = LocalDensity.current
-        val zoomState = rememberZoomState(initialScale = initialPosition.zoom)
+        val zoomState = rememberZoomState(
+            initialScale = initialPosition.zoom,
+            initialPanFraction = initialPosition.panFraction,
+            initialViewportWidth = constraints.maxWidth,
+        )
         val listState = rememberLazyListState(
             initialFirstVisibleItemIndex = initialPosition.pageIndex,
             initialFirstVisibleItemScrollOffset = remember {
@@ -114,6 +118,7 @@ fun PdfPageList(
                         listState.firstVisibleItemScrollOffset.toFloat() / it.size
                     } ?: 0f,
                     zoom = zoomState.scale,
+                    panFraction = zoomState.panFraction,
                 )
             }.collect(onPositionChanged)
         }
