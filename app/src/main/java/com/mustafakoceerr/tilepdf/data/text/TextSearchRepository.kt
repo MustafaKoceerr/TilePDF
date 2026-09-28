@@ -12,6 +12,12 @@ interface TextSearchRepository {
      */
     fun search(uri: String, pageCount: Int, query: String): Flow<List<SearchMatch>>
 
+    /**
+     * Opens [uri]'s text provider ahead of the first search, so any
+     * background extraction can start while the user is still reading.
+     */
+    suspend fun prepare(uri: String)
+
     /** Frees the cached text of [uri], e.g. when its reader closes. */
     suspend fun release(uri: String)
 }

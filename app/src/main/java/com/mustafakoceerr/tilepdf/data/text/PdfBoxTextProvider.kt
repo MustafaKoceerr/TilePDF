@@ -18,6 +18,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.FileNotFoundException
+import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 
 /**
@@ -32,8 +33,16 @@ class PdfBoxTextProvider private constructor(
 ) : PdfTextProvider {
 
     private val mutex = Mutex()
-    private val pages = HashMap<Int, PageText>()
+
+    // Concurrent so cachedPageText can read without waiting on the mutex,
+    // which an ongoing extraction may be holding.
+    private val pages = ConcurrentHashMap<Int, PageText>()
     private var closed = false
+
+    val pageCount: Int = document.numberOfPages
+
+    /** The page's text if already extracted, without waiting or extracting. */
+    fun cachedPageText(pageIndex: Int): PageText? = pages[pageIndex]
 
     override suspend fun pageText(pageIndex: Int): PageText = mutex.withLock {
         check(!closed) { "Provider is closed" }
@@ -98,7 +107,7 @@ class PdfBoxTextProvider private constructor(
         @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher,
     ) : PdfTextProvider.Factory {
 
-        override suspend fun create(uri: String): PdfTextProvider = withContext(ioDispatcher) {
+        override suspend fun create(uri: String): PdfBoxTextProvider = withContext(ioDispatcher) {
             PDFBoxResourceLoader.init(context)
             val document = context.contentResolver.openInputStream(uri.toUri())?.use {
                 // Buffer the file on disk rather than the heap: PDFs can be large.

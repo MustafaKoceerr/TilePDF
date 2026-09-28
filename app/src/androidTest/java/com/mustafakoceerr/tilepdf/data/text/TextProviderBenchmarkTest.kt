@@ -45,23 +45,31 @@ class TextProviderBenchmarkTest {
 
     @Test
     fun providersAgreeAndReportTimings(): Unit = runBlocking {
-        val pdfBox = measure("PdfBox", PdfBoxTextProvider.Factory(context, Dispatchers.IO))
-        val native = measure("Native", NativePdfTextProvider.Factory(context, Dispatchers.IO))
+        val pdfBoxFactory = PdfBoxTextProvider.Factory(context, Dispatchers.IO)
+        val nativeFactory = NativePdfTextProvider.Factory(context, Dispatchers.IO)
+        val pdfBox = measure("PdfBox", pdfBoxFactory)
+        val native = measure("Native", nativeFactory)
+        val hybrid = measure("Hybrid", HybridTextProvider.Factory(nativeFactory, pdfBoxFactory, Dispatchers.IO)) {
+            (it as HybridTextProvider).awaitWarmUp()
+        }
 
-        for (query in QUERIES) {
-            val a = pdfBox.matches.getValue(query)
-            val b = native.matches.getValue(query)
-            assertEquals("match count for '$query'", a.size, b.size)
-            a.zip(b).forEach { (x, y) ->
-                assertEquals(x.pageIndex, y.pageIndex)
-                assertTrue("'$query' p${x.pageIndex}: $x vs $y", samePlace(x.rects.first(), y.rects.first()))
+        for (other in listOf(native, hybrid)) {
+            for (query in QUERIES) {
+                val a = pdfBox.matches.getValue(query)
+                val b = other.matches.getValue(query)
+                assertEquals("${other.name} match count for '$query'", a.size, b.size)
+                a.zip(b).forEach { (x, y) ->
+                    assertEquals(x.pageIndex, y.pageIndex)
+                    assertTrue("'$query' p${x.pageIndex}: $x vs $y", samePlace(x.rects.first(), y.rects.first()))
+                }
             }
         }
         Log.i(TAG, "| Provider | Open | Cold search (5 queries) | Warm search (5 queries) |")
         Log.i(TAG, "|---|---|---|---|")
-        listOf(pdfBox, native).forEach {
+        listOf(pdfBox, native, hybrid).forEach {
             Log.i(TAG, "| ${it.name} | ${it.openMs} ms | ${it.coldMs} ms | ${it.warmMs} ms |")
         }
+        Log.i(TAG, "Hybrid fully warmed ${hybrid.warmUpMs} ms after opening")
         Log.i(TAG, "matches per query: " + QUERIES.joinToString { "$it=${pdfBox.matches.getValue(it).size}" })
     }
 
@@ -71,16 +79,28 @@ class TextProviderBenchmarkTest {
         val coldMs: Long,
         val warmMs: Long,
         val matches: Map<String, List<SearchMatch>>,
+        val warmUpMs: Long,
     )
 
-    private suspend fun measure(name: String, factory: PdfTextProvider.Factory): Result {
+    /**
+     * Cold = first searches right after opening. [awaitReady] runs between
+     * cold and warm, for providers that finish preparing in the background.
+     */
+    private suspend fun measure(
+        name: String,
+        factory: PdfTextProvider.Factory,
+        awaitReady: suspend (PdfTextProvider) -> Unit = {},
+    ): Result {
         lateinit var provider: PdfTextProvider
+        val openedAt = System.nanoTime()
         val open = measureNanoTime { provider = factory.create(uri) }
         val matches = LinkedHashMap<String, List<SearchMatch>>()
         val cold = measureNanoTime { QUERIES.forEach { matches[it] = searchAll(provider, it) } }
+        awaitReady(provider)
+        val warmUp = System.nanoTime() - openedAt
         val warm = measureNanoTime { QUERIES.forEach { searchAll(provider, it) } }
         provider.close()
-        return Result(name, open.ms, cold.ms, warm.ms, matches)
+        return Result(name, open.ms, cold.ms, warm.ms, matches, warmUp.ms)
     }
 
     private suspend fun searchAll(provider: PdfTextProvider, query: String) =

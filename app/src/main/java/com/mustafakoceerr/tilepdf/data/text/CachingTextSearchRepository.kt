@@ -35,6 +35,10 @@ class CachingTextSearchRepository @Inject constructor(
         }
     }.flowOn(ioDispatcher)
 
+    override suspend fun prepare(uri: String) {
+        provider(uri)
+    }
+
     override suspend fun release(uri: String) = mutex.withLock {
         val (openUri, provider) = current ?: return@withLock
         if (openUri == uri) {

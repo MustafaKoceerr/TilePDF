@@ -15,6 +15,7 @@ import com.mustafakoceerr.tilepdf.domain.OpenedDocument
 import com.mustafakoceerr.tilepdf.feature.reader.navigation.ReaderRoute
 import com.mustafakoceerr.tilepdf.model.ReadingPosition
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -79,6 +80,7 @@ class ReaderViewModel @Inject constructor(
         viewModelScope.launch {
             documentState.value = try {
                 val opened = openDocument(uri)
+                prepareSearch()
                 DocumentState.Opened(
                     opened = opened,
                     pageImages = TiledPageImageSource(opened.document, pageRenderer, viewModelScope),
@@ -155,6 +157,16 @@ class ReaderViewModel @Inject constructor(
                     }
                 searchState.update { it.copy(isSearching = false) }
             }
+    }
+
+    private fun prepareSearch() = viewModelScope.launch {
+        // Best effort: if text can't be read, searching just finds nothing.
+        try {
+            textSearchRepository.prepare(uri)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+        }
     }
 
     @OptIn(FlowPreview::class)

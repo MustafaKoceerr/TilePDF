@@ -1,7 +1,7 @@
 package com.mustafakoceerr.tilepdf.di
 
 import android.os.Build
-import com.mustafakoceerr.tilepdf.data.text.NativePdfTextProvider
+import com.mustafakoceerr.tilepdf.data.text.HybridTextProvider
 import com.mustafakoceerr.tilepdf.data.text.PdfBoxTextProvider
 import com.mustafakoceerr.tilepdf.data.text.PdfTextProvider
 import dagger.Module
@@ -18,7 +18,8 @@ object TextModule {
     @Provides
     fun providesTextProviderFactory(
         pdfBox: Provider<PdfBoxTextProvider.Factory>,
-        native: Provider<NativePdfTextProvider.Factory>,
+        hybrid: Provider<HybridTextProvider.Factory>,
     ): PdfTextProvider.Factory =
-        if (Build.VERSION.SDK_INT >= 35) native.get() else pdfBox.get()
+        // Native search only exists from API 35; below it PdfBox does everything.
+        if (Build.VERSION.SDK_INT >= 35) hybrid.get() else pdfBox.get()
 }
