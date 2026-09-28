@@ -21,6 +21,8 @@ minSdk 29
   draft underneath
 - Full-text search with live results, a match counter, previous/next, and
   highlights drawn over the page
+- Fast-scroll thumb and a page indicator while scrolling; jump to any page
+  by number
 - Night mode by colour inversion (no re-rendering)
 - Reopens a document exactly where you left it: page, offset within the page,
   zoom and horizontal pan

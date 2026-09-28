@@ -18,6 +18,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
@@ -78,6 +81,7 @@ internal fun ReaderScreen(
 ) {
     val ready = uiState as? ReaderUiState.Ready
     val search = ready?.search
+    var goToPageOpen by rememberSaveable { mutableStateOf(false) }
     BackHandler(enabled = search?.isActive == true, onBack = searchActions.onClose)
 
     Scaffold(
@@ -109,6 +113,12 @@ internal fun ReaderScreen(
                     },
                     actions = {
                         if (ready != null) {
+                            IconButton(onClick = { goToPageOpen = true }) {
+                                Icon(
+                                    painter = painterResource(R.drawable.ic_tag),
+                                    contentDescription = stringResource(R.string.reader_go_to_page),
+                                )
+                            }
                             IconButton(onClick = searchActions.onOpen) {
                                 Icon(
                                     painter = painterResource(R.drawable.ic_search),
@@ -155,6 +165,8 @@ internal fun ReaderScreen(
                     matches = uiState.search.matches,
                     currentMatch = uiState.search.currentMatch,
                     onPositionChanged = onPositionChanged,
+                    goToPageOpen = goToPageOpen,
+                    onGoToPageOpenChange = { goToPageOpen = it },
                 )
             }
         }

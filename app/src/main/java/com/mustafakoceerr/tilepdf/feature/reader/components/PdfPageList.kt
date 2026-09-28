@@ -21,6 +21,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
@@ -55,6 +56,7 @@ import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
 /** Drafts are rendered at a fraction of the screen width to keep them cheap. */
@@ -90,6 +92,8 @@ fun PdfPageList(
     matches: List<SearchMatch>,
     currentMatch: SearchMatch?,
     onPositionChanged: (ReadingPosition) -> Unit,
+    goToPageOpen: Boolean,
+    onGoToPageOpenChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val matchesByPage = remember(matches) { matches.groupBy { it.pageIndex } }
@@ -159,6 +163,26 @@ fun PdfPageList(
                     currentMatch = currentMatch,
                 )
             }
+        }
+
+        PageNavigationOverlay(
+            listState = listState,
+            pageCount = pageSizes.size,
+            onRequestGoToPage = { onGoToPageOpenChange(true) },
+            modifier = Modifier.fillMaxSize(),
+        )
+
+        if (goToPageOpen) {
+            val scope = rememberCoroutineScope()
+            GoToPageDialog(
+                pageCount = pageSizes.size,
+                currentPage = listState.layoutInfo.centerPage() ?: 0,
+                onGoToPage = { pageIndex ->
+                    onGoToPageOpenChange(false)
+                    scope.launch { listState.scrollToItem(pageIndex) }
+                },
+                onDismiss = { onGoToPageOpenChange(false) },
+            )
         }
     }
 }
