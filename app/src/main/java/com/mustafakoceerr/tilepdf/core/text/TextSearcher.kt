@@ -1,6 +1,5 @@
 package com.mustafakoceerr.tilepdf.core.text
 
-import com.mustafakoceerr.tilepdf.core.geometry.PdfRect
 import com.mustafakoceerr.tilepdf.model.PageText
 import com.mustafakoceerr.tilepdf.model.SearchMatch
 
@@ -37,7 +36,7 @@ object TextSearcher {
         while (start >= 0) {
             val boxes = (start until start + needle.length)
                 .mapNotNull { page.box(charIndex[it]) }
-            if (boxes.isNotEmpty()) matches += SearchMatch(page.pageIndex, mergeIntoLines(boxes))
+            if (boxes.isNotEmpty()) matches += SearchMatch(page.pageIndex, LineMerger.merge(boxes))
             start = haystack.indexOf(needle, start + needle.length)
         }
         return matches
@@ -57,28 +56,5 @@ object TextSearcher {
     private fun fold(char: Char): Char = when (char) {
         'İ', 'I', 'ı' -> 'i'
         else -> char.lowercaseChar()
-    }
-
-    /**
-     * Joins consecutive character boxes into one rectangle per line. A box
-     * starts a new line when it doesn't vertically overlap the current one,
-     * or when it jumps back to the left (the next line of a column).
-     */
-    private fun mergeIntoLines(boxes: List<PdfRect>): List<PdfRect> {
-        val lines = mutableListOf<PdfRect>()
-        var current = boxes.first()
-        for (box in boxes.drop(1)) {
-            val overlap = minOf(current.bottom, box.bottom) - maxOf(current.top, box.top)
-            val sameLine = overlap > 0.5f * minOf(current.height, box.height) &&
-                box.left >= current.left - current.height
-            if (sameLine) {
-                current = current.union(box)
-            } else {
-                lines += current
-                current = box
-            }
-        }
-        lines += current
-        return lines
     }
 }

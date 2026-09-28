@@ -9,13 +9,17 @@ import com.mustafakoceerr.tilepdf.model.SearchMatch
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.async
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
@@ -31,7 +35,8 @@ private const val WARM_UP_DELAY_MS = 1_000L
  *   and its [TextSearcher] also folds Turkish dotted/dotless i.
  *
  * Native answers right away while PdfBox extracts the whole document in the
- * background. Each page switches to the PdfBox cache as soon as it has been
+ * background. [pageText] always goes through PdfBox, extracting on demand,
+ * because only it reports character boxes (needed to select text). Each page switches to the PdfBox cache as soon as it has been
  * extracted, so a search during warm-up mixes both sources page by page.
  * Their boxes agree (both use top-left, crop-box-relative points), so
  * highlights look the same either way.
@@ -49,36 +54,60 @@ class HybridTextProvider(
 
     private val scope = CoroutineScope(SupervisorJob() + ioDispatcher)
 
-    @Volatile
-    private var pdfBox: PdfBoxTextProvider? = null
-
-    private val warmUp: Job = scope.launch {
-        delay(warmUpDelayMs)
+    /**
+     * Opened on first need: by the background warm-up, or earlier when a
+     * caller needs character boxes. `null` if PdfBox can't read the file.
+     */
+    private val pdfBox: Deferred<PdfBoxTextProvider?> = scope.async(start = CoroutineStart.LAZY) {
         val provider = try {
             // Not cancellable halfway: a document opened but never stored
             // would leak its file handle and temp files.
             withContext(NonCancellable) { pdfBoxFactory.create(uri) }
         } catch (e: Exception) {
             if (e is CancellationException) throw e
-            return@launch
+            return@async null
         }
-        pdfBox = provider
-        ensureActive()
+        if (!isActive) {
+            withContext(NonCancellable) { provider.close() }
+            throw CancellationException("Closed while opening")
+        }
+        provider
+    }
+
+    private val warmUp: Job = scope.launch {
+        delay(warmUpDelayMs)
+        val provider = pdfBox.await() ?: return@launch
         for (pageIndex in 0 until provider.pageCount) provider.pageText(pageIndex)
     }
 
+    /** PdfBox when it's already open; never waits for it. */
+    private val openPdfBox: PdfBoxTextProvider?
+        get() = if (pdfBox.isCompleted && !pdfBox.isCancelled) {
+            @OptIn(ExperimentalCoroutinesApi::class)
+            pdfBox.getCompleted()
+        } else {
+            null
+        }
+
+    /** Uses PdfBox, extracting the page now if needed: only it has character boxes. */
     override suspend fun pageText(pageIndex: Int): PageText =
-        pdfBox?.cachedPageText(pageIndex) ?: native.pageText(pageIndex)
+        pdfBox.await()?.pageText(pageIndex) ?: native.pageText(pageIndex)
 
     override suspend fun search(pageIndex: Int, query: String): List<SearchMatch> {
-        val cached = pdfBox?.cachedPageText(pageIndex)
+        val cached = openPdfBox?.cachedPageText(pageIndex)
         return if (cached != null) TextSearcher.search(cached, query) else native.search(pageIndex, query)
     }
 
     override suspend fun close() {
         warmUp.cancelAndJoin()
+        pdfBox.cancel()
+        val provider = try {
+            pdfBox.await()
+        } catch (_: CancellationException) {
+            null // Never opened, or it closed itself when cancelled.
+        }
+        provider?.close()
         scope.cancel()
-        pdfBox?.close()
         native.close()
     }
 
@@ -87,7 +116,9 @@ class HybridTextProvider(
 
     @VisibleForTesting
     internal val warmedPageCount: Int
-        get() = pdfBox?.let { provider -> (0 until provider.pageCount).count { provider.cachedPageText(it) != null } } ?: 0
+        get() = openPdfBox?.let { provider ->
+            (0 until provider.pageCount).count { provider.cachedPageText(it) != null }
+        } ?: 0
 
     @RequiresApi(35)
     class Factory @Inject constructor(

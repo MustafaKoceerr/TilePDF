@@ -8,8 +8,8 @@ import com.mustafakoceerr.tilepdf.data.outline.DocumentOutlineRepository
 import com.mustafakoceerr.tilepdf.data.outline.PdfBoxOutlineRepository
 import com.mustafakoceerr.tilepdf.data.preferences.DataStoreReaderPreferencesRepository
 import com.mustafakoceerr.tilepdf.data.preferences.ReaderPreferencesRepository
-import com.mustafakoceerr.tilepdf.data.text.CachingTextSearchRepository
-import com.mustafakoceerr.tilepdf.data.text.TextSearchRepository
+import com.mustafakoceerr.tilepdf.data.text.CachingDocumentTextRepository
+import com.mustafakoceerr.tilepdf.data.text.DocumentTextRepository
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -34,5 +34,5 @@ interface DataModule {
     fun bindsDocumentOutlineRepository(impl: PdfBoxOutlineRepository): DocumentOutlineRepository
 
     @Binds
-    fun bindsTextSearchRepository(impl: CachingTextSearchRepository): TextSearchRepository
+    fun bindsDocumentTextRepository(impl: CachingDocumentTextRepository): DocumentTextRepository
 }

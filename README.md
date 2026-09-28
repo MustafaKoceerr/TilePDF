@@ -25,6 +25,8 @@ minSdk 29
   by number
 - Table of contents from the PDF outline: nested entries, jumps to the
   exact heading position (XYZ, named and GoTo destinations)
+- Text selection: long-press a word, drag Material-style handles, copy or
+  select all from the system text toolbar
 - Night mode by colour inversion (no re-rendering)
 - Reopens a document exactly where you left it: page, offset within the page,
   zoom and horizontal pan

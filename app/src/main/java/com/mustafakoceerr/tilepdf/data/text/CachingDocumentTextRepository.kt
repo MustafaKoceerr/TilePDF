@@ -1,6 +1,7 @@
 package com.mustafakoceerr.tilepdf.data.text
 
 import com.mustafakoceerr.tilepdf.di.IoDispatcher
+import com.mustafakoceerr.tilepdf.model.PageText
 import com.mustafakoceerr.tilepdf.model.SearchMatch
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
@@ -8,6 +9,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -18,10 +20,10 @@ import javax.inject.Singleton
  * shown at a time.
  */
 @Singleton
-class CachingTextSearchRepository @Inject constructor(
+class CachingDocumentTextRepository @Inject constructor(
     private val providerFactory: PdfTextProvider.Factory,
     @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher,
-) : TextSearchRepository {
+) : DocumentTextRepository {
 
     private val mutex = Mutex()
     private var current: Pair<String, PdfTextProvider>? = null
@@ -34,6 +36,9 @@ class CachingTextSearchRepository @Inject constructor(
             if (matches.isNotEmpty()) emit(matches)
         }
     }.flowOn(ioDispatcher)
+
+    override suspend fun pageText(uri: String, pageIndex: Int): PageText =
+        withContext(ioDispatcher) { provider(uri).pageText(pageIndex) }
 
     override suspend fun prepare(uri: String) {
         provider(uri)

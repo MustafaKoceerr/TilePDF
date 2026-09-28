@@ -5,21 +5,24 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.toRoute
 import com.mustafakoceerr.tilepdf.core.render.PageRenderer
+import com.mustafakoceerr.tilepdf.core.text.TextSelection
 import com.mustafakoceerr.tilepdf.core.render.TiledPageImageSource
 import com.mustafakoceerr.tilepdf.data.library.LibraryRepository
 import com.mustafakoceerr.tilepdf.data.outline.DocumentOutlineRepository
 import com.mustafakoceerr.tilepdf.data.preferences.ReaderPreferencesRepository
-import com.mustafakoceerr.tilepdf.data.text.TextSearchRepository
+import com.mustafakoceerr.tilepdf.data.text.DocumentTextRepository
 import com.mustafakoceerr.tilepdf.di.ApplicationScope
 import com.mustafakoceerr.tilepdf.domain.OpenDocumentUseCase
 import com.mustafakoceerr.tilepdf.domain.OpenedDocument
 import com.mustafakoceerr.tilepdf.feature.reader.navigation.ReaderRoute
 import com.mustafakoceerr.tilepdf.model.OutlineEntry
+import com.mustafakoceerr.tilepdf.model.PageText
 import com.mustafakoceerr.tilepdf.model.ReadingPosition
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -48,7 +51,7 @@ class ReaderViewModel @Inject constructor(
     private val pageRenderer: PageRenderer,
     private val libraryRepository: LibraryRepository,
     private val preferencesRepository: ReaderPreferencesRepository,
-    private val textSearchRepository: TextSearchRepository,
+    private val documentTextRepository: DocumentTextRepository,
     private val outlineRepository: DocumentOutlineRepository,
     @param:ApplicationScope private val applicationScope: CoroutineScope,
 ) : ViewModel() {
@@ -59,6 +62,8 @@ class ReaderViewModel @Inject constructor(
     private val searchState = MutableStateFlow(SearchUiState())
     private val searchQuery = MutableStateFlow("")
     private val outline = MutableStateFlow<List<OutlineEntry>>(emptyList())
+    private val selection = MutableStateFlow<Selection?>(null)
+    private var selectionJob: Job? = null
     private val positionUpdates = MutableSharedFlow<ReadingPosition>(extraBufferCapacity = 1)
 
     val uiState: StateFlow<ReaderUiState> = combine(
@@ -66,7 +71,8 @@ class ReaderViewModel @Inject constructor(
         preferencesRepository.nightMode,
         searchState,
         outline,
-    ) { document, nightMode, search, outline ->
+        selection,
+    ) { document, nightMode, search, outline, selection ->
         when (document) {
             DocumentState.Loading -> ReaderUiState.Loading
             is DocumentState.Failed -> ReaderUiState.Error(document.reason)
@@ -78,6 +84,7 @@ class ReaderViewModel @Inject constructor(
                 nightMode = nightMode,
                 search = search,
                 outline = outline,
+                selection = selection?.toUiState(),
             )
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ReaderUiState.Loading)
@@ -111,6 +118,47 @@ class ReaderViewModel @Inject constructor(
     fun onToggleNightMode() {
         val current = (uiState.value as? ReaderUiState.Ready)?.nightMode ?: return
         viewModelScope.launch { preferencesRepository.setNightMode(!current) }
+    }
+
+    /** Selects the word at a point on a page, given in top-left PDF points. */
+    fun onLongPress(pageIndex: Int, x: Float, y: Float) {
+        selectionJob?.cancel()
+        selectionJob = viewModelScope.launch {
+            val page = try {
+                documentTextRepository.pageText(uri, pageIndex)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                return@launch // Unreadable text: nothing to select.
+            }
+            selection.value = TextSelection.wordAt(page, x, y)?.let { Selection(page, it) }
+        }
+    }
+
+    /** Moves one end of the selection to the character nearest a point on its page. */
+    fun onDragSelectionHandle(handle: SelectionHandle, x: Float, y: Float) {
+        selection.update { current ->
+            current ?: return@update null
+            val index = TextSelection.charAt(current.page, x, y) ?: return@update current
+            val (start, end) = when (handle) {
+                SelectionHandle.Start -> index to current.range.last
+                SelectionHandle.End -> current.range.first to index
+            }
+            // Dragging one handle past the other just flips which end it is.
+            current.copy(range = minOf(start, end)..maxOf(start, end))
+        }
+    }
+
+    fun onSelectAllOnPage() {
+        selection.update { current ->
+            current ?: return@update null
+            TextSelection.all(current.page)?.let { current.copy(range = it) } ?: current
+        }
+    }
+
+    fun onClearSelection() {
+        selectionJob?.cancel()
+        selection.value = null
     }
 
     fun onOpenSearch() {
@@ -150,7 +198,7 @@ class ReaderViewModel @Inject constructor(
                 if (query.isBlank()) return@collectLatest
                 val pageCount = documentState.filterIsInstance<DocumentState.Opened>()
                     .first().opened.document.pageCount
-                textSearchRepository.search(uri, pageCount, query)
+                documentTextRepository.search(uri, pageCount, query)
                     // An unreadable document simply has no matches.
                     .catch { }
                     .collect { pageMatches ->
@@ -179,7 +227,7 @@ class ReaderViewModel @Inject constructor(
     private fun prepareSearch() = viewModelScope.launch {
         // Best effort: if text can't be read, searching just finds nothing.
         try {
-            textSearchRepository.prepare(uri)
+            documentTextRepository.prepare(uri)
         } catch (e: CancellationException) {
             throw e
         } catch (_: Exception) {
@@ -198,7 +246,23 @@ class ReaderViewModel @Inject constructor(
     override fun onCleared() {
         (documentState.value as? DocumentState.Opened)?.opened?.document?.close()
         // viewModelScope is already cancelled here.
-        applicationScope.launch { textSearchRepository.release(uri) }
+        applicationScope.launch { documentTextRepository.release(uri) }
+    }
+
+    /** The page's text is kept so dragging handles needs no reload. */
+    private data class Selection(val page: PageText, val range: IntRange) {
+        fun toUiState(): SelectionUiState {
+            // Separators have no box, so the ends use the nearest boxed chars.
+            val first = range.first { page.box(it) != null }
+            val last = range.last { page.box(it) != null }
+            return SelectionUiState(
+                pageIndex = page.pageIndex,
+                text = TextSelection.text(page, range),
+                rects = TextSelection.rects(page, range),
+                startBox = page.box(first)!!,
+                endBox = page.box(last)!!,
+            )
+        }
     }
 
     private sealed interface DocumentState {

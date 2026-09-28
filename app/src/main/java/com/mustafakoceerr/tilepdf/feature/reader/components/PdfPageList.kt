@@ -19,6 +19,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -27,6 +28,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
@@ -34,8 +36,12 @@ import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalTextToolbar
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.IntOffset
@@ -50,6 +56,8 @@ import com.mustafakoceerr.tilepdf.core.render.RenderedTile
 import com.mustafakoceerr.tilepdf.core.render.Tile
 import com.mustafakoceerr.tilepdf.core.render.TileGrid
 import com.mustafakoceerr.tilepdf.core.render.tilesFor
+import com.mustafakoceerr.tilepdf.feature.reader.SelectionActions
+import com.mustafakoceerr.tilepdf.feature.reader.SelectionUiState
 import com.mustafakoceerr.tilepdf.model.ReadingPosition
 import com.mustafakoceerr.tilepdf.model.SearchMatch
 import kotlinx.coroutines.FlowPreview
@@ -69,6 +77,7 @@ private val PAGE_GAP = 8.dp
 
 private val HighlightColor = Color(0x66FFEB3B)
 private val CurrentHighlightColor = Color(0x99FF9800)
+private val SelectionColor = Color(0x553D7BFF)
 
 /** Inverts colours without re-rendering: white paper becomes black. */
 private val NightModeFilter = ColorFilter.colorMatrix(
@@ -84,7 +93,7 @@ private val NightModeFilter = ColorFilter.colorMatrix(
 
 /** Zoomable vertical list of all pages. */
 @Composable
-fun PdfPageList(
+internal fun PdfPageList(
     pageSizes: List<PageSize>,
     pageImages: PageImageSource,
     initialPosition: ReadingPosition,
@@ -96,6 +105,8 @@ fun PdfPageList(
     onGoToPageOpenChange: (Boolean) -> Unit,
     pageJump: PageJump?,
     onPageJumpHandled: () -> Unit,
+    selection: SelectionUiState?,
+    selectionActions: SelectionActions,
     modifier: Modifier = Modifier,
 ) {
     val matchesByPage = remember(matches) { matches.groupBy { it.pageIndex } }
@@ -151,7 +162,15 @@ fun PdfPageList(
             state = listState,
             modifier = Modifier
                 .fillMaxSize()
-                .zoomable(zoomState, listState),
+                .zoomable(
+                    zoomState = zoomState,
+                    listState = listState,
+                    onTap = { selectionActions.onClear() },
+                    onLongPress = { position ->
+                        pagePointAt(position, listState, zoomState, pageSizes, density)
+                            ?.let { (page, x, y) -> selectionActions.onLongPress(page, x, y) }
+                    },
+                ),
             // Horizontal padding scales with zoom so the whole content grows
             // proportionally; otherwise page heights would grow by a slightly
             // different factor than the zoom and the scroll anchor would drift.
@@ -170,6 +189,8 @@ fun PdfPageList(
                     nightMode = nightMode,
                     matches = matchesByPage[pageIndex].orEmpty(),
                     currentMatch = currentMatch,
+                    selection = selection?.takeIf { it.pageIndex == pageIndex },
+                    selectionActions = selectionActions,
                 )
             }
         }
@@ -244,6 +265,32 @@ private suspend fun requestVisibleTiles(
         .distinctUntilChanged()
         .debounce(TILE_REQUEST_DEBOUNCE_MS)
         .collect(pageImages::requestTiles)
+}
+
+/**
+ * The page under a viewport position and the position on it in PDF points,
+ * or `null` over the gaps between pages.
+ */
+private fun pagePointAt(
+    position: Offset,
+    listState: LazyListState,
+    zoomState: ZoomState,
+    pageSizes: List<PageSize>,
+    density: Density,
+): Triple<Int, Float, Float>? {
+    val paddingPx = with(density) { (PAGE_GAP * zoomState.scale).roundToPx() }
+    val layout = pageLayout(zoomState, paddingPx)
+    val info = listState.layoutInfo
+    for (item in info.visibleItemsInfo) {
+        val top = item.offset - info.viewportStartOffset
+        val x = position.x - layout.pageLeft
+        val y = position.y - top
+        if (x in 0f..layout.pageWidth.toFloat() && y in 0f..item.size.toFloat()) {
+            val (xPt, yPt) = CoordinateMapper.toPdfPoints(x, y, pageSizes[item.index], layout.pageWidth.toFloat())
+            return Triple(item.index, xPt, yPt)
+        }
+    }
+    return null
 }
 
 /** Leaves a little room above a jump target such as a chapter heading. */
@@ -335,6 +382,8 @@ private fun PdfPage(
     nightMode: Boolean,
     matches: List<SearchMatch>,
     currentMatch: SearchMatch?,
+    selection: SelectionUiState?,
+    selectionActions: SelectionActions,
 ) {
     // Seed from the cache so pages scrolled back into view don't flash blank.
     var draft by remember(pageIndex, draftWidthPx) {
@@ -345,34 +394,82 @@ private fun PdfPage(
         if (draft == null) draft = pageImages.loadDraft(pageIndex, draftWidthPx)
     }
     val colorFilter = if (nightMode) NightModeFilter else null
+    var pageWidthPx by remember { mutableFloatStateOf(0f) }
+    var coordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
 
     // Sized from the page's aspect ratio up front so the layout never jumps.
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .aspectRatio(pageSize.aspectRatio)
-            .background(if (nightMode) Color.Black else Color.White)
-            // Tiles are read in the draw phase: a new tile only redraws this
-            // page, it doesn't recompose it.
-            .drawWithContent {
-                drawContent()
-                pageImages.renderedTiles(pageIndex).forEach { drawTile(it, colorFilter) }
-                matches.forEach { match ->
-                    val color = if (match == currentMatch) CurrentHighlightColor else HighlightColor
-                    match.rects.forEach { drawHighlight(it, pageSize, color) }
-                }
-            },
+            .onSizeChanged { pageWidthPx = it.width.toFloat() }
+            .onGloballyPositioned { coordinates = it },
     ) {
-        draft?.let {
-            Image(
-                bitmap = it.asImageBitmap(),
-                contentDescription = stringResource(R.string.reader_page_description, pageIndex + 1),
-                contentScale = ContentScale.FillBounds,
-                colorFilter = colorFilter,
-                modifier = Modifier.fillMaxSize(),
-            )
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .background(if (nightMode) Color.Black else Color.White)
+                // Tiles are read in the draw phase: a new tile only redraws
+                // this page, it doesn't recompose it.
+                .drawWithContent {
+                    drawContent()
+                    pageImages.renderedTiles(pageIndex).forEach { drawTile(it, colorFilter) }
+                    matches.forEach { match ->
+                        val color = if (match == currentMatch) CurrentHighlightColor else HighlightColor
+                        match.rects.forEach { drawHighlight(it, pageSize, color) }
+                    }
+                    selection?.rects?.forEach { drawHighlight(it, pageSize, SelectionColor) }
+                },
+        ) {
+            draft?.let {
+                Image(
+                    bitmap = it.asImageBitmap(),
+                    contentDescription = stringResource(R.string.reader_page_description, pageIndex + 1),
+                    contentScale = ContentScale.FillBounds,
+                    colorFilter = colorFilter,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+        }
+        // Siblings of the page layer, not its children: the page draws its
+        // tiles after its children, which would cover the handles.
+        if (selection != null && pageWidthPx > 0f) {
+            SelectionHandles(selection, pageSize, pageWidthPx, selectionActions.onDragHandle)
+            SelectionToolbarEffect(selection, pageSize, pageWidthPx, coordinates, selectionActions)
         }
     }
+}
+
+/**
+ * Shows the system's floating text toolbar (Copy, Select all) above the
+ * selection, positioned in root coordinates as Android expects.
+ */
+@Composable
+private fun SelectionToolbarEffect(
+    selection: SelectionUiState,
+    pageSize: PageSize,
+    pageWidthPx: Float,
+    coordinates: LayoutCoordinates?,
+    actions: SelectionActions,
+) {
+    val textToolbar = LocalTextToolbar.current
+    val handleHeightPx = with(LocalDensity.current) { HandleTouchSize.toPx() }
+    LaunchedEffect(selection, coordinates, pageWidthPx) {
+        val page = coordinates?.takeIf { it.isAttached } ?: return@LaunchedEffect
+        val rects = selection.rects.map { CoordinateMapper.toPagePixels(it, pageSize, pageWidthPx) }
+        val topLeft = page.localToRoot(Offset(rects.minOf { it.left }, rects.minOf { it.top }))
+        // Include the handles hanging below the text, so a toolbar placed
+        // under the selection doesn't cover them.
+        val bottomRight = page.localToRoot(
+            Offset(rects.maxOf { it.right }, rects.maxOf { it.bottom } + handleHeightPx)
+        )
+        textToolbar.showMenu(
+            rect = Rect(topLeft, bottomRight),
+            onCopyRequested = actions.onCopy,
+            onSelectAllRequested = actions.onSelectAll,
+        )
+    }
+    DisposableEffect(textToolbar) { onDispose { textToolbar.hide() } }
 }
 
 private fun DrawScope.drawHighlight(

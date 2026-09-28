@@ -1,5 +1,8 @@
 package com.mustafakoceerr.tilepdf.feature.reader
 
+import android.content.ClipData
+import android.os.Build
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Box
@@ -22,10 +25,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.LocalClipboard
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -40,6 +48,7 @@ import com.mustafakoceerr.tilepdf.feature.reader.components.SearchTopBar
 import com.mustafakoceerr.tilepdf.feature.reader.components.TableOfContentsSheet
 import com.mustafakoceerr.tilepdf.model.ReadingPosition
 import com.mustafakoceerr.tilepdf.ui.theme.TilePDFTheme
+import kotlinx.coroutines.launch
 
 @Composable
 fun ReaderScreen(
@@ -59,8 +68,21 @@ fun ReaderScreen(
             onNext = viewModel::onNextMatch,
             onClose = viewModel::onCloseSearch,
         ),
+        onLongPress = viewModel::onLongPress,
+        onDragSelectionHandle = viewModel::onDragSelectionHandle,
+        onSelectAllOnPage = viewModel::onSelectAllOnPage,
+        onClearSelection = viewModel::onClearSelection,
     )
 }
+
+/** Selection events for the page list; copying is done by the screen itself. */
+internal class SelectionActions(
+    val onLongPress: (pageIndex: Int, x: Float, y: Float) -> Unit,
+    val onDragHandle: (SelectionHandle, x: Float, y: Float) -> Unit,
+    val onCopy: () -> Unit,
+    val onSelectAll: () -> Unit,
+    val onClear: () -> Unit,
+)
 
 /** Search events, grouped to keep the screen's signature readable. */
 internal class SearchActions(
@@ -83,9 +105,16 @@ internal fun ReaderScreen(
     onToggleNightMode: () -> Unit,
     onPositionChanged: (ReadingPosition) -> Unit,
     searchActions: SearchActions,
+    onLongPress: (pageIndex: Int, x: Float, y: Float) -> Unit = { _, _, _ -> },
+    onDragSelectionHandle: (SelectionHandle, x: Float, y: Float) -> Unit = { _, _, _ -> },
+    onSelectAllOnPage: () -> Unit = {},
+    onClearSelection: () -> Unit = {},
 ) {
     val ready = uiState as? ReaderUiState.Ready
     val search = ready?.search
+    val selection = ready?.selection
+    val copySelection = rememberCopyAction(selection?.text, onCopied = onClearSelection)
+    BackHandler(enabled = selection != null, onBack = onClearSelection)
     var goToPageOpen by rememberSaveable { mutableStateOf(false) }
     var tocOpen by rememberSaveable { mutableStateOf(false) }
     var menuOpen by remember { mutableStateOf(false) }
@@ -177,6 +206,14 @@ internal fun ReaderScreen(
                     onGoToPageOpenChange = { goToPageOpen = it },
                     pageJump = pageJump,
                     onPageJumpHandled = { pageJump = null },
+                    selection = uiState.selection,
+                    selectionActions = SelectionActions(
+                        onLongPress = onLongPress,
+                        onDragHandle = onDragSelectionHandle,
+                        onCopy = copySelection,
+                        onSelectAll = onSelectAllOnPage,
+                        onClear = onClearSelection,
+                    ),
                 )
             }
         }
@@ -191,6 +228,32 @@ internal fun ReaderScreen(
             },
             onDismiss = { tocOpen = false },
         )
+    }
+}
+
+/**
+ * Copies [text] to the clipboard. Android 13+ confirms copies itself; older
+ * versions get a toast so the user knows it worked.
+ */
+@Composable
+private fun rememberCopyAction(text: String?, onCopied: () -> Unit): () -> Unit {
+    val clipboard = LocalClipboard.current
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val currentText by rememberUpdatedState(text)
+    val currentOnCopied by rememberUpdatedState(onCopied)
+    return remember {
+        {
+            currentText?.let { copied ->
+                scope.launch {
+                    clipboard.setClipEntry(ClipEntry(ClipData.newPlainText(copied.take(40), copied)))
+                    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+                        Toast.makeText(context, R.string.reader_copied, Toast.LENGTH_SHORT).show()
+                    }
+                    currentOnCopied()
+                }
+            }
+        }
     }
 }
 

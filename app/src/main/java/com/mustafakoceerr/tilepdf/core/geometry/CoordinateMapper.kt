@@ -20,6 +20,12 @@ data class PixelRectF(val left: Float, val top: Float, val right: Float, val bot
  */
 object CoordinateMapper {
 
+    /** The inverse, for a point: where a touch on the laid-out page falls in PDF points. */
+    fun toPdfPoints(xPx: Float, yPx: Float, pageSize: PageSize, pageWidthPx: Float): Pair<Float, Float> {
+        val scale = pageWidthPx / pageSize.widthPt
+        return xPx / scale to yPx / scale
+    }
+
     fun toPagePixels(rect: PdfRect, pageSize: PageSize, pageWidthPx: Float): PixelRectF {
         val scale = pageWidthPx / pageSize.widthPt
         return PixelRectF(rect.left * scale, rect.top * scale, rect.right * scale, rect.bottom * scale)

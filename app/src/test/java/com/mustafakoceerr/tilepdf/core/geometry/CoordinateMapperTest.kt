@@ -20,6 +20,15 @@ class CoordinateMapperTest {
     }
 
     @Test
+    fun pointMappingInvertsRectMapping() {
+        val rect = CoordinateMapper.toPagePixels(PdfRect(100f, 200f, 100f, 200f), a4, pageWidthPx = 1333f)
+        val (x, y) = CoordinateMapper.toPdfPoints(rect.left, rect.top, a4, pageWidthPx = 1333f)
+
+        assertEquals(100f, x, 0.001f)
+        assertEquals(200f, y, 0.001f)
+    }
+
+    @Test
     fun matchesRendererScaleForTheSameWidth() {
         // A point at the page's right edge maps to the rendered width exactly.
         val edge = PdfRect(595f, 842f, 595f, 842f)

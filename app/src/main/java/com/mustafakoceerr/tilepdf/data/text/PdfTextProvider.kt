@@ -10,7 +10,10 @@ import com.mustafakoceerr.tilepdf.model.SearchMatch
  */
 interface PdfTextProvider {
 
-    /** Extracted once per page, then served from memory. */
+    /**
+     * Extracted once per page, then served from memory. Has a box per
+     * character whenever the provider can supply one.
+     */
     suspend fun pageText(pageIndex: Int): PageText
 
     /** Matches on one page; implementations may use a faster native search. */

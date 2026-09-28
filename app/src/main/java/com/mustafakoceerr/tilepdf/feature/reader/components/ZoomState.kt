@@ -185,7 +185,12 @@ fun rememberZoomState(
  * pinch, double tap and horizontal pan are handled here while vertical scroll
  * stays with the list itself.
  */
-fun Modifier.zoomable(zoomState: ZoomState, listState: LazyListState): Modifier = this
+fun Modifier.zoomable(
+    zoomState: ZoomState,
+    listState: LazyListState,
+    onTap: (Offset) -> Unit = {},
+    onLongPress: (Offset) -> Unit = {},
+): Modifier = this
     .clipToBounds()
     .onSizeChanged { zoomState.viewportWidth = it.width }
     .pointerInput(zoomState) {
@@ -210,9 +215,15 @@ fun Modifier.zoomable(zoomState: ZoomState, listState: LazyListState): Modifier 
         }
     }
     .pointerInput(zoomState) {
-        detectTapGestures(onDoubleTap = { focus ->
-            listState.keepAnchor(zoomState.zoomTo(zoomState.doubleTapTarget, focus))
-        })
+        // One detector for every tap kind: separate ones would compete, and
+        // the first to see a tap would starve the others (e.g. double tap).
+        detectTapGestures(
+            onDoubleTap = { focus ->
+                listState.keepAnchor(zoomState.zoomTo(zoomState.doubleTapTarget, focus))
+            },
+            onTap = { onTap(it) },
+            onLongPress = { onLongPress(it) },
+        )
     }
     .draggable(
         state = zoomState.draggableState,

@@ -1,5 +1,6 @@
 package com.mustafakoceerr.tilepdf.feature.reader
 
+import com.mustafakoceerr.tilepdf.core.geometry.PdfRect
 import com.mustafakoceerr.tilepdf.core.pdf.PageSize
 import com.mustafakoceerr.tilepdf.core.render.PageImageSource
 import com.mustafakoceerr.tilepdf.model.OutlineEntry
@@ -21,10 +22,24 @@ sealed interface ReaderUiState {
         val search: SearchUiState,
         /** Table of contents; empty until loaded, or if the PDF has none. */
         val outline: List<OutlineEntry>,
+        val selection: SelectionUiState?,
     ) : ReaderUiState
 }
 
 enum class ReaderError { NotFound, PasswordProtected, Corrupt }
+
+/** Selected text on one page; positions in top-left PDF points. */
+data class SelectionUiState(
+    val pageIndex: Int,
+    val text: String,
+    /** One per line, for drawing. */
+    val rects: List<PdfRect>,
+    /** Boxes of the first and last selected characters, where the handles sit. */
+    val startBox: PdfRect,
+    val endBox: PdfRect,
+)
+
+enum class SelectionHandle { Start, End }
 
 data class SearchUiState(
     /** Whether the search bar is shown. */
