@@ -34,7 +34,7 @@ class PdfBoxTextProviderTest {
 
     @Test
     fun extractsPageTextInReadingOrder() = runBlocking {
-        val text = provider.pageText(0).chars.joinToString("") { it.char.toString() }
+        val text = provider.pageText(0).text
         assertEquals("TilePDF sample page 1", text.trim())
     }
 
@@ -42,7 +42,8 @@ class PdfBoxTextProviderTest {
     fun boxesAreInTopLeftPointSpace() = runBlocking {
         // The sample draws 36 pt Helvetica at x = 72 pt with its baseline
         // 100 pt below the top of an 842 pt tall page.
-        val first = provider.pageText(0).chars.first { it.box != null }.box!!
+        val page = provider.pageText(0)
+        val first = page.text.indices.firstNotNullOf { page.box(it) }
         assertEquals(72f, first.left, 1f)
         assertEquals(100f, first.bottom, 2f)
         assertTrue("glyph height ${first.height}", first.height in 15f..40f)

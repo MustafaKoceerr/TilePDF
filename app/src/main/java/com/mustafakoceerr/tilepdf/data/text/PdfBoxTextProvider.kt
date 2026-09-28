@@ -7,7 +7,6 @@ import com.mustafakoceerr.tilepdf.core.text.TextSearcher
 import com.mustafakoceerr.tilepdf.di.IoDispatcher
 import com.mustafakoceerr.tilepdf.model.PageText
 import com.mustafakoceerr.tilepdf.model.SearchMatch
-import com.mustafakoceerr.tilepdf.model.TextChar
 import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
 import com.tom_roush.pdfbox.io.MemoryUsageSetting
 import com.tom_roush.pdfbox.pdmodel.PDDocument
@@ -59,7 +58,7 @@ class PdfBoxTextProvider private constructor(
             sortByPosition = true
         }
         stripper.getText(document)
-        return PageText(pageIndex, stripper.chars)
+        return stripper.page.build(pageIndex)
     }
 
     /**
@@ -69,7 +68,7 @@ class PdfBoxTextProvider private constructor(
      * PdfRenderer renders.
      */
     private class CharCollector : PDFTextStripper() {
-        val chars = ArrayList<TextChar>()
+        val page = PageText.Builder()
 
         override fun writeString(text: String?, textPositions: MutableList<TextPosition>?) {
             for (position in textPositions.orEmpty()) {
@@ -80,17 +79,17 @@ class PdfBoxTextProvider private constructor(
                 val top = bottom - position.heightDir
                 unicode.forEachIndexed { i, char ->
                     val left = position.xDirAdj + i * width
-                    chars += TextChar(char, PdfRect(left, top, left + width, bottom))
+                    page.append(char, PdfRect(left, top, left + width, bottom))
                 }
             }
         }
 
         override fun writeWordSeparator() {
-            chars += TextChar(' ', null)
+            page.append(' ', null)
         }
 
         override fun writeLineSeparator() {
-            chars += TextChar('\n', null)
+            page.append('\n', null)
         }
     }
 

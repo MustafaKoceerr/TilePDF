@@ -20,15 +20,15 @@ object TextSearcher {
         val needle = normalize(query).trim()
         if (needle.isEmpty()) return emptyList()
 
-        // Normalized page text, plus the index in page.chars of every char in it.
-        val haystack = StringBuilder(page.chars.size)
-        val charIndex = IntArray(page.chars.size)
+        // Normalized page text, plus the index in page.text of every char in it.
+        val haystack = StringBuilder(page.text.length)
+        val charIndex = IntArray(page.text.length)
         var lastWasSpace = true
-        page.chars.forEachIndexed { index, textChar ->
-            val isSpace = textChar.char.isWhitespace()
+        page.text.forEachIndexed { index, char ->
+            val isSpace = char.isWhitespace()
             if (isSpace && lastWasSpace) return@forEachIndexed
             charIndex[haystack.length] = index
-            haystack.append(if (isSpace) ' ' else fold(textChar.char))
+            haystack.append(if (isSpace) ' ' else fold(char))
             lastWasSpace = isSpace
         }
 
@@ -36,7 +36,7 @@ object TextSearcher {
         var start = haystack.indexOf(needle)
         while (start >= 0) {
             val boxes = (start until start + needle.length)
-                .mapNotNull { page.chars[charIndex[it]].box }
+                .mapNotNull { page.box(charIndex[it]) }
             if (boxes.isNotEmpty()) matches += SearchMatch(page.pageIndex, mergeIntoLines(boxes))
             start = haystack.indexOf(needle, start + needle.length)
         }

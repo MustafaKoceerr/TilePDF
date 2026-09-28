@@ -2,7 +2,6 @@ package com.mustafakoceerr.tilepdf.core.text
 
 import com.mustafakoceerr.tilepdf.core.geometry.PdfRect
 import com.mustafakoceerr.tilepdf.model.PageText
-import com.mustafakoceerr.tilepdf.model.TextChar
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -14,19 +13,16 @@ class TextSearcherTest {
      * box-less separators between words and lines like PdfBox inserts.
      */
     private fun page(vararg lines: String): PageText {
-        val chars = mutableListOf<TextChar>()
+        val builder = PageText.Builder(expectedLength = 4)
         lines.forEachIndexed { row, line ->
-            if (row > 0) chars += TextChar('\n', null)
+            if (row > 0) builder.append('\n', null)
             line.forEachIndexed { col, char ->
-                chars += if (char == ' ') {
-                    TextChar(' ', null)
-                } else {
-                    val top = row * 20f
-                    TextChar(char, PdfRect(col * 10f, top, col * 10f + 10f, top + 12f))
-                }
+                val top = row * 20f
+                val box = if (char == ' ') null else PdfRect(col * 10f, top, col * 10f + 10f, top + 12f)
+                builder.append(char, box)
             }
         }
-        return PageText(pageIndex = 4, chars = chars)
+        return builder.build(pageIndex = 4)
     }
 
     @Test
@@ -67,5 +63,16 @@ class TextSearcherTest {
     @Test
     fun matchesDoNotOverlap() {
         assertEquals(2, TextSearcher.search(page("aaaa"), "aa").size)
+    }
+
+    @Test
+    fun builderGrowsAndKeepsBoxesAligned() {
+        // Starts with room for 4 chars, so this forces several resizes.
+        val page = page("abcdefghij klmnop")
+
+        assertEquals("abcdefghij klmnop", page.text)
+        assertEquals(PdfRect(90f, 0f, 100f, 12f), page.box(9))
+        assertEquals(null, page.box(10)) // the space
+        assertEquals(PdfRect(160f, 0f, 170f, 12f), page.box(16))
     }
 }

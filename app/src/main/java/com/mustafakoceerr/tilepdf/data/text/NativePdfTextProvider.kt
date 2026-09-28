@@ -10,7 +10,6 @@ import com.mustafakoceerr.tilepdf.core.geometry.PdfRect
 import com.mustafakoceerr.tilepdf.di.IoDispatcher
 import com.mustafakoceerr.tilepdf.model.PageText
 import com.mustafakoceerr.tilepdf.model.SearchMatch
-import com.mustafakoceerr.tilepdf.model.TextChar
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.sync.Mutex
@@ -49,7 +48,7 @@ class NativePdfTextProvider private constructor(
                 val text = renderer.openPage(pageIndex).use { page ->
                     page.textContents.joinToString("\n") { it.text }
                 }
-                PageText(pageIndex, text.map { TextChar(it, null) })
+                PageText.withoutBoxes(pageIndex, text)
             }
         }
     }
