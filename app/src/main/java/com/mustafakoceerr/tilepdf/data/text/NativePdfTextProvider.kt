@@ -15,7 +15,7 @@ class NativePdfTextProvider : PdfTextProvider {
     // TODO(week 4): PdfRenderer.Page.searchText() -> PageMatchBounds.
     override suspend fun search(pageIndex: Int, query: String): List<SearchMatch> = emptyList()
 
-    override fun close() = Unit
+    override suspend fun close() = Unit
 
     @RequiresApi(35)
     class Factory @Inject constructor() : PdfTextProvider.Factory {

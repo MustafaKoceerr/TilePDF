@@ -4,25 +4,30 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.toRoute
-import com.mustafakoceerr.tilepdf.core.render.TiledPageImageSource
 import com.mustafakoceerr.tilepdf.core.render.PageRenderer
+import com.mustafakoceerr.tilepdf.core.render.TiledPageImageSource
 import com.mustafakoceerr.tilepdf.data.library.LibraryRepository
 import com.mustafakoceerr.tilepdf.data.preferences.ReaderPreferencesRepository
 import com.mustafakoceerr.tilepdf.data.text.TextSearchRepository
+import com.mustafakoceerr.tilepdf.di.ApplicationScope
 import com.mustafakoceerr.tilepdf.domain.OpenDocumentUseCase
 import com.mustafakoceerr.tilepdf.domain.OpenedDocument
 import com.mustafakoceerr.tilepdf.feature.reader.navigation.ReaderRoute
 import com.mustafakoceerr.tilepdf.model.ReadingPosition
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.FlowPreview
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
-import kotlinx.coroutines.flow.onCompletion
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filterIsInstance
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -31,6 +36,7 @@ import java.io.IOException
 import javax.inject.Inject
 
 private const val SAVE_POSITION_DEBOUNCE_MS = 500L
+private const val SEARCH_DEBOUNCE_MS = 300L
 
 @HiltViewModel
 class ReaderViewModel @Inject constructor(
@@ -40,14 +46,15 @@ class ReaderViewModel @Inject constructor(
     private val libraryRepository: LibraryRepository,
     private val preferencesRepository: ReaderPreferencesRepository,
     private val textSearchRepository: TextSearchRepository,
+    @param:ApplicationScope private val applicationScope: CoroutineScope,
 ) : ViewModel() {
 
     private val uri = savedStateHandle.toRoute<ReaderRoute>().uri
 
     private val documentState = MutableStateFlow<DocumentState>(DocumentState.Loading)
     private val searchState = MutableStateFlow(SearchUiState())
+    private val searchQuery = MutableStateFlow("")
     private val positionUpdates = MutableSharedFlow<ReadingPosition>(extraBufferCapacity = 1)
-    private var searchJob: Job? = null
 
     val uiState: StateFlow<ReaderUiState> = combine(
         documentState,
@@ -85,6 +92,7 @@ class ReaderViewModel @Inject constructor(
             }
         }
         savePositionWhileReading()
+        searchAsQueryChanges()
     }
 
     fun onPositionChanged(position: ReadingPosition) {
@@ -96,15 +104,57 @@ class ReaderViewModel @Inject constructor(
         viewModelScope.launch { preferencesRepository.setNightMode(!current) }
     }
 
-    fun onSearch(query: String) {
-        val opened = (documentState.value as? DocumentState.Opened) ?: return
-        searchJob?.cancel()
-        searchState.value = SearchUiState(query = query, isSearching = query.isNotBlank())
-        searchJob = viewModelScope.launch {
-            textSearchRepository.search(uri, opened.opened.document.pageCount, query)
-                .onCompletion { searchState.update { it.copy(isSearching = false) } }
-                .collect { match -> searchState.update { it.copy(matches = it.matches + match) } }
-        }
+    fun onOpenSearch() {
+        searchState.update { it.copy(isActive = true) }
+    }
+
+    fun onCloseSearch() {
+        searchState.value = SearchUiState()
+        searchQuery.value = ""
+    }
+
+    fun onSearchQueryChange(query: String) {
+        searchState.update { it.copy(query = query) }
+        searchQuery.value = query
+    }
+
+    fun onNextMatch() = moveCurrentMatch(+1)
+
+    fun onPreviousMatch() = moveCurrentMatch(-1)
+
+    private fun moveCurrentMatch(step: Int) = searchState.update { state ->
+        if (state.matches.isEmpty()) return@update state
+        // Wraps around at either end, like find-in-page in a browser.
+        state.copy(currentIndex = (state.currentIndex + step).mod(state.matches.size))
+    }
+
+    @OptIn(FlowPreview::class)
+    private fun searchAsQueryChanges() = viewModelScope.launch {
+        searchQuery
+            .debounce(SEARCH_DEBOUNCE_MS)
+            .distinctUntilChanged()
+            // A new query cancels the search still running for the old one.
+            .collectLatest { query ->
+                searchState.update {
+                    it.copy(matches = emptyList(), currentIndex = -1, isSearching = query.isNotBlank())
+                }
+                if (query.isBlank()) return@collectLatest
+                val pageCount = documentState.filterIsInstance<DocumentState.Opened>()
+                    .first().opened.document.pageCount
+                textSearchRepository.search(uri, pageCount, query)
+                    // An unreadable document simply has no matches.
+                    .catch { }
+                    .collect { pageMatches ->
+                        searchState.update { state ->
+                            state.copy(
+                                matches = state.matches + pageMatches,
+                                // Jump to the first match as soon as it's found.
+                                currentIndex = state.currentIndex.coerceAtLeast(0),
+                            )
+                        }
+                    }
+                searchState.update { it.copy(isSearching = false) }
+            }
     }
 
     @OptIn(FlowPreview::class)
@@ -118,6 +168,8 @@ class ReaderViewModel @Inject constructor(
 
     override fun onCleared() {
         (documentState.value as? DocumentState.Opened)?.opened?.document?.close()
+        // viewModelScope is already cancelled here.
+        applicationScope.launch { textSearchRepository.release(uri) }
     }
 
     private sealed interface DocumentState {

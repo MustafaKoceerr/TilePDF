@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -24,6 +25,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
@@ -38,6 +41,8 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.mustafakoceerr.tilepdf.R
+import com.mustafakoceerr.tilepdf.core.geometry.CoordinateMapper
+import com.mustafakoceerr.tilepdf.core.geometry.PdfRect
 import com.mustafakoceerr.tilepdf.core.pdf.PageSize
 import com.mustafakoceerr.tilepdf.core.render.PageImageSource
 import com.mustafakoceerr.tilepdf.core.render.RenderedTile
@@ -45,6 +50,7 @@ import com.mustafakoceerr.tilepdf.core.render.Tile
 import com.mustafakoceerr.tilepdf.core.render.TileGrid
 import com.mustafakoceerr.tilepdf.core.render.tilesFor
 import com.mustafakoceerr.tilepdf.model.ReadingPosition
+import com.mustafakoceerr.tilepdf.model.SearchMatch
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -58,6 +64,9 @@ private const val DRAFT_SCALE = 0.5f
 private const val TILE_REQUEST_DEBOUNCE_MS = 80L
 
 private val PAGE_GAP = 8.dp
+
+private val HighlightColor = Color(0x66FFEB3B)
+private val CurrentHighlightColor = Color(0x99FF9800)
 
 /** Inverts colours without re-rendering: white paper becomes black. */
 private val NightModeFilter = ColorFilter.colorMatrix(
@@ -78,9 +87,13 @@ fun PdfPageList(
     pageImages: PageImageSource,
     initialPosition: ReadingPosition,
     nightMode: Boolean,
+    matches: List<SearchMatch>,
+    currentMatch: SearchMatch?,
     onPositionChanged: (ReadingPosition) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val matchesByPage = remember(matches) { matches.groupBy { it.pageIndex } }
+
     BoxWithConstraints(modifier.fillMaxSize()) {
         val draftWidthPx = (constraints.maxWidth * DRAFT_SCALE).toInt()
         // TODO: also restore pageOffsetFraction and zoom.
@@ -107,6 +120,11 @@ fun PdfPageList(
 
         TrimMemoryEffect(pageImages)
 
+        LaunchedEffect(currentMatch) {
+            val match = currentMatch ?: return@LaunchedEffect
+            scrollToMatch(listState, zoomState, match, pageSizes[match.pageIndex], density)
+        }
+
         LazyColumn(
             state = listState,
             modifier = Modifier
@@ -128,6 +146,8 @@ fun PdfPageList(
                     draftWidthPx = draftWidthPx,
                     pageImages = pageImages,
                     nightMode = nightMode,
+                    matches = matchesByPage[pageIndex].orEmpty(),
+                    currentMatch = currentMatch,
                 )
             }
         }
@@ -165,6 +185,42 @@ private suspend fun requestVisibleTiles(
         .collect(pageImages::requestTiles)
 }
 
+/**
+ * Brings [match] into view, a third of the way down the screen, unless it is
+ * already fully visible. When zoomed, also pans it horizontally into the centre.
+ */
+private suspend fun scrollToMatch(
+    listState: LazyListState,
+    zoomState: ZoomState,
+    match: SearchMatch,
+    pageSize: PageSize,
+    density: Density,
+) {
+    val paddingPx = with(density) { (PAGE_GAP * zoomState.scale).roundToPx() }
+    val layout = pageLayout(zoomState, paddingPx)
+    val rect = CoordinateMapper.toPagePixels(match.rects.first(), pageSize, layout.pageWidth.toFloat())
+    val info = listState.layoutInfo
+    val viewportHeight = info.viewportSize.height
+    val item = info.visibleItemsInfo.firstOrNull { it.index == match.pageIndex }
+
+    if (item != null) {
+        val top = item.offset - info.viewportStartOffset + rect.top
+        val left = layout.pageLeft + rect.left
+        val fullyVisible = top >= 0 && top + rect.height <= viewportHeight &&
+            left >= 0 && left + rect.width <= zoomState.viewportWidth
+        if (fullyVisible) return
+        listState.animateScrollBy(top - viewportHeight / 3f)
+    } else {
+        // Far away: jump to the page, then settle on the match.
+        listState.scrollToItem(match.pageIndex)
+        listState.animateScrollBy(rect.top - viewportHeight / 3f)
+    }
+    if (zoomState.scale > 1f) {
+        // Content x of the match centre; pages start after the left padding.
+        zoomState.panTo(paddingPx + rect.centerX - zoomState.viewportWidth / 2f)
+    }
+}
+
 @Composable
 private fun TrimMemoryEffect(pageImages: PageImageSource) {
     val context = LocalContext.current
@@ -191,6 +247,8 @@ private fun PdfPage(
     draftWidthPx: Int,
     pageImages: PageImageSource,
     nightMode: Boolean,
+    matches: List<SearchMatch>,
+    currentMatch: SearchMatch?,
 ) {
     // Seed from the cache so pages scrolled back into view don't flash blank.
     var draft by remember(pageIndex, draftWidthPx) {
@@ -213,6 +271,10 @@ private fun PdfPage(
             .drawWithContent {
                 drawContent()
                 pageImages.renderedTiles(pageIndex).forEach { drawTile(it, colorFilter) }
+                matches.forEach { match ->
+                    val color = if (match == currentMatch) CurrentHighlightColor else HighlightColor
+                    match.rects.forEach { drawHighlight(it, pageSize, color) }
+                }
             },
     ) {
         draft?.let {
@@ -225,6 +287,15 @@ private fun PdfPage(
             )
         }
     }
+}
+
+private fun DrawScope.drawHighlight(
+    rect: PdfRect,
+    pageSize: PageSize,
+    color: Color,
+) {
+    val px = CoordinateMapper.toPagePixels(rect, pageSize, size.width)
+    drawRect(color, topLeft = Offset(px.left, px.top), size = Size(px.width, px.height))
 }
 
 /**

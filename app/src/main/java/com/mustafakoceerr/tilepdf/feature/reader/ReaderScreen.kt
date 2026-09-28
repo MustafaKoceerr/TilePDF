@@ -1,8 +1,11 @@
 package com.mustafakoceerr.tilepdf.feature.reader
 
+import androidx.activity.compose.BackHandler
 import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -26,6 +29,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mustafakoceerr.tilepdf.R
 import com.mustafakoceerr.tilepdf.feature.reader.components.PdfPageList
+import com.mustafakoceerr.tilepdf.feature.reader.components.SearchTopBar
 import com.mustafakoceerr.tilepdf.model.ReadingPosition
 import com.mustafakoceerr.tilepdf.ui.theme.TilePDFTheme
 
@@ -40,7 +44,27 @@ fun ReaderScreen(
         onBack = onBack,
         onToggleNightMode = viewModel::onToggleNightMode,
         onPositionChanged = viewModel::onPositionChanged,
+        searchActions = SearchActions(
+            onOpen = viewModel::onOpenSearch,
+            onQueryChange = viewModel::onSearchQueryChange,
+            onPrevious = viewModel::onPreviousMatch,
+            onNext = viewModel::onNextMatch,
+            onClose = viewModel::onCloseSearch,
+        ),
     )
+}
+
+/** Search events, grouped to keep the screen's signature readable. */
+internal class SearchActions(
+    val onOpen: () -> Unit,
+    val onQueryChange: (String) -> Unit,
+    val onPrevious: () -> Unit,
+    val onNext: () -> Unit,
+    val onClose: () -> Unit,
+) {
+    companion object {
+        val None = SearchActions({}, {}, {}, {}, {})
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -50,46 +74,70 @@ internal fun ReaderScreen(
     onBack: () -> Unit,
     onToggleNightMode: () -> Unit,
     onPositionChanged: (ReadingPosition) -> Unit,
+    searchActions: SearchActions,
 ) {
     val ready = uiState as? ReaderUiState.Ready
+    val search = ready?.search
+    BackHandler(enabled = search?.isActive == true, onBack = searchActions.onClose)
+
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = ready?.title ?: stringResource(R.string.app_name),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            painter = painterResource(R.drawable.ic_arrow_back),
-                            contentDescription = stringResource(R.string.navigate_back),
+            if (search?.isActive == true) {
+                SearchTopBar(
+                    state = search,
+                    onQueryChange = searchActions.onQueryChange,
+                    onPrevious = searchActions.onPrevious,
+                    onNext = searchActions.onNext,
+                    onClose = searchActions.onClose,
+                )
+            } else {
+                TopAppBar(
+                    title = {
+                        Text(
+                            text = ready?.title ?: stringResource(R.string.app_name),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                         )
-                    }
-                },
-                actions = {
-                    if (ready != null) {
-                        IconToggleButton(
-                            checked = ready.nightMode,
-                            onCheckedChange = { onToggleNightMode() },
-                        ) {
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
                             Icon(
-                                painter = painterResource(R.drawable.ic_dark_mode),
-                                contentDescription = stringResource(R.string.reader_night_mode),
+                                painter = painterResource(R.drawable.ic_arrow_back),
+                                contentDescription = stringResource(R.string.navigate_back),
                             )
                         }
-                    }
-                },
-            )
+                    },
+                    actions = {
+                        if (ready != null) {
+                            IconButton(onClick = searchActions.onOpen) {
+                                Icon(
+                                    painter = painterResource(R.drawable.ic_search),
+                                    contentDescription = stringResource(R.string.reader_search),
+                                )
+                            }
+                            IconToggleButton(
+                                checked = ready.nightMode,
+                                onCheckedChange = { onToggleNightMode() },
+                            ) {
+                                Icon(
+                                    painter = painterResource(R.drawable.ic_dark_mode),
+                                    contentDescription = stringResource(R.string.reader_night_mode),
+                                )
+                            }
+                        }
+                    },
+                )
+            }
         },
     ) { innerPadding ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding),
+                .padding(innerPadding)
+                .consumeWindowInsets(innerPadding)
+                // Edge-to-edge: the keyboard overlaps unless we shrink for it,
+                // and search would scroll matches behind the keyboard.
+                .imePadding(),
             contentAlignment = Alignment.Center,
         ) {
             when (uiState) {
@@ -104,6 +152,8 @@ internal fun ReaderScreen(
                     pageImages = uiState.pageImages,
                     initialPosition = uiState.initialPosition,
                     nightMode = uiState.nightMode,
+                    matches = uiState.search.matches,
+                    currentMatch = uiState.search.currentMatch,
                     onPositionChanged = onPositionChanged,
                 )
             }
@@ -123,6 +173,6 @@ private val ReaderError.messageRes: Int
 @Composable
 private fun ReaderScreenErrorPreview() {
     TilePDFTheme {
-        ReaderScreen(ReaderUiState.Error(ReaderError.PasswordProtected), {}, {}, {})
+        ReaderScreen(ReaderUiState.Error(ReaderError.PasswordProtected), {}, {}, {}, SearchActions.None)
     }
 }

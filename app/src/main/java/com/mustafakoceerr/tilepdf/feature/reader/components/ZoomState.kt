@@ -114,6 +114,11 @@ class ZoomState(private val flingDecay: DecayAnimationSpec<Float>) {
         return commit()
     }
 
+    /** Scrolls horizontally so content x [x] is at the viewport's left edge. */
+    fun panTo(x: Float) {
+        panX = x.coerceIn(0f, maxPanX)
+    }
+
     /** Scrolls horizontally by a drag delta; returns the delta actually consumed. */
     fun panBy(delta: Float): Float {
         val old = panX

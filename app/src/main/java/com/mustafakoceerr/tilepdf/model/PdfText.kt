@@ -3,11 +3,13 @@ package com.mustafakoceerr.tilepdf.model
 import com.mustafakoceerr.tilepdf.core.geometry.PdfRect
 
 /**
- * One character and its box in PDF point space (top-left origin, crop box
- * applied, page rotation applied). Every text provider produces this format,
- * so coordinate mapping never depends on where the text came from.
+ * One character and its box in PDF point space (top-left origin, relative to
+ * the crop box, page rotation applied). Every text provider produces this
+ * format, so coordinate mapping never depends on where the text came from.
+ *
+ * Word and line separators the provider inserts have no [box].
  */
-data class TextChar(val char: Char, val box: PdfRect)
+data class TextChar(val char: Char, val box: PdfRect?)
 
 data class PageText(val pageIndex: Int, val chars: List<TextChar>)
 

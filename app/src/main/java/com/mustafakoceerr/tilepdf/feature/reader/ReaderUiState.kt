@@ -24,7 +24,14 @@ sealed interface ReaderUiState {
 enum class ReaderError { NotFound, PasswordProtected, Corrupt }
 
 data class SearchUiState(
+    /** Whether the search bar is shown. */
+    val isActive: Boolean = false,
     val query: String = "",
+    /** In document order; grows while [isSearching]. */
     val matches: List<SearchMatch> = emptyList(),
+    /** Index into [matches] of the match being shown, or -1. */
+    val currentIndex: Int = -1,
     val isSearching: Boolean = false,
-)
+) {
+    val currentMatch: SearchMatch? get() = matches.getOrNull(currentIndex)
+}
