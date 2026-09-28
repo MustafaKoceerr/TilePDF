@@ -118,32 +118,41 @@ box, page rotation applied.**
 - Screen placement reuses the list's own rounding (`Dp.roundToPx`,
   `round(width × zoom)`) rather than approximating it.
 
-## Text extraction: two strategies, one interface
+## Text extraction: strategies behind one interface
 
-`PdfTextProvider` has two implementations, chosen in `TextModule` by API level:
+`PdfTextProvider` has three implementations; `TextModule` picks one by API
+level:
 
-- **`PdfBoxTextProvider`** — works everywhere (API 29+). Extracts every
-  character with its box once, caches it, and searches with `TextSearcher`
-  (case-insensitive, Turkish İ/ı/I/i folded together, line breaks match
-  spaces).
-- **`NativePdfTextProvider`** — API 35+, `PdfRenderer.Page.searchText`
-  (PDFium). No extra library, native search.
+- **`PdfBoxTextProvider`** (all API levels) extracts every character with
+  its box once and caches it. It searches with `TextSearcher`, which is
+  case-insensitive, folds Turkish İ/ı/I/i together, and matches a line break
+  as a space.
+- **`NativePdfTextProvider`** (API 35+) calls `PdfRenderer.Page.searchText`
+  (PDFium). It needs no extraction but caches nothing.
+- **`HybridTextProvider`** (API 35+, **the default there**) answers with
+  native search immediately while PdfBox extracts the document in the
+  background. Each page switches to the PdfBox cache once it has been
+  extracted.
 
-An instrumented benchmark (`TextProviderBenchmarkTest`) runs both on the same
-80-page, text-dense document with 5 queries. It also asserts that **both find
-the same 3,310 matches at the same positions**, which verifies that the
-geometry layer is independent of the text source.
+Below API 35, PdfBox handles everything.
 
-API 37 emulator, three runs:
+The text provider opens together with the document, so warm-up starts before
+the first search. Extracted text is stored compactly as a String plus four
+floats per character (about 18 bytes per character), so keeping a whole book
+in memory stays affordable.
 
-| Provider | Open | First search (5 queries, includes extraction) | Repeated search (5 queries) |
-|---|---|---|---|
-| PdfBox | 57–58 ms | 1157–1423 ms | **49–55 ms** |
-| Native | 29–88 ms | **259–354 ms** | 251–433 ms |
+An instrumented benchmark (`TextProviderBenchmarkTest`) runs every provider
+on the same 80-page, text-dense document with 5 queries. It also asserts that
+**all of them find the same 3,310 matches at the same positions**, which
+verifies that the geometry layer doesn't depend on where the text came from.
 
-Native is about 4x faster for the first search because it doesn't copy text
-into Kotlin. PdfBox's per-page cache makes every later search 5–8x faster.
-Native search also doesn't apply Turkish i-folding.
+API 37 emulator:
+
+| Provider | First search (5 queries) | Repeated search (5 queries) |
+|---|---|---|
+| PdfBox | 852–1423 ms (includes extraction) | 39–55 ms |
+| Native | 240–354 ms | 231–433 ms |
+| **Hybrid** | **235 ms** | **36 ms** (fully warmed 1.8 s after opening) |
 
 ## Testing
 
@@ -171,7 +180,7 @@ Test PDFs are generated deterministically and live in
 - Password-protected PDFs aren't supported.
 - Scanned (image-only) PDFs have no text, so search finds nothing (no OCR).
 - Horizontal pan isn't saved with the reading position.
-- Library entries have no page thumbnails yet.
+- Library entries have no page thumbnails.
 
 ## Out of scope, on purpose
 
