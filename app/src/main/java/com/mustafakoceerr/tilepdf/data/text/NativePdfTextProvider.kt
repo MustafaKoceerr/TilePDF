@@ -7,6 +7,7 @@ import android.os.ParcelFileDescriptor
 import androidx.annotation.RequiresApi
 import androidx.core.net.toUri
 import com.mustafakoceerr.tilepdf.core.geometry.PdfRect
+import com.mustafakoceerr.tilepdf.core.pdf.openPdfRenderer
 import com.mustafakoceerr.tilepdf.di.IoDispatcher
 import com.mustafakoceerr.tilepdf.model.PageText
 import com.mustafakoceerr.tilepdf.model.SearchMatch
@@ -15,7 +16,6 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import java.io.FileNotFoundException
 import javax.inject.Inject
 
 /**
@@ -84,14 +84,8 @@ class NativePdfTextProvider private constructor(
 
         @RequiresApi(35)
         override suspend fun create(uri: String): PdfTextProvider = withContext(ioDispatcher) {
-            val fileDescriptor = context.contentResolver.openFileDescriptor(uri.toUri(), "r")
-                ?: throw FileNotFoundException("Cannot open $uri")
-            try {
-                NativePdfTextProvider(fileDescriptor, PdfRenderer(fileDescriptor), ioDispatcher)
-            } catch (e: Exception) {
-                fileDescriptor.close()
-                throw e
-            }
+            val (fileDescriptor, renderer) = context.openPdfRenderer(uri.toUri())
+            NativePdfTextProvider(fileDescriptor, renderer, ioDispatcher)
         }
     }
 

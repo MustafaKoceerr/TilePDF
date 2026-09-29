@@ -4,6 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.toRoute
+import com.mustafakoceerr.tilepdf.core.common.runCatchingCancellable
 import com.mustafakoceerr.tilepdf.core.render.PageRenderer
 import com.mustafakoceerr.tilepdf.core.text.TextSelection
 import com.mustafakoceerr.tilepdf.core.render.TiledPageImageSource
@@ -19,7 +20,6 @@ import com.mustafakoceerr.tilepdf.feature.reader.navigation.ReaderRoute
 import com.mustafakoceerr.tilepdf.model.PageText
 import com.mustafakoceerr.tilepdf.model.ReadingPosition
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
@@ -151,13 +151,9 @@ class ReaderViewModel @Inject constructor(
     fun onLongPress(pageIndex: Int, x: Float, y: Float) {
         selectionJob?.cancel()
         selectionJob = viewModelScope.launch {
-            val page = try {
-                documentTextRepository.pageText(uri, pageIndex)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (_: Exception) {
-                return@launch // Unreadable text: nothing to select.
-            }
+            // Unreadable text: nothing to select.
+            val page = runCatchingCancellable { documentTextRepository.pageText(uri, pageIndex) }
+                .getOrNull() ?: return@launch
             selection.value = TextSelection.wordAt(page, x, y)?.let { Selection(page, it) }
         }
     }
@@ -243,23 +239,13 @@ class ReaderViewModel @Inject constructor(
 
     private fun loadOutline() = viewModelScope.launch {
         // Optional extra: a PDF PdfBox can't parse simply shows no contents.
-        try {
-            val entries = outlineRepository.outline(uri)
-            toc.update { it.copy(entries = entries) }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (_: Exception) {
-        }
+        runCatchingCancellable { outlineRepository.outline(uri) }
+            .onSuccess { entries -> toc.update { it.copy(entries = entries) } }
     }
 
     private fun prepareSearch() = viewModelScope.launch {
         // Best effort: if text can't be read, searching just finds nothing.
-        try {
-            documentTextRepository.prepare(uri)
-        } catch (e: CancellationException) {
-            throw e
-        } catch (_: Exception) {
-        }
+        runCatchingCancellable { documentTextRepository.prepare(uri) }
     }
 
     @OptIn(FlowPreview::class)
