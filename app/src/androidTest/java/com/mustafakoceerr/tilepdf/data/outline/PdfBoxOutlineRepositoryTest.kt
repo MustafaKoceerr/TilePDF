@@ -1,6 +1,5 @@
 package com.mustafakoceerr.tilepdf.data.outline
 
-import android.net.Uri
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.mustafakoceerr.tilepdf.data.pdfbox.PdfBoxDocumentLoader
@@ -11,7 +10,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
-import java.io.File
+import com.mustafakoceerr.tilepdf.testing.TestAssets
 
 @RunWith(AndroidJUnit4::class)
 class PdfBoxOutlineRepositoryTest {
@@ -20,15 +19,9 @@ class PdfBoxOutlineRepositoryTest {
     private val context = instrumentation.targetContext
     private val repository = PdfBoxOutlineRepository(PdfBoxDocumentLoader(context, Dispatchers.IO), Dispatchers.IO)
 
-    private fun asset(name: String): String {
-        val file = File(context.cacheDir, name)
-        instrumentation.context.assets.open(name).use { input -> file.outputStream().use { input.copyTo(it) } }
-        return Uri.fromFile(file).toString()
-    }
-
     @Test
     fun flattensTreeAndResolvesEveryDestinationKind() = runBlocking {
-        val outline = repository.outline(asset("outline.pdf"))
+        val outline = repository.outline(TestAssets.uriString("outline.pdf"))
 
         assertEquals(
             listOf(
@@ -48,6 +41,6 @@ class PdfBoxOutlineRepositoryTest {
 
     @Test
     fun documentWithoutOutlineHasNoEntries() = runBlocking {
-        assertTrue(repository.outline(asset("sample.pdf")).isEmpty())
+        assertTrue(repository.outline(TestAssets.uriString("sample.pdf")).isEmpty())
     }
 }

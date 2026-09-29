@@ -15,6 +15,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import com.mustafakoceerr.tilepdf.testing.TestAssets
 import java.io.File
 import java.io.IOException
 
@@ -29,7 +30,7 @@ class PdfDocumentTest {
 
     @Before
     fun setUp() = runBlocking {
-        document = opener.open(copyAsset("sample.pdf"))
+        document = opener.open(TestAssets.uri("sample.pdf"))
     }
 
     @After
@@ -71,13 +72,5 @@ class PdfDocumentTest {
     fun invalidFileThrowsIOException() {
         val notPdf = File(targetContext.cacheDir, "not-a.pdf").apply { writeText("hello") }
         runBlocking { opener.open(Uri.fromFile(notPdf)) }
-    }
-
-    private fun copyAsset(name: String): Uri {
-        val file = File(targetContext.cacheDir, name)
-        instrumentation.context.assets.open(name).use { input ->
-            file.outputStream().use { input.copyTo(it) }
-        }
-        return Uri.fromFile(file)
     }
 }

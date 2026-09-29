@@ -1,6 +1,5 @@
 package com.mustafakoceerr.tilepdf.data.text
 
-import android.net.Uri
 import android.util.Log
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.mustafakoceerr.tilepdf.data.pdfbox.PdfBoxDocumentLoader
@@ -14,7 +13,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
-import java.io.File
+import com.mustafakoceerr.tilepdf.testing.TestAssets
 import kotlin.math.abs
 import kotlin.system.measureNanoTime
 
@@ -36,13 +35,7 @@ class TextProviderBenchmarkTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private val context = instrumentation.targetContext
 
-    private val uri: String by lazy {
-        val file = File(context.cacheDir, "benchmark.pdf")
-        instrumentation.context.assets.open("benchmark.pdf").use { input ->
-            file.outputStream().use { input.copyTo(it) }
-        }
-        Uri.fromFile(file).toString()
-    }
+    private val uri: String by lazy { TestAssets.uriString("benchmark.pdf") }
 
     @Test
     fun providersAgreeAndReportTimings(): Unit = runBlocking {

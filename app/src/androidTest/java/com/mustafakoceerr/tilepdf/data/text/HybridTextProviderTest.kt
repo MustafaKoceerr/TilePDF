@@ -1,6 +1,5 @@
 package com.mustafakoceerr.tilepdf.data.text
 
-import android.net.Uri
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.mustafakoceerr.tilepdf.data.pdfbox.PdfBoxDocumentLoader
 import androidx.test.filters.SdkSuppress
@@ -10,7 +9,7 @@ import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.junit.runner.RunWith
-import java.io.File
+import com.mustafakoceerr.tilepdf.testing.TestAssets
 
 @SdkSuppress(minSdkVersion = 35)
 @RunWith(AndroidJUnit4::class)
@@ -21,13 +20,7 @@ class HybridTextProviderTest {
     private val pdfBoxFactory = PdfBoxTextProvider.Factory(PdfBoxDocumentLoader(context, Dispatchers.IO), Dispatchers.IO)
     private val nativeFactory = NativePdfTextProvider.Factory(context, Dispatchers.IO)
 
-    private val uri: String by lazy {
-        val file = File(context.cacheDir, "benchmark.pdf")
-        instrumentation.context.assets.open("benchmark.pdf").use { input ->
-            file.outputStream().use { input.copyTo(it) }
-        }
-        Uri.fromFile(file).toString()
-    }
+    private val uri: String by lazy { TestAssets.uriString("benchmark.pdf") }
 
     private fun hybrid(warmUpDelayMs: Long) =
         runBlocking { HybridTextProvider(nativeFactory.create(uri), pdfBoxFactory, uri, Dispatchers.IO, warmUpDelayMs) }

@@ -1,6 +1,5 @@
 package com.mustafakoceerr.tilepdf.data.text
 
-import android.net.Uri
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.mustafakoceerr.tilepdf.data.pdfbox.PdfBoxDocumentLoader
 import androidx.test.platform.app.InstrumentationRegistry
@@ -12,7 +11,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
-import java.io.File
+import com.mustafakoceerr.tilepdf.testing.TestAssets
 
 @RunWith(AndroidJUnit4::class)
 class PdfBoxTextProviderTest {
@@ -23,11 +22,8 @@ class PdfBoxTextProviderTest {
 
     @Before
     fun setUp() = runBlocking {
-        val file = File(context.cacheDir, "sample.pdf")
-        instrumentation.context.assets.open("sample.pdf").use { input ->
-            file.outputStream().use { input.copyTo(it) }
-        }
-        provider = PdfBoxTextProvider.Factory(PdfBoxDocumentLoader(context, Dispatchers.IO), Dispatchers.IO).create(Uri.fromFile(file).toString())
+        provider = PdfBoxTextProvider.Factory(PdfBoxDocumentLoader(context, Dispatchers.IO), Dispatchers.IO)
+            .create(TestAssets.uriString("sample.pdf"))
     }
 
     @After

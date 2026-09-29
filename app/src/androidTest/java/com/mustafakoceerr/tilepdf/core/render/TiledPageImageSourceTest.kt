@@ -1,12 +1,9 @@
 package com.mustafakoceerr.tilepdf.core.render
 
-import android.net.Uri
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import androidx.test.platform.app.InstrumentationRegistry
 import com.mustafakoceerr.tilepdf.core.geometry.PixelRect
 import com.mustafakoceerr.tilepdf.core.pdf.PdfDocument
-import com.mustafakoceerr.tilepdf.core.pdf.PdfDocumentOpener
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -19,14 +16,12 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
-import java.io.File
+import com.mustafakoceerr.tilepdf.testing.TestAssets
 
 /** The source must be driven from the main thread, as the UI does. */
 @RunWith(AndroidJUnit4::class)
 class TiledPageImageSourceTest {
 
-    private val instrumentation = InstrumentationRegistry.getInstrumentation()
-    private val context = instrumentation.targetContext
     private val renderer = PageRenderer(Dispatchers.IO)
     /**
      * Renders resume only when the test yields, so assertions right after a
@@ -40,12 +35,7 @@ class TiledPageImageSourceTest {
 
     @Before
     fun setUp() = runBlocking {
-        val file = File(context.cacheDir, "sample.pdf")
-        instrumentation.context.assets.open("sample.pdf").use { input ->
-            file.outputStream().use { input.copyTo(it) }
-        }
-        document = PdfDocumentOpener(context, Dispatchers.IO.limitedParallelism(1))
-            .open(Uri.fromFile(file))
+        document = TestAssets.openDocument("sample.pdf")
     }
 
     @After

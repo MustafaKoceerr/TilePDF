@@ -3,13 +3,10 @@ package com.mustafakoceerr.tilepdf.core.render
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
-import android.net.Uri
 import androidx.core.graphics.createBitmap
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import androidx.test.platform.app.InstrumentationRegistry
 import com.mustafakoceerr.tilepdf.core.geometry.PixelRect
 import com.mustafakoceerr.tilepdf.core.pdf.PdfDocument
-import com.mustafakoceerr.tilepdf.core.pdf.PdfDocumentOpener
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -18,25 +15,18 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
-import java.io.File
+import com.mustafakoceerr.tilepdf.testing.TestAssets
 import kotlin.math.abs
 
 @RunWith(AndroidJUnit4::class)
 class TileRenderTest {
 
-    private val instrumentation = InstrumentationRegistry.getInstrumentation()
-    private val context = instrumentation.targetContext
     private val renderer = PageRenderer(Dispatchers.IO)
     private lateinit var document: PdfDocument
 
     @Before
     fun setUp() = runBlocking {
-        val file = File(context.cacheDir, "sample.pdf")
-        instrumentation.context.assets.open("sample.pdf").use { input ->
-            file.outputStream().use { input.copyTo(it) }
-        }
-        document = PdfDocumentOpener(context, Dispatchers.IO.limitedParallelism(1))
-            .open(Uri.fromFile(file))
+        document = TestAssets.openDocument("sample.pdf")
     }
 
     @After
