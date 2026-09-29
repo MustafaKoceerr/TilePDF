@@ -20,9 +20,8 @@ class LibraryViewModel @Inject constructor(
 
     val uiState: StateFlow<LibraryUiState> = libraryRepository.observeDocuments()
         .map { documents ->
-            LibraryUiState.Success(
-                documents.map { LibraryItem(it, documentRepository.hasAccess(it.uri)) }
-            )
+            val accessible = documentRepository.accessibleUris()
+            LibraryUiState.Success(documents.map { LibraryItem(it, it.uri in accessible) })
         }
         .stateIn(
             scope = viewModelScope,

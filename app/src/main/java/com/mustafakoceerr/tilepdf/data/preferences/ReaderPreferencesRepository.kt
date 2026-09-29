@@ -4,5 +4,5 @@ import kotlinx.coroutines.flow.Flow
 
 interface ReaderPreferencesRepository {
     val nightMode: Flow<Boolean>
-    suspend fun setNightMode(enabled: Boolean)
+    suspend fun toggleNightMode()
 }

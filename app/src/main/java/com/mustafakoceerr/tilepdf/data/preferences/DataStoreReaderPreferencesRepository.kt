@@ -14,8 +14,10 @@ class DataStoreReaderPreferencesRepository @Inject constructor(
 
     override val nightMode: Flow<Boolean> = dataStore.data.map { it[NIGHT_MODE] ?: false }
 
-    override suspend fun setNightMode(enabled: Boolean) {
-        dataStore.edit { it[NIGHT_MODE] = enabled }
+    // Read and write in one edit transaction, so quick repeated toggles
+    // can't both start from the same stale value.
+    override suspend fun toggleNightMode() {
+        dataStore.edit { it[NIGHT_MODE] = !(it[NIGHT_MODE] ?: false) }
     }
 
     private companion object {

@@ -360,7 +360,9 @@ private fun TrimMemoryEffect(pageImages: PageImageSource) {
     DisposableEffect(context, pageImages) {
         val callbacks = object : ComponentCallbacks2 {
             override fun onTrimMemory(level: Int) {
-                if (level >= ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW) pageImages.trimMemory()
+                // Since Android 14 only UI_HIDDEN and BACKGROUND are delivered:
+                // drop off-screen caches once the reader isn't visible.
+                if (level >= ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN) pageImages.trimMemory()
             }
 
             override fun onConfigurationChanged(newConfig: Configuration) = Unit

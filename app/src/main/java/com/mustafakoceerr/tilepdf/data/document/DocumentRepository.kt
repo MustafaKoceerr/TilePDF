@@ -8,8 +8,8 @@ interface DocumentRepository {
     /** Keeps read access to [uri] across app restarts, when the provider allows it. */
     fun persistAccess(uri: String)
 
-    /** Whether the app still holds read access to [uri]. */
-    fun hasAccess(uri: String): Boolean
+    /** URIs the app still holds a persisted read grant for; one system call. */
+    suspend fun accessibleUris(): Set<String>
 
     /** Name shown to the user, e.g. `report.pdf`. */
     suspend fun displayName(uri: String): String?

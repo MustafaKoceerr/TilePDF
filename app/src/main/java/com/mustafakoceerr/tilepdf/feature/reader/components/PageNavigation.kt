@@ -23,6 +23,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -112,7 +113,8 @@ internal fun PageNavigationOverlay(
             visible = false
         }
     }
-    val currentPage = listState.layoutInfo.centerPage() ?: 0
+    // derivedStateOf: recompose when the page number changes, not every frame.
+    val currentPage by remember(listState) { derivedStateOf { listState.layoutInfo.centerPage() ?: 0 } }
 
     Box(modifier) {
         if (pageCount > 1) {
@@ -171,7 +173,6 @@ private fun FastScroller(
     // While dragging, the thumb follows the finger rather than the list, whose
     // estimated progress would make it jitter.
     var dragProgress by remember { mutableFloatStateOf(-1f) }
-    val progress = if (dragProgress >= 0f) dragProgress else listState.scrollProgress(pageCount)
     val description = stringResource(R.string.reader_fast_scroll)
 
     BoxWithConstraints(modifier.padding(vertical = 8.dp)) {
@@ -183,7 +184,12 @@ private fun FastScroller(
             visible = visible,
             enter = fadeIn(),
             exit = fadeOut(),
-            modifier = Modifier.offset { IntOffset(0, (progress * travelPx).roundToInt()) },
+            // Scroll position is read here, in the layout phase, so scrolling
+            // moves the thumb without recomposing it every frame.
+            modifier = Modifier.offset {
+                val progress = if (dragProgress >= 0f) dragProgress else listState.scrollProgress(pageCount)
+                IntOffset(0, (progress * travelPx).roundToInt())
+            },
         ) {
             Box(
                 contentAlignment = Alignment.Center,

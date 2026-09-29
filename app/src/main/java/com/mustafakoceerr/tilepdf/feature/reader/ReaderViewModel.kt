@@ -144,8 +144,7 @@ class ReaderViewModel @Inject constructor(
     }
 
     fun onToggleNightMode() {
-        val current = (uiState.value as? ReaderUiState.Ready)?.nightMode ?: return
-        viewModelScope.launch { preferencesRepository.setNightMode(!current) }
+        viewModelScope.launch { preferencesRepository.toggleNightMode() }
     }
 
     /** Selects the word at a point on a page, given in top-left PDF points. */

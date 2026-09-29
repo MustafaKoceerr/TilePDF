@@ -32,8 +32,11 @@ class SafDocumentRepository @Inject constructor(
         }
     }
 
-    override fun hasAccess(uri: String): Boolean =
-        contentResolver.persistedUriPermissions.any { it.uri.toString() == uri && it.isReadPermission }
+    override suspend fun accessibleUris(): Set<String> = withContext(ioDispatcher) {
+        contentResolver.persistedUriPermissions
+            .filter { it.isReadPermission }
+            .mapTo(HashSet()) { it.uri.toString() }
+    }
 
     override suspend fun displayName(uri: String): String? = withContext(ioDispatcher) {
         contentResolver.query(uri.toUri(), arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
