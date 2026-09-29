@@ -72,6 +72,8 @@ fun ReaderScreen(
         onDragSelectionHandle = viewModel::onDragSelectionHandle,
         onSelectAllOnPage = viewModel::onSelectAllOnPage,
         onClearSelection = viewModel::onClearSelection,
+        onOpenToc = viewModel::onOpenToc,
+        onCloseToc = viewModel::onCloseToc,
     )
 }
 
@@ -109,6 +111,8 @@ internal fun ReaderScreen(
     onDragSelectionHandle: (SelectionHandle, x: Float, y: Float) -> Unit = { _, _, _ -> },
     onSelectAllOnPage: () -> Unit = {},
     onClearSelection: () -> Unit = {},
+    onOpenToc: () -> Unit = {},
+    onCloseToc: () -> Unit = {},
 ) {
     val ready = uiState as? ReaderUiState.Ready
     val search = ready?.search
@@ -116,7 +120,6 @@ internal fun ReaderScreen(
     val copySelection = rememberCopyAction(selection?.text, onCopied = onClearSelection)
     BackHandler(enabled = selection != null, onBack = onClearSelection)
     var goToPageOpen by rememberSaveable { mutableStateOf(false) }
-    var tocOpen by rememberSaveable { mutableStateOf(false) }
     var menuOpen by remember { mutableStateOf(false) }
     var pageJump by remember { mutableStateOf<PageJump?>(null) }
     BackHandler(enabled = search?.isActive == true, onBack = searchActions.onClose)
@@ -150,8 +153,8 @@ internal fun ReaderScreen(
                     },
                     actions = {
                         if (ready != null) {
-                            if (ready.outline.isNotEmpty()) {
-                                IconButton(onClick = { tocOpen = true }) {
+                            if (ready.toc.entries.isNotEmpty()) {
+                                IconButton(onClick = onOpenToc) {
                                     Icon(
                                         painter = painterResource(R.drawable.ic_toc),
                                         contentDescription = stringResource(R.string.reader_toc),
@@ -219,14 +222,15 @@ internal fun ReaderScreen(
         }
     }
 
-    if (tocOpen && ready != null) {
+    if (ready != null && ready.toc.isOpen) {
         TableOfContentsSheet(
-            outline = ready.outline,
+            outline = ready.toc.entries,
+            currentIndex = ready.toc.currentIndex,
             onSelect = { entry ->
-                tocOpen = false
+                onCloseToc()
                 pageJump = PageJump(entry.pageIndex, entry.topPt)
             },
-            onDismiss = { tocOpen = false },
+            onDismiss = onCloseToc,
         )
     }
 }

@@ -20,13 +20,20 @@ sealed interface ReaderUiState {
         val initialPosition: ReadingPosition,
         val nightMode: Boolean,
         val search: SearchUiState,
-        /** Table of contents; empty until loaded, or if the PDF has none. */
-        val outline: List<OutlineEntry>,
+        val toc: TocUiState,
         val selection: SelectionUiState?,
     ) : ReaderUiState
 }
 
 enum class ReaderError { NotFound, PasswordProtected, Corrupt }
+
+data class TocUiState(
+    /** Table of contents; empty until loaded, or if the PDF has none. */
+    val entries: List<OutlineEntry> = emptyList(),
+    val isOpen: Boolean = false,
+    /** Entry the reader was in when the sheet opened, or -1 before the first. */
+    val currentIndex: Int = -1,
+)
 
 /** Selected text on one page; positions in top-left PDF points. */
 data class SelectionUiState(

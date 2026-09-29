@@ -13,9 +13,9 @@ import com.mustafakoceerr.tilepdf.data.preferences.ReaderPreferencesRepository
 import com.mustafakoceerr.tilepdf.data.text.DocumentTextRepository
 import com.mustafakoceerr.tilepdf.di.ApplicationScope
 import com.mustafakoceerr.tilepdf.domain.OpenDocumentUseCase
+import com.mustafakoceerr.tilepdf.domain.OutlineLocator
 import com.mustafakoceerr.tilepdf.domain.OpenedDocument
 import com.mustafakoceerr.tilepdf.feature.reader.navigation.ReaderRoute
-import com.mustafakoceerr.tilepdf.model.OutlineEntry
 import com.mustafakoceerr.tilepdf.model.PageText
 import com.mustafakoceerr.tilepdf.model.ReadingPosition
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -61,7 +61,13 @@ class ReaderViewModel @Inject constructor(
     private val documentState = MutableStateFlow<DocumentState>(DocumentState.Loading)
     private val searchState = MutableStateFlow(SearchUiState())
     private val searchQuery = MutableStateFlow("")
-    private val outline = MutableStateFlow<List<OutlineEntry>>(emptyList())
+    private val toc = MutableStateFlow(TocUiState())
+
+    /**
+     * Latest scroll position. A plain field, not state: it changes every
+     * frame while scrolling, and only matters when the contents open.
+     */
+    private var position: ReadingPosition? = null
     private val selection = MutableStateFlow<Selection?>(null)
     private var selectionJob: Job? = null
     private val positionUpdates = MutableSharedFlow<ReadingPosition>(extraBufferCapacity = 1)
@@ -70,9 +76,9 @@ class ReaderViewModel @Inject constructor(
         documentState,
         preferencesRepository.nightMode,
         searchState,
-        outline,
+        toc,
         selection,
-    ) { document, nightMode, search, outline, selection ->
+    ) { document, nightMode, search, toc, selection ->
         when (document) {
             DocumentState.Loading -> ReaderUiState.Loading
             is DocumentState.Failed -> ReaderUiState.Error(document.reason)
@@ -83,7 +89,7 @@ class ReaderViewModel @Inject constructor(
                 initialPosition = document.opened.position,
                 nightMode = nightMode,
                 search = search,
-                outline = outline,
+                toc = toc,
                 selection = selection?.toUiState(),
             )
         }
@@ -112,7 +118,29 @@ class ReaderViewModel @Inject constructor(
     }
 
     fun onPositionChanged(position: ReadingPosition) {
+        this.position = position
         positionUpdates.tryEmit(position)
+    }
+
+    fun onOpenToc() {
+        val opened = (documentState.value as? DocumentState.Opened)?.opened ?: return
+        val at = position ?: opened.position
+        // The position is the fraction scrolled into the top page; convert to points.
+        val pageHeight = opened.document.pageSizes.getOrNull(at.pageIndex)?.heightPt ?: 0
+        toc.update { state ->
+            state.copy(
+                isOpen = true,
+                currentIndex = OutlineLocator.currentIndex(
+                    state.entries,
+                    at.pageIndex,
+                    at.pageOffsetFraction * pageHeight,
+                ) ?: -1,
+            )
+        }
+    }
+
+    fun onCloseToc() {
+        toc.update { it.copy(isOpen = false) }
     }
 
     fun onToggleNightMode() {
@@ -217,7 +245,8 @@ class ReaderViewModel @Inject constructor(
     private fun loadOutline() = viewModelScope.launch {
         // Optional extra: a PDF PdfBox can't parse simply shows no contents.
         try {
-            outline.value = outlineRepository.outline(uri)
+            val entries = outlineRepository.outline(uri)
+            toc.update { it.copy(entries = entries) }
         } catch (e: CancellationException) {
             throw e
         } catch (_: Exception) {
