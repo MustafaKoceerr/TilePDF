@@ -62,9 +62,15 @@ class TiledPageImageSource(
     private var requestedTiles: Map<Int, List<TileKey>> = emptyMap()
 
     private val draftCache = BitmapCache<Int>(DRAFT_CACHE_BYTES)
+    /** Set while trimming for a hidden UI: evicted bitmaps are freed, not pooled. */
+    private var recycleEvicted = false
+
     private val tileCache = BitmapCache<TileKey>(tileCacheBytes) { key, bitmap ->
-        if (key in liveTiles || key in fallbackTiles) evictedWhileShown += key
-        else bitmapPool.release(bitmap)
+        when {
+            key in liveTiles || key in fallbackTiles -> evictedWhileShown += key
+            recycleEvicted -> bitmap.recycle()
+            else -> bitmapPool.release(bitmap)
+        }
     }
 
     override fun cachedDraft(pageIndex: Int, widthPx: Int): Bitmap? =
@@ -125,9 +131,16 @@ class TiledPageImageSource(
         liveTiles.values.filterTo(this) { it.tile.key.pageIndex == pageIndex }
     }
 
-    override fun trimMemory() {
-        tileCache.evictAll()
-        bitmapPool.clear()
+    override fun trimMemory(uiHidden: Boolean) {
+        // Tiles still on screen are never recycled: they're drawn again when
+        // the reader comes back. Drafts aren't either; visible pages show them.
+        recycleEvicted = uiHidden
+        try {
+            tileCache.evictAll()
+        } finally {
+            recycleEvicted = false
+        }
+        bitmapPool.clear(recycle = uiHidden)
         draftCache.trimToSize(DRAFT_CACHE_BYTES / 2)
     }
 

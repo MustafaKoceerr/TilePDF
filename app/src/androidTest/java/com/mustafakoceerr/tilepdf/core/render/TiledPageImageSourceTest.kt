@@ -112,6 +112,40 @@ class TiledPageImageSourceTest {
         renderedTiles(page).map { it.image.asAndroidBitmap() }
 
     @Test
+    fun trimmingWhileHiddenFreesOffScreenTilesButNotVisibleOnes() = onMain {
+        val source = TiledPageImageSource(document, renderer, scope, tileCacheBytes = 64 * TILE_BYTES)
+        source.requestTiles(allTiles(page = 0, renderWidth = 1000))
+        source.awaitRenders()
+        val offScreen = source.bitmaps(0)
+        source.requestTiles(allTiles(page = 1, renderWidth = 1000))
+        source.awaitRenders()
+        val onScreen = source.bitmaps(1)
+
+        source.trimMemory(uiHidden = true)
+
+        // Page 0 only lived in the cache: its native memory is freed now.
+        assertTrue(offScreen.all { it.isRecycled })
+        // Page 1 is what the reader shows when it comes back.
+        assertTrue(onScreen.none { it.isRecycled })
+        assertEquals(onScreen.size, source.renderedTiles(1).size)
+    }
+
+    @Test
+    fun trimmingInForegroundOnlyEvicts() = onMain {
+        val source = TiledPageImageSource(document, renderer, scope, tileCacheBytes = 64 * TILE_BYTES)
+        source.requestTiles(allTiles(page = 0, renderWidth = 1000))
+        source.awaitRenders()
+        val offScreen = source.bitmaps(0)
+        source.requestTiles(allTiles(page = 1, renderWidth = 1000))
+        source.awaitRenders()
+
+        source.trimMemory(uiHidden = false)
+
+        // A frame could still be drawing them: left to the garbage collector.
+        assertTrue(offScreen.none { it.isRecycled })
+    }
+
+    @Test
     fun rendersThatFinishWithoutSuspendingAreNotLeftPending() = onMain {
         // No cache, so every return to a page renders again. Tiny blank tiles
         // often finish before launch returns; they must still leave pending.

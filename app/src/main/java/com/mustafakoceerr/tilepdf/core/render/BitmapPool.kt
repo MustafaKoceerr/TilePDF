@@ -48,7 +48,9 @@ class BitmapPool(
         bytes += bitmap.allocationByteCount
     }
 
-    fun clear() {
+    /** Empties the pool; with [recycle], frees the bitmaps' native memory now. */
+    fun clear(recycle: Boolean = false) {
+        if (recycle) entries.forEach { it.bitmap.recycle() }
         entries.clear()
         bytes = 0
     }

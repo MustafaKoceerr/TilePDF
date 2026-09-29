@@ -213,14 +213,17 @@ private fun TrimMemoryEffect(pageImages: PageImageSource) {
         val callbacks = object : ComponentCallbacks2 {
             override fun onTrimMemory(level: Int) {
                 // Since Android 14 only UI_HIDDEN and BACKGROUND are delivered:
-                // drop off-screen caches once the reader isn't visible.
-                if (level >= ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN) pageImages.trimMemory()
+                // drop off-screen caches once the reader isn't visible. Every
+                // level from UI_HIDDEN up means nothing is being drawn.
+                if (level >= ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN) pageImages.trimMemory(uiHidden = true)
             }
 
             override fun onConfigurationChanged(newConfig: Configuration) = Unit
 
+            // Still in the foreground: evict, but a frame may still reference
+            // what's evicted, so leave freeing it to the garbage collector.
             @Deprecated("Deprecated in Java")
-            override fun onLowMemory() = pageImages.trimMemory()
+            override fun onLowMemory() = pageImages.trimMemory(uiHidden = false)
         }
         context.registerComponentCallbacks(callbacks)
         onDispose { context.unregisterComponentCallbacks(callbacks) }

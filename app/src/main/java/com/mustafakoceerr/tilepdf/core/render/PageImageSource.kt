@@ -29,8 +29,14 @@ interface PageImageSource {
      */
     fun renderedTiles(pageIndex: Int): List<RenderedTile>
 
-    /** Drops off-screen cached images when the system is low on memory. */
-    fun trimMemory()
+    /**
+     * Drops off-screen cached images when the system is low on memory.
+     *
+     * @param uiHidden the app isn't visible, so no frame can still be drawing
+     *   the dropped bitmaps and their native memory can be freed right away
+     *   instead of waiting for a garbage collection.
+     */
+    fun trimMemory(uiHidden: Boolean)
 }
 
 class RenderedTile(val tile: Tile, val image: ImageBitmap)

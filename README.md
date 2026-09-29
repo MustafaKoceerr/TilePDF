@@ -108,7 +108,35 @@ tests without a ViewModel.
   screen.
 - Pooled bitmaps wait 100 ms before reuse, so the RenderThread never samples a
   bitmap mid-overwrite.
-- `onTrimMemory` drops everything that isn't on screen.
+- `onTrimMemory` drops everything that isn't on screen. Once the reader is
+  hidden, dropped tiles are recycled immediately rather than waiting for a
+  garbage collection, which the small Java heap would rarely trigger.
+
+## Measured on a real device
+
+Samsung Galaxy A52 (Android 14, 90 Hz display, 256 MB app heap, so a 64 MB
+tile cache). The session was scripted over adb on a 30-page PDF with a
+full-page 150 dpi image on every page: flings through the whole document in
+both directions, 2.5× zoom with panning, scrollbar drags, go to page, search.
+
+![Memory over the session: native heap and graphics rise while new pages and zoom levels render, then plateau; Java heap stays under 20 MB](docs/memory-a52.svg)
+
+Memory rises while new pages and zoom levels are rendered, then plateaus.
+During the last 30 seconds, jumping around the document and searching adds
+nothing: the caches are bounded, and nothing leaks.
+
+| Moment | Native heap | Total PSS |
+|---|---|---|
+| Reading, zoomed in | 155 MB | 377 MB |
+| 6 s after pressing Home | 76 MB | 201 MB |
+
+Frame times for the same session, measured with `dumpsys gfxinfo`; a frame
+has 11.1 ms at 90 Hz:
+
+| Build | Janky frames | 50th pct | 90th pct | 99th pct |
+|---|---|---|---|---|
+| Release | 2.1 % | 9 ms | 14 ms | 31 ms |
+| Debug | 4.5 % | 11 ms | 17 ms | 40 ms |
 
 ## Coordinate spaces
 
