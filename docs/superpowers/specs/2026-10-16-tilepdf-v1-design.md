@@ -90,25 +90,30 @@ app                  MainActivity, NavHost, Hilt kökü, intent işleme
 feature:library      kütüphane ekranı
 feature:reader       sayfa listesi, zoom, arama, seçim, TOC, küçük resim, yer imi
 feature:annotation   araç çubuğu, araçlar, geri al/yinele, açıklama listesi
-core:pdfium          JNI köprüsü, PdfiumEngine, tek-thread dispatcher
+core:pdf             motor modülü: bugün PdfRenderer; Aşama 2'de PDFium JNI köprüsü + PdfEngine
 core:render          tile, BitmapPool, BitmapCache
 core:data            repository'ler
 core:database        Room: belgeler, yer imleri, açıklama taslakları
 core:datastore       okuyucu tercihleri
 core:domain          use case'ler
 core:model           saf Kotlin modeller (PdfRect, Annotation, Bookmark…)
+core:common          dispatcher qualifier'ları, ApplicationScope
 core:designsystem    tema, renkler, tipografi
 core:ui              paylaşılan Compose bileşenleri
 core:testing         fake'ler, test PDF'leri, test kuralları
 build-logic          convention plugin'leri
 ```
 
-Bağımlılık yönü: `feature → core:domain → core:data → core:{pdfium,database,datastore}`;
+`core:ui` ve `feature:annotation` ilk kodlarını aldıklarında (Aşama 5-6)
+oluşturulur; boş modül açılmaz.
+
+Bağımlılık yönü: `feature → core:domain → core:data → core:{pdf,database,datastore}`;
 feature modülleri birbirine bağımlı değildir. `core:model` her yerden kullanılabilir.
 
 Mevcut koddan taşınanlar: `core/geometry` → `core:model`; `core/render` →
 `core:render`; `core/text` (TextSearcher, LineMerger, TextSelection) →
-`core:domain`; `data/*` ve `di/*` → ilgili `core:*`; `feature/*` → feature
+`core:data` (TextSearcher data katmanında kullanılıyor ve TextSelection ile
+`internal LineMerger`'ı paylaşıyor; domain'e koymak katman yönünü ters çevirirdi); `data/*` ve `di/*` → ilgili `core:*`; `feature/*` → feature
 modülleri; `app/schemas` → `core:database` (migration testi korunur).
 
 ## Veri akışı
@@ -141,7 +146,7 @@ modülleri; `app/schemas` → `core:database` (migration testi korunur).
 
 - TDD: her davranış önce başarısız testle.
 - JVM: domain, ViewModel, repository (fake `PdfEngine`, fake DAO'lar).
-- Instrumented: `core:pdfium` gerçek PDF'lerle (normal, şifreli, bozuk,
+- Instrumented: `core:pdf` (PDFium) gerçek PDF'lerle (normal, şifreli, bozuk,
   kesik); kayıt akışının uçtan uca testi (yaz → yeniden aç → annotation var);
   Room migration.
 - Roborazzi ekran görüntüsü testleri: reader, library, annotation.
@@ -153,7 +158,7 @@ Her aşama kendi uygulama planıyla (writing-plans) ve yeşil testlerle biter.
 
 0. Spec + benchmark temizliği
 1. `build-logic` ve modül iskeleti; mevcut kodu davranış değiştirmeden taşı
-2. `core:pdfium`: JNI köprüsü, `PdfEngine`, testler
+2. `core:pdf` içine PDFium: JNI köprüsü, `PdfEngine`, testler
 3. Okuyucuyu PDFium'a geçir; PdfBox ve `PdfRenderer` kaldırılır
 4. Eksik okuma özellikleri
 5. `feature:annotation` + taslak + güvenli kayıt

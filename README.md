@@ -33,30 +33,42 @@ minSdk 29
 
 ## Architecture
 
-Single module, layered by package, following
+Modules follow [Now in Android](https://github.com/android/nowinandroid) and
 [Modern Android Development](https://developer.android.com/topic/architecture)
-guidance with unidirectional data flow:
+guidance, with unidirectional data flow. Shared Gradle setup lives in
+convention plugins under `build-logic/` (`tilepdf.android.library`,
+`tilepdf.android.feature`, `tilepdf.hilt`, …).
 
 ```
-feature/   UI layer      Screen (stateful → stateless) · ViewModel · UiState
-   │         state flows up as StateFlow<UiState>; events go down as calls
+app                  MainActivity, Hilt application, nav host
+   │
+feature:library      Screen (stateful → stateless) · ViewModel · UiState
+feature:reader         state flows up as StateFlow<UiState>; events go down as calls
    ▼
-domain/    OpenDocumentUseCase — open + record in library + restore position
+core:domain          OpenDocumentUseCase — open + record in library + restore position
    ▼
-data/      Repositories behind interfaces
-             DocumentRepository     SAF access, persisted grants
-             LibraryRepository      Room
-             ReaderPreferences      DataStore
-             TextSearchRepository   PdfTextProvider strategy + text cache
+core:data            Repositories behind interfaces
+                       DocumentRepository     SAF access, persisted grants
+                       LibraryRepository      Room
+                       ReaderPreferences      DataStore
+                       TextSearchRepository   PdfTextProvider strategy + text cache
+                     TextSearcher, TextSelection
    ▼
-core/      Rendering engine and geometry, UI-framework independent
-             pdf/       PdfDocument: PdfRenderer serialized on one thread
-             render/    TileGrid, PageRenderer, TiledPageImageSource,
-                        BitmapCache, BitmapPool
-             geometry/  Viewport, PageLayout, CoordinateMapper
-             text/      TextSearcher
-model/     Plain data shared across layers
+core:database        Room (schema history in core/database/schemas)
+core:datastore       Preferences DataStore
+core:render          TileGrid, PageRenderer, TiledPageImageSource, BitmapCache, BitmapPool
+core:pdf             PdfDocument: PdfRenderer serialized on one thread
+   ▼
+core:model           Pure Kotlin: geometry (Viewport, PageLayout, CoordinateMapper) and data
+core:common          Dispatcher qualifiers, application scope
+
+core:designsystem    Theme and TilePdfIcons, used by the features
+core:testing         Test PDFs and TestAssets for instrumented tests
 ```
+
+Feature modules never depend on each other; `app` wires them together.
+Kotlin packages predate the modules and still read `core.render`, `data.text`
+and so on.
 
 Each feature owns its type-safe route and `NavGraphBuilder` extension.
 Stateless screens take `UiState` plus callbacks, so they render in previews and
