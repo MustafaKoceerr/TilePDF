@@ -52,7 +52,21 @@ class OpenWithTest {
                 .forEach { it.finish() }
         }
         if (::scenario.isInitialized) scenario.close()
+        // finish() is asynchronous: wait until every activity is gone, or the
+        // next test's intent can land on one that is still finishing.
+        val deadline = System.currentTimeMillis() + 10_000
+        while (System.currentTimeMillis() < deadline && aliveActivities() > 0) Thread.sleep(50)
         published.forEach { context.contentResolver.delete(it, null, null) }
+    }
+
+    private fun aliveActivities(): Int {
+        var count = 0
+        instrumentation.runOnMainSync {
+            val monitor = ActivityLifecycleMonitorRegistry.getInstance()
+            count = listOf(Stage.PRE_ON_CREATE, Stage.CREATED, Stage.STARTED, Stage.RESUMED, Stage.PAUSED, Stage.STOPPED, Stage.RESTARTED)
+                .sumOf { monitor.getActivitiesInStage(it).size }
+        }
+        return count
     }
 
     /** Display names MediaStore actually gave the published files. */
