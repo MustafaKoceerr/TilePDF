@@ -19,10 +19,11 @@ internal object PdfiumNative {
 
     /**
      * Opens the PDF readable through [fd] (which must stay open until the
-     * document is closed). Returns a handle > 0, or minus PDFium's error code.
+     * document is closed). Returns a non-zero handle, or 0 with PDFium's error
+     * code in `error[0]`. Handles may be negative: arm64 tags heap pointers.
      */
     @JvmStatic
-    external fun nativeOpen(fd: Int, size: Long, password: String?): Long
+    external fun nativeOpen(fd: Int, size: Long, password: String?, error: IntArray): Long
 
     @JvmStatic
     external fun nativeCloseDocument(document: Long)
@@ -65,11 +66,19 @@ internal object PdfiumNative {
     external fun nativeBookmarkTitle(bookmark: Long): String
 
     /**
-     * `[pageIndex, topPt]`; pageIndex is -1 if the bookmark points nowhere,
-     * topPt is NaN unless it is an XYZ destination with a y.
+     * `[pageIndex, x, y]` in PDF user space; pageIndex is -1 if the bookmark
+     * points nowhere, y is NaN unless it is an XYZ destination with a y.
+     * Loads no page.
      */
     @JvmStatic
     external fun nativeBookmarkTarget(document: Long, bookmark: Long): FloatArray
+
+    /**
+     * Maps `[x0, y0, x1, y1, ...]` in page [index]'s user space to top-left
+     * points. Loads the page; null if it can't be loaded.
+     */
+    @JvmStatic
+    external fun nativePageToTopLeft(document: Long, index: Int, points: FloatArray): FloatArray?
 
     /** PDFium's `FPDF_ERR_PASSWORD`. */
     const val ERROR_PASSWORD = 4

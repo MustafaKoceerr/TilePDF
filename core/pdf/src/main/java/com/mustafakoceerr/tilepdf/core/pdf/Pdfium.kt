@@ -31,13 +31,8 @@ class Pdfium @Inject constructor(
         try {
             val size = fileDescriptor.statSize
             if (size <= 0) throw PdfCorruptException("Empty or unsized file")
-            val handle = PdfiumNative.nativeOpen(fileDescriptor.fd, size, password)
-            if (handle <= 0) {
-                throw when ((-handle).toInt()) {
-                    PdfiumNative.ERROR_PASSWORD -> PdfPasswordException(wrongPassword = password != null)
-                    else -> PdfCorruptException("PDFium error ${-handle}")
-                }
-            }
+            val error = IntArray(1)
+            val handle = openedHandle(PdfiumNative.nativeOpen(fileDescriptor.fd, size, password, error), error[0], password)
             val pageSizes = try {
                 List(PdfiumNative.nativePageCount(handle)) { index -> pageSize(handle, index) }
             } catch (e: Exception) {
@@ -57,4 +52,19 @@ class Pdfium @Inject constructor(
         // Truncated like PdfRenderer, so both engines lay pages out identically.
         return PageSize(size[0].toInt(), size[1].toInt())
     }
+}
+
+/**
+ * Checks the result of [PdfiumNative.nativeOpen]. Only 0 means failure: on
+ * arm64, Android 11+ tags heap pointers in the top byte, so a valid handle
+ * is often negative.
+ */
+internal fun openedHandle(handle: Long, error: Int, password: String?): Long {
+    if (handle == 0L) {
+        throw when (error) {
+            PdfiumNative.ERROR_PASSWORD -> PdfPasswordException(wrongPassword = password != null)
+            else -> PdfCorruptException("PDFium error $error")
+        }
+    }
+    return handle
 }

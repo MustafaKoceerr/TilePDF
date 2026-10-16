@@ -87,23 +87,30 @@ Java_com_mustafakoceerr_tilepdf_core_pdf_PdfiumNative_nativeInit(JNIEnv*, jclass
     g_initialized = true;
 }
 
-// Returns a document handle (> 0), or minus PDFium's error code on failure.
+// Returns a document handle, or 0 with PDFium's error code in error[0]. A
+// handle is a pointer and may be negative as a jlong: arm64 tags heap pointers.
 JNIEXPORT jlong JNICALL
 Java_com_mustafakoceerr_tilepdf_core_pdf_PdfiumNative_nativeOpen(
-        JNIEnv* env, jclass, jint fd, jlong size, jstring password) {
+        JNIEnv* env, jclass, jint fd, jlong size, jstring password, jintArray error) {
+    const char* passwordChars = nullptr;
+    if (password) {
+        passwordChars = env->GetStringUTFChars(password, nullptr);
+        if (!passwordChars) return 0;  // OutOfMemoryError is pending.
+    }
     auto* native = new NativeDocument();
     native->access.m_FileLen = static_cast<unsigned long>(size);
     native->access.m_GetBlock = ReadBlock;
     native->access.m_Param = reinterpret_cast<void*>(static_cast<intptr_t>(fd));
 
-    const char* passwordChars = password ? env->GetStringUTFChars(password, nullptr) : nullptr;
     native->document = FPDF_LoadCustomDocument(&native->access, passwordChars);
     if (passwordChars) env->ReleaseStringUTFChars(password, passwordChars);
 
     if (!native->document) {
-        const auto error = static_cast<jlong>(FPDF_GetLastError());
+        const auto code = static_cast<jint>(FPDF_GetLastError());
+        const jint reported = code > 0 ? code : FPDF_ERR_UNKNOWN;
+        env->SetIntArrayRegion(error, 0, 1, &reported);
         delete native;
-        return -(error > 0 ? error : FPDF_ERR_UNKNOWN);
+        return 0;
     }
     return reinterpret_cast<jlong>(native);
 }
@@ -129,6 +136,7 @@ Java_com_mustafakoceerr_tilepdf_core_pdf_PdfiumNative_nativePageSize(
         return env->NewFloatArray(0);
     }
     jfloatArray result = env->NewFloatArray(2);
+    if (!result) return nullptr;  // OutOfMemoryError is pending.
     const jfloat values[] = {size.width, size.height};
     env->SetFloatArrayRegion(result, 0, 2, values);
     return result;
@@ -215,6 +223,7 @@ Java_com_mustafakoceerr_tilepdf_core_pdf_PdfiumNative_nativeCharBoxes(
         box[3] = std::max(y1, y2);
     }
     jfloatArray result = env->NewFloatArray(static_cast<jsize>(boxes.size()));
+    if (!result) return nullptr;  // OutOfMemoryError is pending.
     env->SetFloatArrayRegion(result, 0, static_cast<jsize>(boxes.size()), boxes.data());
     return result;
 }
@@ -245,8 +254,9 @@ Java_com_mustafakoceerr_tilepdf_core_pdf_PdfiumNative_nativeBookmarkTitle(JNIEnv
     return env->NewString(title.data(), static_cast<jsize>(title.size() - 1));
 }
 
-// [pageIndex, topPt]: pageIndex -1 if the bookmark points nowhere, topPt NaN
-// unless it is an XYZ destination with a y. Follows GoTo actions.
+// [pageIndex, x, y] in PDF user space: pageIndex -1 if the bookmark points
+// nowhere; y NaN unless it is an XYZ destination with a y. Follows GoTo
+// actions. Loads no page, so walking a long outline stays cheap.
 JNIEXPORT jfloatArray JNICALL
 Java_com_mustafakoceerr_tilepdf_core_pdf_PdfiumNative_nativeBookmarkTarget(
         JNIEnv* env, jclass, jlong handle, jlong bookmark) {
@@ -257,23 +267,40 @@ Java_com_mustafakoceerr_tilepdf_core_pdf_PdfiumNative_nativeBookmarkTarget(
         FPDF_ACTION action = FPDFBookmark_GetAction(native);
         if (action && FPDFAction_GetType(action) == PDFACTION_GOTO) dest = FPDFAction_GetDest(document, action);
     }
-    jfloat target[] = {-1, NAN};
+    jfloat target[] = {-1, 0, NAN};
     if (dest) {
-        const int pageIndex = FPDFDest_GetDestPageIndex(document, dest);
-        target[0] = static_cast<jfloat>(pageIndex);
+        target[0] = static_cast<jfloat>(FPDFDest_GetDestPageIndex(document, dest));
         FPDF_BOOL hasX = 0, hasY = 0, hasZoom = 0;
         FS_FLOAT x = 0, y = 0, zoom = 0;
-        if (pageIndex >= 0 && FPDFDest_GetLocationInPage(dest, &hasX, &hasY, &hasZoom, &x, &y, &zoom) && hasY) {
-            FPDF_PAGE page = FPDF_LoadPage(document, pageIndex);
-            if (page) {
-                float ignoredX = 0;
-                PageToTopLeft(page, hasX ? x : 0, y, &ignoredX, &target[1]);
-                FPDF_ClosePage(page);
-            }
+        if (target[0] >= 0 && FPDFDest_GetLocationInPage(dest, &hasX, &hasY, &hasZoom, &x, &y, &zoom) && hasY) {
+            target[1] = hasX ? x : 0;
+            target[2] = y;
         }
     }
-    jfloatArray result = env->NewFloatArray(2);
-    env->SetFloatArrayRegion(result, 0, 2, target);
+    jfloatArray result = env->NewFloatArray(3);
+    if (!result) return nullptr;  // OutOfMemoryError is pending.
+    env->SetFloatArrayRegion(result, 0, 3, target);
+    return result;
+}
+
+// Maps (x, y) pairs in page [index]'s user space to top-left points, in place
+// order: returns [x0, y0, x1, y1, ...], or null if the page can't be loaded.
+JNIEXPORT jfloatArray JNICALL
+Java_com_mustafakoceerr_tilepdf_core_pdf_PdfiumNative_nativePageToTopLeft(
+        JNIEnv* env, jclass, jlong handle, jint index, jfloatArray points) {
+    const jsize count = env->GetArrayLength(points);
+    std::vector<jfloat> values(static_cast<size_t>(count));
+    env->GetFloatArrayRegion(points, 0, count, values.data());
+    FPDF_PAGE page = FPDF_LoadPage(FromHandle(handle)->document, index);
+    if (!page) return nullptr;
+    for (jsize i = 0; i + 1 < count; i += 2) {
+        PageToTopLeft(page, values[static_cast<size_t>(i)], values[static_cast<size_t>(i) + 1],
+                      &values[static_cast<size_t>(i)], &values[static_cast<size_t>(i) + 1]);
+    }
+    FPDF_ClosePage(page);
+    jfloatArray result = env->NewFloatArray(count);
+    if (!result) return nullptr;  // OutOfMemoryError is pending.
+    env->SetFloatArrayRegion(result, 0, count, values.data());
     return result;
 }
 

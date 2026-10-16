@@ -77,9 +77,34 @@ class PdfiumDocument internal constructor(
      * The table of contents, flattened depth first. Entries with a blank title
      * or no target page are skipped but their children are kept; `topPt` is
      * set only for destinations that give a y.
+     *
+     * Bookmarks are read in one pass that loads no page. Mapping a y to the
+     * top-left needs the page loaded, so that happens one page per call, and
+     * renders waiting on the PDF dispatcher run in between.
      */
-    suspend fun outline(): List<OutlineEntry> = withDocument { handle ->
-        val entries = mutableListOf<OutlineEntry>()
+    suspend fun outline(): List<OutlineEntry> {
+        val raw = withDocument { handle -> readBookmarks(handle) }
+        val tops = HashMap<Int, FloatArray?>()
+        for ((pageIndex, entries) in raw.filter { !it.y.isNaN() }.groupBy { it.pageIndex }) {
+            val points = FloatArray(entries.size * 2).also { points ->
+                entries.forEachIndexed { i, entry -> points[i * 2] = entry.x; points[i * 2 + 1] = entry.y }
+            }
+            tops[pageIndex] = withDocument { PdfiumNative.nativePageToTopLeft(it, pageIndex, points) }
+        }
+        val nextOnPage = HashMap<Int, Int>()
+        return raw.map { entry ->
+            val topPt = if (entry.y.isNaN()) null else {
+                val slot = nextOnPage.merge(entry.pageIndex, 1, Int::plus)!! - 1
+                tops[entry.pageIndex]?.get(slot * 2 + 1)?.coerceIn(0f, pageSizes[entry.pageIndex].heightPt.toFloat())
+            }
+            OutlineEntry(entry.title, entry.pageIndex, topPt, entry.depth)
+        }
+    }
+
+    private class RawBookmark(val title: String, val pageIndex: Int, val x: Float, val y: Float, val depth: Int)
+
+    private fun readBookmarks(handle: Long): List<RawBookmark> {
+        val entries = mutableListOf<RawBookmark>()
         // Malformed files can link bookmarks into a cycle.
         val visited = HashSet<Long>()
 
@@ -87,11 +112,10 @@ class PdfiumDocument internal constructor(
             var bookmark = PdfiumNative.nativeBookmarkFirstChild(handle, parent)
             while (bookmark != 0L && visited.add(bookmark) && entries.size < MAX_OUTLINE_ENTRIES) {
                 val title = PdfiumNative.nativeBookmarkTitle(bookmark).trim()
-                val (page, top) = PdfiumNative.nativeBookmarkTarget(handle, bookmark)
+                val (page, x, y) = PdfiumNative.nativeBookmarkTarget(handle, bookmark)
                 val pageIndex = page.toInt()
                 if (title.isNotEmpty() && pageIndex in 0 until pageCount) {
-                    val topPt = top.takeUnless { it.isNaN() }?.coerceIn(0f, pageSizes[pageIndex].heightPt.toFloat())
-                    entries += OutlineEntry(title, pageIndex, topPt, depth)
+                    entries += RawBookmark(title, pageIndex, x, y, depth)
                 }
                 addChildren(bookmark, depth + 1)
                 bookmark = PdfiumNative.nativeBookmarkNextSibling(handle, bookmark)
@@ -99,7 +123,7 @@ class PdfiumDocument internal constructor(
         }
 
         addChildren(parent = 0L, depth = 0)
-        entries
+        return entries
     }
 
     /** Runs [block] with the native handle, after checking [pageIndex] if given. */
