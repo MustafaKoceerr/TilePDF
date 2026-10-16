@@ -163,7 +163,11 @@ Her aşama kendi uygulama planıyla (writing-plans) ve yeşil testlerle biter.
 1. `build-logic` ve modül iskeleti; mevcut kodu davranış değiştirmeden taşı
 2. `core:pdf` içine PDFium (okuma tarafı): açma/şifre, sayfa boyutu, render,
    metin + karakter kutuları, içindekiler, testler
-3. Okuyucuyu PDFium'a geçir; PdfBox ve `PdfRenderer` kaldırılır
+3. Okuyucuyu PDFium'a geçir; PdfBox ve `PdfRenderer` kaldırılır. Performans,
+   motoru değiştirerek değil kullanımıyla kazanılır (MuPDF AGPL, Poppler GPL;
+   PDFium lisansı uygun en iyi C++ motor): görünür sayfalar native tarafta açık
+   tutulur (karo başına parse yok), metin sayfası tek yüklenir, ekrandan çıkan
+   karonun render'ı iptal edilir; etkisi gerçek cihazda Perfetto ile ölçülür
 4. Eksik okuma özellikleri; PDFium link okuma burada eklenir
 5. `feature:annotation` + taslak + güvenli kayıt; PDFium annotation yazma ve
    artımlı kayıt burada eklenir
