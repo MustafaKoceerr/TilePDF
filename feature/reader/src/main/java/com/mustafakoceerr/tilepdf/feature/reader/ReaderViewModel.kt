@@ -20,6 +20,7 @@ import com.mustafakoceerr.tilepdf.feature.reader.navigation.ReaderRoute
 import com.mustafakoceerr.tilepdf.model.PageText
 import com.mustafakoceerr.tilepdf.model.ReadingPosition
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
@@ -37,8 +38,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import java.io.FileNotFoundException
-import java.io.IOException
 import javax.inject.Inject
 
 private const val SAVE_POSITION_DEBOUNCE_MS = 500L
@@ -105,12 +104,9 @@ class ReaderViewModel @Inject constructor(
                     opened = opened,
                     pageImages = TiledPageImageSource(opened.document, pageRenderer, viewModelScope),
                 )
-            } catch (_: FileNotFoundException) {
-                DocumentState.Failed(ReaderError.NotFound)
-            } catch (_: SecurityException) {
-                DocumentState.Failed(ReaderError.PasswordProtected)
-            } catch (_: IOException) {
-                DocumentState.Failed(ReaderError.Corrupt)
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                DocumentState.Failed(readerErrorFor(e) ?: throw e)
             }
         }
         savePositionWhileReading()

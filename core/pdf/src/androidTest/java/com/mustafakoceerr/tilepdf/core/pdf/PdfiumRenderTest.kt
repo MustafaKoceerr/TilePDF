@@ -38,7 +38,7 @@ class PdfiumRenderTest {
 
     @Test
     fun matchesPdfRenderer() = runBlocking {
-        PdfDocumentOpener(context, dispatcher).open(TestAssets.uri("sample.pdf")).use { reference ->
+        PlatformReference(TestAssets.uri("sample.pdf")).use { reference ->
             for (page in 0 until document.pageCount) {
                 val size = document.pageSizes[page]
                 val transform = Matrix().apply { setScale(400f / size.widthPt, 400f / size.widthPt) }

@@ -16,8 +16,8 @@ import javax.inject.Singleton
 annotation class IoDispatcher
 
 /**
- * Single-threaded dispatcher for all [android.graphics.pdf.PdfRenderer] access.
- * PdfRenderer is not thread-safe and allows only one open page at a time.
+ * Single-threaded dispatcher for every PDFium call. PDFium keeps global state
+ * and is not thread-safe, so all documents share this one dispatcher.
  */
 @Qualifier
 @Retention(AnnotationRetention.BINARY)

@@ -5,7 +5,7 @@ import android.content.Intent
 import android.provider.OpenableColumns
 import androidx.core.net.toUri
 import com.mustafakoceerr.tilepdf.core.pdf.PdfDocument
-import com.mustafakoceerr.tilepdf.core.pdf.PdfDocumentOpener
+import com.mustafakoceerr.tilepdf.core.pdf.PdfEngine
 import com.mustafakoceerr.tilepdf.di.IoDispatcher
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineDispatcher
@@ -15,7 +15,7 @@ import javax.inject.Inject
 class SafDocumentRepository @Inject constructor(
     @param:ApplicationContext private val context: Context,
     @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher,
-    private val opener: PdfDocumentOpener,
+    private val engine: PdfEngine,
 ) : DocumentRepository {
 
     private val contentResolver get() = context.contentResolver
@@ -43,5 +43,5 @@ class SafDocumentRepository @Inject constructor(
             ?.use { cursor -> if (cursor.moveToFirst()) cursor.getString(0) else null }
     }
 
-    override suspend fun open(uri: String): PdfDocument = opener.open(uri.toUri())
+    override suspend fun open(uri: String, password: String?): PdfDocument = engine.open(uri.toUri(), password)
 }

@@ -24,13 +24,13 @@ class PdfDocumentTest {
 
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private val targetContext = instrumentation.targetContext
-    private val opener = PdfDocumentOpener(targetContext, Dispatchers.IO.limitedParallelism(1))
+    private val pdfium = Pdfium(targetContext, Dispatchers.IO.limitedParallelism(1))
     private val pageRenderer = PageRenderer(Dispatchers.IO)
     private lateinit var document: PdfDocument
 
     @Before
     fun setUp() = runBlocking {
-        document = opener.open(TestAssets.uri("sample.pdf"))
+        document = pdfium.open(TestAssets.uri("sample.pdf"))
     }
 
     @After
@@ -71,6 +71,6 @@ class PdfDocumentTest {
     @Test(expected = IOException::class)
     fun invalidFileThrowsIOException() {
         val notPdf = File(targetContext.cacheDir, "not-a.pdf").apply { writeText("hello") }
-        runBlocking { opener.open(Uri.fromFile(notPdf)) }
+        runBlocking { pdfium.open(Uri.fromFile(notPdf)) }
     }
 }

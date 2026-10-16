@@ -15,11 +15,12 @@ interface DocumentRepository {
     suspend fun displayName(uri: String): String?
 
     /**
-     * Opens [uri] for rendering. The caller owns the result and must close it.
+     * Opens [uri] for reading. The caller owns the result and must close it.
      *
-     * @throws java.io.FileNotFoundException if the file is gone or access was revoked.
-     * @throws SecurityException if the PDF is password protected.
-     * @throws java.io.IOException if the file is not a valid PDF.
+     * @throws java.io.FileNotFoundException if the file is gone.
+     * @throws SecurityException if the read grant was revoked.
+     * @throws com.mustafakoceerr.tilepdf.core.pdf.PdfPasswordException if a (different) password is needed.
+     * @throws com.mustafakoceerr.tilepdf.core.pdf.PdfCorruptException if the file is not a readable PDF.
      */
-    suspend fun open(uri: String): PdfDocument
+    suspend fun open(uri: String, password: String? = null): PdfDocument
 }

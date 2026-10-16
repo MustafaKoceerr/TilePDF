@@ -18,13 +18,8 @@ import javax.inject.Singleton
 class Pdfium @Inject constructor(
     @param:ApplicationContext private val context: Context,
     @param:PdfDispatcher private val dispatcher: CoroutineDispatcher,
-) {
-    /**
-     * @throws FileNotFoundException if [uri] can't be opened.
-     * @throws PdfPasswordException if the document needs a (different) password.
-     * @throws PdfCorruptException if the file isn't a readable PDF.
-     */
-    suspend fun open(uri: Uri, password: String? = null): PdfiumDocument = withContext(dispatcher) {
+) : PdfEngine {
+    override suspend fun open(uri: Uri, password: String?): PdfiumDocument = withContext(dispatcher) {
         PdfiumNative.nativeInit()
         val fileDescriptor = context.contentResolver.openFileDescriptor(uri, "r")
             ?: throw FileNotFoundException("Cannot open $uri")
