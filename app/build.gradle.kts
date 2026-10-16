@@ -1,7 +1,6 @@
 plugins {
     alias(libs.plugins.tilepdf.android.application)
     alias(libs.plugins.tilepdf.android.application.compose)
-    alias(libs.plugins.tilepdf.android.room)
     alias(libs.plugins.tilepdf.hilt)
     alias(libs.plugins.kotlin.serialization)
 }
@@ -26,6 +25,7 @@ android {
 
 dependencies {
     implementation(projects.core.common)
+    implementation(projects.core.data)
     implementation(projects.core.model)
     implementation(projects.core.pdf)
     implementation(projects.core.render)
@@ -41,6 +41,4 @@ dependencies {
     implementation(libs.androidx.hilt.navigation.compose)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.kotlinx.coroutines.android)
-    implementation(libs.androidx.datastore.preferences)
-    implementation(libs.pdfbox.android)
 }

@@ -5,9 +5,6 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.preferencesDataStoreFile
-import androidx.room.Room
-import com.mustafakoceerr.tilepdf.data.local.DocumentDao
-import com.mustafakoceerr.tilepdf.data.local.TilePdfDatabase
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -17,15 +14,7 @@ import javax.inject.Singleton
 
 @Module
 @InstallIn(SingletonComponent::class)
-object DatabaseModule {
-
-    @Provides
-    @Singleton
-    fun providesDatabase(@ApplicationContext context: Context): TilePdfDatabase =
-        Room.databaseBuilder(context, TilePdfDatabase::class.java, "tilepdf.db").build()
-
-    @Provides
-    fun providesDocumentDao(database: TilePdfDatabase): DocumentDao = database.documentDao()
+object DataStoreModule {
 
     @Provides
     @Singleton
