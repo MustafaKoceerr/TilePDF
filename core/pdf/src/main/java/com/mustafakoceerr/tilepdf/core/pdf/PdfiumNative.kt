@@ -42,6 +42,17 @@ internal object PdfiumNative {
     @JvmStatic
     external fun nativeRender(document: Long, index: Int, bitmap: Bitmap, matrix: FloatArray): Boolean
 
+    /** One char per PDFium character index; null if the page has no text layer. */
+    @JvmStatic
+    external fun nativePageText(document: Long, index: Int): String?
+
+    /**
+     * Left, top, right, bottom per character of [nativePageText], in top-left
+     * points; NaN for generated characters. Null if there is no text layer.
+     */
+    @JvmStatic
+    external fun nativeCharBoxes(document: Long, index: Int): FloatArray?
+
     /** PDFium's `FPDF_ERR_PASSWORD`. */
     const val ERROR_PASSWORD = 4
 }

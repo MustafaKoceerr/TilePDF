@@ -3,6 +3,8 @@ package com.mustafakoceerr.tilepdf.core.pdf
 import android.graphics.Bitmap
 import android.graphics.Matrix
 import android.os.ParcelFileDescriptor
+import com.mustafakoceerr.tilepdf.core.geometry.PdfRect
+import com.mustafakoceerr.tilepdf.model.PageText
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.NonCancellable
@@ -46,6 +48,28 @@ class PdfiumDocument internal constructor(
         )
         val rendered = withDocument(pageIndex) { PdfiumNative.nativeRender(it, pageIndex, bitmap, matrix) }
         if (!rendered) throw PdfCorruptException("Page $pageIndex could not be rendered")
+    }
+
+    /**
+     * The text of [pageIndex] with a box per character in top-left points.
+     * Line breaks are plain `'\n'`; characters PDFium generates (spaces and
+     * line breaks it inferred) have no box.
+     */
+    suspend fun pageText(pageIndex: Int): PageText {
+        val (text, boxes) = withDocument(pageIndex) {
+            PdfiumNative.nativePageText(it, pageIndex) to PdfiumNative.nativeCharBoxes(it, pageIndex)
+        }
+        if (text == null || boxes == null) return PageText.withoutBoxes(pageIndex, "")
+        val builder = PageText.Builder(text.length)
+        text.forEachIndexed { i, char ->
+            if (char == '\r') return@forEachIndexed
+            val offset = i * 4
+            val box = if (boxes[offset].isNaN()) null else {
+                PdfRect(boxes[offset], boxes[offset + 1], boxes[offset + 2], boxes[offset + 3])
+            }
+            builder.append(char, box)
+        }
+        return builder.build(pageIndex)
     }
 
     /** Runs [block] with the native handle, after checking [pageIndex] if given. */

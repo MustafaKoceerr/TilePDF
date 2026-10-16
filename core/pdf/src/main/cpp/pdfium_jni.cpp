@@ -4,10 +4,14 @@
 #include <android/bitmap.h>
 #include <jni.h>
 
+#include <algorithm>
 #include <cerrno>
+#include <cmath>
 #include <cstdint>
 #include <unistd.h>
+#include <vector>
 
+#include "fpdf_text.h"
 #include "fpdfview.h"
 
 namespace {
@@ -36,6 +40,38 @@ int ReadBlock(void* param, unsigned long position, unsigned char* buffer, unsign
 NativeDocument* FromHandle(jlong handle) {
     return reinterpret_cast<NativeDocument*>(handle);
 }
+
+// Device space is PDFium's page space mapped to a top-left origin with crop
+// box and /Rotate applied. FPDF_PageToDevice only returns ints, so the page
+// is mapped at 64x and scaled back, keeping 1/64 pt precision.
+constexpr int kDeviceScale = 64;
+
+void PageToTopLeft(FPDF_PAGE page, double x, double y, float* outX, float* outY) {
+    const int width = static_cast<int>(FPDF_GetPageWidthF(page) * kDeviceScale + 0.5f);
+    const int height = static_cast<int>(FPDF_GetPageHeightF(page) * kDeviceScale + 0.5f);
+    int deviceX = 0;
+    int deviceY = 0;
+    FPDF_PageToDevice(page, 0, 0, width, height, 0, x, y, &deviceX, &deviceY);
+    *outX = static_cast<float>(deviceX) / kDeviceScale;
+    *outY = static_cast<float>(deviceY) / kDeviceScale;
+}
+
+// Owns a loaded page and its text page for the duration of one call.
+struct TextPage {
+    FPDF_PAGE page;
+    FPDF_TEXTPAGE text;
+
+    TextPage(FPDF_DOCUMENT document, int index)
+        : page(FPDF_LoadPage(document, index)), text(page ? FPDFText_LoadPage(page) : nullptr) {}
+
+    ~TextPage() {
+        if (text) FPDFText_ClosePage(text);
+        if (page) FPDF_ClosePage(page);
+    }
+
+    TextPage(const TextPage&) = delete;
+    TextPage& operator=(const TextPage&) = delete;
+};
 
 }  // namespace
 
@@ -132,6 +168,54 @@ Java_com_mustafakoceerr_tilepdf_core_pdf_PdfiumNative_nativeRender(
     AndroidBitmap_unlockPixels(env, bitmap);
     FPDF_ClosePage(page);
     return target ? JNI_TRUE : JNI_FALSE;
+}
+
+// The page's text, one Java char per PDFium character index, or null if the
+// page has no text layer. Characters outside the BMP become U+FFFD so the
+// indices stay aligned with nativeCharBoxes.
+JNIEXPORT jstring JNICALL
+Java_com_mustafakoceerr_tilepdf_core_pdf_PdfiumNative_nativePageText(
+        JNIEnv* env, jclass, jlong handle, jint index) {
+    TextPage page(FromHandle(handle)->document, index);
+    if (!page.text) return nullptr;
+    const int count = FPDFText_CountChars(page.text);
+    if (count <= 0) return env->NewString(nullptr, 0);
+    std::vector<jchar> chars(static_cast<size_t>(count));
+    for (int i = 0; i < count; ++i) {
+        const unsigned int unicode = FPDFText_GetUnicode(page.text, i);
+        chars[static_cast<size_t>(i)] = unicode > 0xFFFF ? 0xFFFD : static_cast<jchar>(unicode);
+    }
+    return env->NewString(chars.data(), count);
+}
+
+// Four floats per character in nativePageText's order: left, top, right,
+// bottom in top-left points. NaN for generated characters and those without
+// a box. Null if the page has no text layer.
+JNIEXPORT jfloatArray JNICALL
+Java_com_mustafakoceerr_tilepdf_core_pdf_PdfiumNative_nativeCharBoxes(
+        JNIEnv* env, jclass, jlong handle, jint index) {
+    TextPage page(FromHandle(handle)->document, index);
+    if (!page.text) return nullptr;
+    const int count = FPDFText_CountChars(page.text);
+    std::vector<jfloat> boxes(static_cast<size_t>(count > 0 ? count : 0) * 4, NAN);
+    for (int i = 0; i < count; ++i) {
+        double left = 0, right = 0, bottom = 0, top = 0;
+        if (FPDFText_IsGenerated(page.text, i) != 0 ||
+            !FPDFText_GetCharBox(page.text, i, &left, &right, &bottom, &top)) {
+            continue;
+        }
+        float x1, y1, x2, y2;
+        PageToTopLeft(page.page, left, top, &x1, &y1);
+        PageToTopLeft(page.page, right, bottom, &x2, &y2);
+        jfloat* box = &boxes[static_cast<size_t>(i) * 4];
+        box[0] = std::min(x1, x2);
+        box[1] = std::min(y1, y2);
+        box[2] = std::max(x1, x2);
+        box[3] = std::max(y1, y2);
+    }
+    jfloatArray result = env->NewFloatArray(static_cast<jsize>(boxes.size()));
+    env->SetFloatArrayRegion(result, 0, static_cast<jsize>(boxes.size()), boxes.data());
+    return result;
 }
 
 }  // extern "C"
