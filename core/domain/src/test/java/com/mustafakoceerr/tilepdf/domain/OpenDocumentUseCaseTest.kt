@@ -54,6 +54,8 @@ class OpenDocumentUseCaseTest {
         override fun persistAccess(uri: String) = Unit
         override suspend fun accessibleUris(): Set<String> = emptySet()
         override suspend fun displayName(uri: String): String? = nameError?.let { throw it } ?: "a.pdf"
+        override suspend fun prepare(uri: String): String = uri
+        override suspend fun forget(uri: String) = Unit
         override suspend fun open(uri: String, password: String?): PdfDocument = document
     }
 
