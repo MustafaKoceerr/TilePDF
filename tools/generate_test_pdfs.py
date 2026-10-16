@@ -7,7 +7,7 @@ reproduces the committed files byte for byte.
 
     python3 tools/generate_test_pdfs.py
 
-Writes to app/src/androidTest/assets/:
+Writes to core/testing/src/main/assets/:
 - sample.pdf     3 pages (A4, A4, A4 landscape): a heading and a black
                  rectangle per page; rendering, tiles and text positions.
 - text-dense.pdf 80 A4 pages of dense text; text-provider tests.
@@ -18,7 +18,7 @@ Writes to app/src/androidTest/assets/:
 import os
 import random
 
-ASSETS = os.path.join(os.path.dirname(__file__), "..", "app", "src", "androidTest", "assets")
+ASSETS = os.path.join(os.path.dirname(__file__), "..", "core", "testing", "src", "main", "assets")
 FONT = "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"
 
 

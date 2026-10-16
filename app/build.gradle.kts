@@ -27,6 +27,10 @@ android {
 dependencies {
     implementation(projects.core.common)
     implementation(projects.core.model)
+    implementation(projects.core.pdf)
+    implementation(projects.core.render)
+
+    androidTestImplementation(projects.core.testing)
 
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.core.ktx)

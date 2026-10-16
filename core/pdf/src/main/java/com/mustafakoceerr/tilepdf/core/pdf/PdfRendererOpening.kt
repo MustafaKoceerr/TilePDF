@@ -14,8 +14,10 @@ import java.io.FileNotFoundException
  * @throws FileNotFoundException if [uri] can't be opened.
  * @throws SecurityException if the PDF is password protected.
  * @throws java.io.IOException if the file is not a valid PDF.
+ *
+ * Public only for NativePdfTextProvider; removed with PdfRenderer in phase 3.
  */
-internal fun Context.openPdfRenderer(uri: Uri): Pair<ParcelFileDescriptor, PdfRenderer> {
+fun Context.openPdfRenderer(uri: Uri): Pair<ParcelFileDescriptor, PdfRenderer> {
     val fileDescriptor = contentResolver.openFileDescriptor(uri, "r")
         ?: throw FileNotFoundException("Cannot open $uri")
     return try {
