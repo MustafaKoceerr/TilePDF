@@ -50,22 +50,50 @@ class OpenDocumentUseCaseTest {
         assertTrue("document leaked", document.closed)
     }
 
-    private inner class Documents(private val nameError: Throwable? = null) : DocumentRepository {
+    @Test
+    fun opensThePreparedUri() = runTest {
+        val documents = Documents(prepared = mapOf("content://x" to "file://copy.pdf"))
+        val library = Library()
+        val opened = OpenDocumentUseCase(documents, library)("content://x")
+        assertEquals("file://copy.pdf", opened.uri)
+        assertEquals(listOf("file://copy.pdf"), documents.opened)
+        assertEquals(listOf("file://copy.pdf"), library.recorded)
+    }
+
+    @Test
+    fun passesThePassword() = runTest {
+        val documents = Documents()
+        OpenDocumentUseCase(documents, Library())("content://x", password = "secret")
+        assertEquals(listOf("secret"), documents.passwords)
+    }
+
+    private inner class Documents(
+        private val nameError: Throwable? = null,
+        private val prepared: Map<String, String> = emptyMap(),
+    ) : DocumentRepository {
+        val opened = mutableListOf<String>()
+        val passwords = mutableListOf<String?>()
         override fun persistAccess(uri: String) = Unit
         override suspend fun accessibleUris(): Set<String> = emptySet()
         override suspend fun displayName(uri: String): String? = nameError?.let { throw it } ?: "a.pdf"
-        override suspend fun prepare(uri: String): String = uri
+        override suspend fun prepare(uri: String): String = prepared[uri] ?: uri
         override suspend fun forget(uri: String) = Unit
-        override suspend fun open(uri: String, password: String?): PdfDocument = document
+        override suspend fun open(uri: String, password: String?): PdfDocument {
+            opened += uri
+            passwords += password
+            return document
+        }
     }
 
     private class Library(
         private val position: ReadingPosition? = null,
         private val recordError: Throwable? = null,
     ) : LibraryRepository {
+        val recorded = mutableListOf<String>()
         override fun observeDocuments(): Flow<List<LibraryDocument>> = emptyFlow()
         override suspend fun recordOpened(uri: String, displayName: String, pageCount: Int) {
             recordError?.let { throw it }
+            recorded += uri
         }
         override suspend fun readingPosition(uri: String): ReadingPosition? = position
         override suspend fun saveReadingPosition(uri: String, position: ReadingPosition) = Unit

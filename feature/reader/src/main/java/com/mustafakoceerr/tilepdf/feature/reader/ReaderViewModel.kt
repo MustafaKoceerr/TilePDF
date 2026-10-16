@@ -243,7 +243,11 @@ class ReaderViewModel @Inject constructor(
         viewModelScope.launch {
             positionUpdates
                 .debounce(SAVE_POSITION_DEBOUNCE_MS)
-                .collect { libraryRepository.saveReadingPosition(uri, it) }
+                .collect { position ->
+                    // Saved under the URI it was opened from: possibly a private copy.
+                    val opened = (documentState.value as? DocumentState.Opened)?.opened ?: return@collect
+                    libraryRepository.saveReadingPosition(opened.uri, position)
+                }
         }
     }
 

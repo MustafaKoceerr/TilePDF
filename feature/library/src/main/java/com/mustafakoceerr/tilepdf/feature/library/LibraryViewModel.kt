@@ -35,6 +35,10 @@ class LibraryViewModel @Inject constructor(
     }
 
     fun onRemove(uri: String) {
-        viewModelScope.launch { libraryRepository.remove(uri) }
+        viewModelScope.launch {
+            libraryRepository.remove(uri)
+            // A private copy belongs to the library entry; the user's file stays.
+            documentRepository.forget(uri)
+        }
     }
 }
