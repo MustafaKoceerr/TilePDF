@@ -2,7 +2,6 @@ plugins {
     alias(libs.plugins.tilepdf.android.application)
     alias(libs.plugins.tilepdf.android.application.compose)
     alias(libs.plugins.tilepdf.hilt)
-    alias(libs.plugins.kotlin.serialization)
 }
 
 android {
@@ -24,23 +23,15 @@ android {
 }
 
 dependencies {
-    implementation(projects.core.common)
     implementation(projects.core.data)
     implementation(projects.core.designsystem)
-    implementation(projects.core.domain)
-    implementation(projects.core.model)
-    implementation(projects.core.pdf)
-    implementation(projects.core.render)
-
-    androidTestImplementation(projects.core.testing)
+    implementation(projects.feature.library)
+    implementation(projects.feature.reader)
 
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
-    implementation(libs.androidx.lifecycle.runtime.compose)
-    implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.navigation.compose)
-    implementation(libs.androidx.hilt.navigation.compose)
-    implementation(libs.kotlinx.serialization.json)
-    implementation(libs.kotlinx.coroutines.android)
+
+    androidTestImplementation(projects.core.testing)
 }

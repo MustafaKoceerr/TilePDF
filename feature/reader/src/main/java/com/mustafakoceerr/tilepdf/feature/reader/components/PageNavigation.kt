@@ -43,7 +43,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import com.mustafakoceerr.tilepdf.R
+import com.mustafakoceerr.tilepdf.feature.reader.R
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 

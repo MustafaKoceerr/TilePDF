@@ -44,7 +44,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
-import com.mustafakoceerr.tilepdf.R
+import com.mustafakoceerr.tilepdf.feature.reader.R
 import com.mustafakoceerr.tilepdf.core.geometry.CoordinateMapper
 import com.mustafakoceerr.tilepdf.core.geometry.PdfRect
 import com.mustafakoceerr.tilepdf.core.pdf.PageSize

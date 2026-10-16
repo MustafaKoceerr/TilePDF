@@ -19,7 +19,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.mustafakoceerr.tilepdf.R
+import com.mustafakoceerr.tilepdf.feature.reader.R
 import com.mustafakoceerr.tilepdf.model.OutlineEntry
 
 private val IndentPerLevel = 16.dp

@@ -41,7 +41,6 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.mustafakoceerr.tilepdf.R
 import com.mustafakoceerr.tilepdf.core.designsystem.TilePdfIcons
 import com.mustafakoceerr.tilepdf.feature.reader.components.PageJump
 import com.mustafakoceerr.tilepdf.feature.reader.components.PdfPageList
@@ -139,7 +138,7 @@ internal fun ReaderScreen(
                 TopAppBar(
                     title = {
                         Text(
-                            text = ready?.title ?: stringResource(R.string.app_name),
+                            text = ready?.title ?: stringResource(R.string.reader_untitled),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
