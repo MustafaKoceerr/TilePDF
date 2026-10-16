@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mustafakoceerr.tilepdf.R
+import com.mustafakoceerr.tilepdf.core.designsystem.TilePdfIcons
 import com.mustafakoceerr.tilepdf.feature.reader.components.PageJump
 import com.mustafakoceerr.tilepdf.feature.reader.components.PdfPageList
 import com.mustafakoceerr.tilepdf.feature.reader.components.SearchTopBar
@@ -146,7 +147,7 @@ internal fun ReaderScreen(
                     navigationIcon = {
                         IconButton(onClick = onBack) {
                             Icon(
-                                painter = painterResource(R.drawable.ic_arrow_back),
+                                painter = painterResource(TilePdfIcons.ArrowBack),
                                 contentDescription = stringResource(R.string.navigate_back),
                             )
                         }
@@ -156,14 +157,14 @@ internal fun ReaderScreen(
                             if (ready.toc.entries.isNotEmpty()) {
                                 IconButton(onClick = onOpenToc) {
                                     Icon(
-                                        painter = painterResource(R.drawable.ic_toc),
+                                        painter = painterResource(TilePdfIcons.Toc),
                                         contentDescription = stringResource(R.string.reader_toc),
                                     )
                                 }
                             }
                             IconButton(onClick = searchActions.onOpen) {
                                 Icon(
-                                    painter = painterResource(R.drawable.ic_search),
+                                    painter = painterResource(TilePdfIcons.Search),
                                     contentDescription = stringResource(R.string.reader_search),
                                 )
                             }
@@ -273,14 +274,14 @@ private fun OverflowMenu(
     Box {
         IconButton(onClick = { onExpandedChange(true) }) {
             Icon(
-                painter = painterResource(R.drawable.ic_more_vert),
+                painter = painterResource(TilePdfIcons.MoreVert),
                 contentDescription = stringResource(R.string.reader_more_options),
             )
         }
         DropdownMenu(expanded = expanded, onDismissRequest = { onExpandedChange(false) }) {
             DropdownMenuItem(
                 text = { Text(stringResource(R.string.reader_go_to_page)) },
-                leadingIcon = { Icon(painterResource(R.drawable.ic_tag), contentDescription = null) },
+                leadingIcon = { Icon(painterResource(TilePdfIcons.Tag), contentDescription = null) },
                 onClick = {
                     onExpandedChange(false)
                     onGoToPage()
@@ -288,7 +289,7 @@ private fun OverflowMenu(
             )
             DropdownMenuItem(
                 text = { Text(stringResource(R.string.reader_night_mode)) },
-                leadingIcon = { Icon(painterResource(R.drawable.ic_dark_mode), contentDescription = null) },
+                leadingIcon = { Icon(painterResource(TilePdfIcons.DarkMode), contentDescription = null) },
                 trailingIcon = { Checkbox(checked = nightMode, onCheckedChange = null) },
                 onClick = {
                     onExpandedChange(false)

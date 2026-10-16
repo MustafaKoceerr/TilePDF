@@ -27,6 +27,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.mustafakoceerr.tilepdf.R
+import com.mustafakoceerr.tilepdf.core.designsystem.TilePdfIcons
 import com.mustafakoceerr.tilepdf.feature.reader.SearchUiState
 import com.mustafakoceerr.tilepdf.ui.theme.TilePDFTheme
 
@@ -48,7 +49,7 @@ fun SearchTopBar(
         navigationIcon = {
             IconButton(onClick = onClose) {
                 Icon(
-                    painter = painterResource(R.drawable.ic_close),
+                    painter = painterResource(TilePdfIcons.Close),
                     contentDescription = stringResource(R.string.reader_search_close),
                 )
             }
@@ -74,13 +75,13 @@ fun SearchTopBar(
             SearchProgress(state)
             IconButton(onClick = onPrevious, enabled = state.matches.isNotEmpty()) {
                 Icon(
-                    painter = painterResource(R.drawable.ic_keyboard_arrow_up),
+                    painter = painterResource(TilePdfIcons.KeyboardArrowUp),
                     contentDescription = stringResource(R.string.reader_search_previous),
                 )
             }
             IconButton(onClick = onNext, enabled = state.matches.isNotEmpty()) {
                 Icon(
-                    painter = painterResource(R.drawable.ic_keyboard_arrow_down),
+                    painter = painterResource(TilePdfIcons.KeyboardArrowDown),
                     contentDescription = stringResource(R.string.reader_search_next),
                 )
             }

@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mustafakoceerr.tilepdf.R
+import com.mustafakoceerr.tilepdf.core.designsystem.TilePdfIcons
 import com.mustafakoceerr.tilepdf.model.LibraryDocument
 import com.mustafakoceerr.tilepdf.model.ReadingPosition
 import com.mustafakoceerr.tilepdf.ui.theme.TilePDFTheme
@@ -70,7 +71,7 @@ internal fun LibraryScreen(
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 onClick = { openDocument.launch(arrayOf(PDF_MIME_TYPE)) },
-                icon = { Icon(painterResource(R.drawable.ic_add), contentDescription = null) },
+                icon = { Icon(painterResource(TilePdfIcons.Add), contentDescription = null) },
                 text = { Text(stringResource(R.string.library_open_pdf)) },
             )
         },
@@ -129,7 +130,7 @@ private fun DocumentList(
                 trailingContent = {
                     IconButton(onClick = { onRemove(document.uri) }) {
                         Icon(
-                            painter = painterResource(R.drawable.ic_delete),
+                            painter = painterResource(TilePdfIcons.Delete),
                             contentDescription = stringResource(R.string.library_remove),
                         )
                     }
