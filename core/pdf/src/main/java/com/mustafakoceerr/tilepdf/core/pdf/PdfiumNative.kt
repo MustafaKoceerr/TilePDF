@@ -43,16 +43,12 @@ internal object PdfiumNative {
     @JvmStatic
     external fun nativeRender(document: Long, index: Int, bitmap: Bitmap, matrix: FloatArray): Boolean
 
-    /** One char per PDFium character index; null if the page has no text layer. */
-    @JvmStatic
-    external fun nativePageText(document: Long, index: Int): String?
-
     /**
-     * Left, top, right, bottom per character of [nativePageText], in top-left
-     * points; NaN for generated characters. Null if there is no text layer.
+     * The page's text and character boxes, loading its text page once; null
+     * if the page has no text layer.
      */
     @JvmStatic
-    external fun nativeCharBoxes(document: Long, index: Int): FloatArray?
+    external fun nativePageText(document: Long, index: Int): NativePageText?
 
     /** First child of [parent] (0 = outline root); 0 if there is none. */
     @JvmStatic

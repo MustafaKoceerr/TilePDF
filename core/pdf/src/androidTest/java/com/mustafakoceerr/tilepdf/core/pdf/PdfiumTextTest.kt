@@ -1,5 +1,7 @@
 package com.mustafakoceerr.tilepdf.core.pdf
 
+import android.graphics.Matrix
+import androidx.core.graphics.createBitmap
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.mustafakoceerr.tilepdf.model.PageText
@@ -52,6 +54,17 @@ class PdfiumTextTest {
             for (page in 0 until document.pageCount) {
                 assertFalse("page $page", '\r' in document.pageText(page).text)
             }
+        }
+    }
+
+    @Test
+    fun textMatchesAfterRender() = runBlocking {
+        val fresh = pageText("sample.pdf", 0)
+        pdfium.open(TestAssets.uri("sample.pdf")).use { doc ->
+            doc.render(0, createBitmap(100, 142), Matrix())
+            val afterRender = doc.pageText(0)
+            assertEquals(fresh.text, afterRender.text)
+            for (i in fresh.text.indices) assertEquals("box $i", fresh.box(i), afterRender.box(i))
         }
     }
 

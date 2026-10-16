@@ -105,6 +105,33 @@ class PdfiumRenderTest {
         expect<IllegalStateException> { doomed.render(0, whiteBitmap(10, 10), Matrix()) }
     }
 
+    @Test
+    fun cachedPagesCloseWithDocument() = runBlocking {
+        // Loaded pages must be released with the document, not outlive it.
+        repeat(2) {
+            pdfium.open(TestAssets.uri("sample.pdf")).use { doc ->
+                for (page in 0 until doc.pageCount) doc.render(page, whiteBitmap(100, 142), Matrix().apply { setScale(0.17f, 0.17f) })
+            }
+        }
+        val after = whiteBitmap(200, 283)
+        document.render(0, after, Matrix().apply { setScale(0.336f, 0.336f) })
+        assertTrue(hasInk(after))
+    }
+
+    @Test
+    fun rendersEveryPageAfterCacheEviction() = runBlocking {
+        pdfium.open(TestAssets.uri("outline.pdf")).use { doc ->
+            val scale = Matrix().apply { setScale(0.336f, 0.336f) }
+            val first = whiteBitmap(200, 283).also { doc.render(0, it, scale) }
+            for (page in 0 until doc.pageCount) {
+                val bitmap = whiteBitmap(200, 283).also { doc.render(page, it, scale) }
+                assertTrue("page $page is blank", hasInk(bitmap))
+            }
+            val again = whiteBitmap(200, 283).also { doc.render(0, it, scale) }
+            assertSimilar("page 0 after eviction", first, again)
+        }
+    }
+
     private fun whiteBitmap(width: Int, height: Int) = createBitmap(width, height).apply { eraseColor(Color.WHITE) }
 
     private fun hasInk(bitmap: Bitmap): Boolean {

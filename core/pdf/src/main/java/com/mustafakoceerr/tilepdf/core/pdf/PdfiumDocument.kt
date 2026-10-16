@@ -53,10 +53,10 @@ class PdfiumDocument internal constructor(
      * line breaks it inferred) have no box.
      */
     override suspend fun pageText(pageIndex: Int): PageText {
-        val (text, boxes) = withDocument(pageIndex) {
-            PdfiumNative.nativePageText(it, pageIndex) to PdfiumNative.nativeCharBoxes(it, pageIndex)
-        }
-        if (text == null || boxes == null) return PageText.withoutBoxes(pageIndex, "")
+        val native = withDocument(pageIndex) { PdfiumNative.nativePageText(it, pageIndex) }
+            ?: return PageText.withoutBoxes(pageIndex, "")
+        val text = native.text
+        val boxes = native.boxes
         val builder = PageText.Builder(text.length)
         text.forEachIndexed { i, char ->
             if (char == '\r') return@forEachIndexed
