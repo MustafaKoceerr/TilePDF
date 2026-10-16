@@ -20,6 +20,9 @@
     <string name="reader_more_options">Diğer seçenekler</string>
     <string name="reader_copied">Kopyalandı</string>
     <string name="reader_error_not_found">Dosya bulunamadı veya erişim izni yok.</string>
-    <string name="reader_error_password">Şifreli PDF\'ler henüz desteklenmiyor.</string>
+    <string name="reader_password_title">Şifre gerekli</string>
+    <string name="reader_password_hint">Şifre</string>
+    <string name="reader_password_wrong">Şifre yanlış</string>
+    <string name="reader_password_open">Aç</string>
     <string name="reader_error_corrupt">PDF açılamadı; dosya bozuk olabilir.</string>
 </resources>
