@@ -5,11 +5,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.toRoute
 import com.mustafakoceerr.tilepdf.core.common.runCatchingCancellable
+import com.mustafakoceerr.tilepdf.core.pdf.PdfDocument
 import com.mustafakoceerr.tilepdf.core.render.PageRenderer
 import com.mustafakoceerr.tilepdf.core.text.TextSelection
 import com.mustafakoceerr.tilepdf.core.render.TiledPageImageSource
 import com.mustafakoceerr.tilepdf.data.library.LibraryRepository
-import com.mustafakoceerr.tilepdf.data.outline.DocumentOutlineRepository
 import com.mustafakoceerr.tilepdf.data.preferences.ReaderPreferencesRepository
 import com.mustafakoceerr.tilepdf.data.text.DocumentTextRepository
 import com.mustafakoceerr.tilepdf.di.ApplicationScope
@@ -51,7 +51,6 @@ class ReaderViewModel @Inject constructor(
     private val libraryRepository: LibraryRepository,
     private val preferencesRepository: ReaderPreferencesRepository,
     private val documentTextRepository: DocumentTextRepository,
-    private val outlineRepository: DocumentOutlineRepository,
     @param:ApplicationScope private val applicationScope: CoroutineScope,
 ) : ViewModel() {
 
@@ -98,7 +97,7 @@ class ReaderViewModel @Inject constructor(
         viewModelScope.launch {
             documentState.value = try {
                 val opened = openDocument(uri)
-                loadOutline()
+                loadOutline(opened.document)
                 DocumentState.Opened(
                     opened = opened,
                     pageImages = TiledPageImageSource(opened.document, pageRenderer, viewModelScope),
@@ -233,9 +232,9 @@ class ReaderViewModel @Inject constructor(
             }
     }
 
-    private fun loadOutline() = viewModelScope.launch {
-        // Optional extra: a PDF PdfBox can't parse simply shows no contents.
-        runCatchingCancellable { outlineRepository.outline(uri) }
+    private fun loadOutline(document: PdfDocument) = viewModelScope.launch {
+        // Optional extra: a damaged outline simply shows no contents.
+        runCatchingCancellable { document.outline() }
             .onSuccess { entries -> toc.update { it.copy(entries = entries) } }
     }
 

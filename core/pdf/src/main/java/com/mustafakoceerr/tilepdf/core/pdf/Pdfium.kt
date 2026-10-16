@@ -44,7 +44,8 @@ class Pdfium @Inject constructor(
     private fun pageSize(handle: Long, index: Int): PageSize {
         val size = PdfiumNative.nativePageSize(handle, index)
         if (size.size != 2) throw PdfCorruptException("Page $index has no size")
-        // Truncated like PdfRenderer, so both engines lay pages out identically.
+        // Truncated to whole points, as PdfRenderer did, so saved layouts and
+        // reading positions stay the same after the switch.
         return PageSize(size[0].toInt(), size[1].toInt())
     }
 }
