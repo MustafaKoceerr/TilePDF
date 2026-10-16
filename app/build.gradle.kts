@@ -25,6 +25,9 @@ android {
 }
 
 dependencies {
+    implementation(projects.core.common)
+    implementation(projects.core.model)
+
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
