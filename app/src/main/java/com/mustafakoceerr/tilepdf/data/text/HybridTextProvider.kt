@@ -28,8 +28,7 @@ import javax.inject.Inject
 private const val WARM_UP_DELAY_MS = 1_000L
 
 /**
- * Combines both strategies on API 35+, based on their measured strengths
- * (see TextProviderBenchmarkTest):
+ * Combines both strategies on API 35+, based on their strengths:
  * - **Native** search needs no extraction, so the first search is fast.
  * - **PdfBox** searches cached text, so repeated searches are much faster,
  *   and its [TextSearcher] also folds Turkish dotted/dotless i.

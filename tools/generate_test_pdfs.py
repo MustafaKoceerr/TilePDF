@@ -10,7 +10,7 @@ reproduces the committed files byte for byte.
 Writes to app/src/androidTest/assets/:
 - sample.pdf     3 pages (A4, A4, A4 landscape): a heading and a black
                  rectangle per page; rendering, tiles and text positions.
-- benchmark.pdf  80 A4 pages of dense text; text-provider benchmark.
+- text-dense.pdf 80 A4 pages of dense text; text-provider tests.
 - outline.pdf    12 pages with an outline covering XYZ, Fit, named and GoTo
                  destinations and UTF-16 Turkish titles; table of contents.
 """
@@ -69,7 +69,7 @@ def sample():
     write_pdf(objects, len(objects), "sample.pdf")
 
 
-def benchmark():
+def text_dense():
     # 45 lines of 8-12 words per page, from a fixed vocabulary and seed.
     rng = random.Random(42)
     words = ("the a of render engine tile cache memory page zoom bitmap viewport scroll "
@@ -90,7 +90,7 @@ def benchmark():
         page_ids.append(len(objects))
     objects.append(f"<< /Type /Pages /Kids [{kids(page_ids)}] /Count {page_count} >>")
     objects.append(f"<< /Type /Catalog /Pages {pages_id} 0 R >>")
-    write_pdf(objects, len(objects), "benchmark.pdf")
+    write_pdf(objects, len(objects), "text-dense.pdf")
 
 
 def utf16(text):
@@ -159,5 +159,5 @@ def outline():
 
 if __name__ == "__main__":
     sample()
-    benchmark()
+    text_dense()
     outline()

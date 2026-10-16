@@ -112,32 +112,6 @@ tests without a ViewModel.
   hidden, dropped tiles are recycled immediately rather than waiting for a
   garbage collection, which the small Java heap would rarely trigger.
 
-## Measured on a real device
-
-Samsung Galaxy A52 (Android 14, 90 Hz display, 256 MB app heap, so a 64 MB
-tile cache). The session was scripted over adb on a 30-page PDF with a
-full-page 150 dpi image on every page: flings through the whole document in
-both directions, 2.5× zoom with panning, scrollbar drags, go to page, search.
-
-![Memory over the session: native heap and graphics rise while new pages and zoom levels render, then plateau; Java heap stays under 20 MB](docs/memory-a52.svg)
-
-Memory rises while new pages and zoom levels are rendered, then plateaus.
-During the last 30 seconds, jumping around the document and searching adds
-nothing: the caches are bounded, and nothing leaks.
-
-| Moment | Native heap | Total PSS |
-|---|---|---|
-| Reading, zoomed in | 155 MB | 377 MB |
-| 6 s after pressing Home | 76 MB | 201 MB |
-
-Frame times for the same session, measured with `dumpsys gfxinfo`; a frame
-has 11.1 ms at 90 Hz:
-
-| Build | Janky frames | 50th pct | 90th pct | 99th pct |
-|---|---|---|---|---|
-| Release | 2.1 % | 9 ms | 14 ms | 31 ms |
-| Debug | 4.5 % | 11 ms | 17 ms | 40 ms |
-
 ## Coordinate spaces
 
 Search highlights must land on the rendered glyphs at any zoom. Everything
@@ -175,19 +149,6 @@ the first search. Extracted text is stored compactly as a String plus four
 floats per character (about 18 bytes per character), so keeping a whole book
 in memory stays affordable.
 
-An instrumented benchmark (`TextProviderBenchmarkTest`) runs every provider
-on the same 80-page, text-dense document with 5 queries. It also asserts that
-**all of them find the same 3,310 matches at the same positions**, which
-verifies that the geometry layer doesn't depend on where the text came from.
-
-API 37 emulator:
-
-| Provider | First search (5 queries) | Repeated search (5 queries) |
-|---|---|---|
-| PdfBox | 852–1423 ms (includes extraction) | 39–55 ms |
-| Native | 240–354 ms | 231–433 ms |
-| **Hybrid** | **235 ms** | **36 ms** (fully warmed 1.8 s after opening) |
-
 ## Testing
 
 ```bash
@@ -196,7 +157,7 @@ API 37 emulator:
                                        # mapping, table-of-contents lookup
 ./gradlew connectedDebugAndroidTest    # device: PdfRenderer, tiles, pool,
                                        # PdfBox extraction, outline, Room
-                                       # migration, benchmark (API 35+)
+                                       # migration
 ```
 
 Instrumented tests to note:

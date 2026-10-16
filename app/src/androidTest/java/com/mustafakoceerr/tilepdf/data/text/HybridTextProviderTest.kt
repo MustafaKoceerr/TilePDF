@@ -20,7 +20,7 @@ class HybridTextProviderTest {
     private val pdfBoxFactory = PdfBoxTextProvider.Factory(PdfBoxDocumentLoader(context, Dispatchers.IO), Dispatchers.IO)
     private val nativeFactory = NativePdfTextProvider.Factory(context, Dispatchers.IO)
 
-    private val uri: String by lazy { TestAssets.uriString("benchmark.pdf") }
+    private val uri: String by lazy { TestAssets.uriString("text-dense.pdf") }
 
     private fun hybrid(warmUpDelayMs: Long) =
         runBlocking { HybridTextProvider(nativeFactory.create(uri), pdfBoxFactory, uri, Dispatchers.IO, warmUpDelayMs) }
