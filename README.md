@@ -15,8 +15,12 @@ minSdk 29
 
 ## Features
 
-- Open any PDF through the Storage Access Framework; recent documents are kept
-  in a local library (no cloud, no accounts)
+- Open any PDF through the Storage Access Framework, or from another app with
+  "Open with" or "Share"; recent documents are kept in a local library (no
+  cloud, no accounts). Files the app couldn't reopen later (no lasting
+  permission, or a stream of unknown size) are kept as a private copy
+- Password-protected PDFs open after entering the password; it is never
+  stored
 - Pinch-to-zoom (1x–5x), double-tap zoom, horizontal pan with fling
 - Sharp text at every zoom level via tiles, with an instant low-resolution
   draft underneath
@@ -215,7 +219,6 @@ rerunning it reproduces them byte for byte.
 
 ## Known limitations
 
-- Password-protected PDFs aren't supported.
 - Scanned (image-only) PDFs have no text, so search finds nothing (no OCR).
 - Library entries have no page thumbnails.
 
