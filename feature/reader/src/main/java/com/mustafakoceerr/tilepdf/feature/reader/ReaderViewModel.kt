@@ -98,7 +98,6 @@ class ReaderViewModel @Inject constructor(
         viewModelScope.launch {
             documentState.value = try {
                 val opened = openDocument(uri)
-                prepareSearch()
                 loadOutline()
                 DocumentState.Opened(
                     opened = opened,
@@ -146,9 +145,10 @@ class ReaderViewModel @Inject constructor(
     /** Selects the word at a point on a page, given in top-left PDF points. */
     fun onLongPress(pageIndex: Int, x: Float, y: Float) {
         selectionJob?.cancel()
+        val document = openedDocument() ?: return
         selectionJob = viewModelScope.launch {
             // Unreadable text: nothing to select.
-            val page = runCatchingCancellable { documentTextRepository.pageText(uri, pageIndex) }
+            val page = runCatchingCancellable { documentTextRepository.pageText(document, pageIndex) }
                 .getOrNull() ?: return@launch
             selection.value = TextSelection.wordAt(page, x, y)?.let { Selection(page, it) }
         }
@@ -215,10 +215,10 @@ class ReaderViewModel @Inject constructor(
                     it.copy(matches = emptyList(), currentIndex = -1, isSearching = query.isNotBlank())
                 }
                 if (query.isBlank()) return@collectLatest
-                val pageCount = documentState.filterIsInstance<DocumentState.Opened>()
-                    .first().opened.document.pageCount
-                documentTextRepository.search(uri, pageCount, query)
-                    // An unreadable document simply has no matches.
+                val document = documentState.filterIsInstance<DocumentState.Opened>()
+                    .first().opened.document
+                documentTextRepository.search(document, query)
+                    // An unreadable or closed document simply has no more matches.
                     .catch { }
                     .collect { pageMatches ->
                         searchState.update { state ->
@@ -239,11 +239,6 @@ class ReaderViewModel @Inject constructor(
             .onSuccess { entries -> toc.update { it.copy(entries = entries) } }
     }
 
-    private fun prepareSearch() = viewModelScope.launch {
-        // Best effort: if text can't be read, searching just finds nothing.
-        runCatchingCancellable { documentTextRepository.prepare(uri) }
-    }
-
     @OptIn(FlowPreview::class)
     private fun savePositionWhileReading() {
         viewModelScope.launch {
@@ -254,10 +249,13 @@ class ReaderViewModel @Inject constructor(
     }
 
     override fun onCleared() {
-        (documentState.value as? DocumentState.Opened)?.opened?.document?.close()
+        val document = openedDocument() ?: return
+        document.close()
         // viewModelScope is already cancelled here.
-        applicationScope.launch { documentTextRepository.release(uri) }
+        applicationScope.launch { documentTextRepository.release(document) }
     }
+
+    private fun openedDocument() = (documentState.value as? DocumentState.Opened)?.opened?.document
 
     /** The page's text is kept so dragging handles needs no reload. */
     private data class Selection(val page: PageText, val range: IntRange) {
