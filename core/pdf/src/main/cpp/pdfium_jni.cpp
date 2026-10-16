@@ -26,8 +26,13 @@ jclass g_pageTextClass = nullptr;
 jmethodID g_pageTextConstructor = nullptr;
 
 // Pages kept loaded per document. Loading parses the page's content, so a
-// page drawn as a dozen tiles is parsed once instead of once per tile.
-constexpr size_t kLoadedPages = 4;
+// page drawn as a dozen tiles is parsed once instead of once per tile: on a
+// Galaxy A52 a 1080 px page of a 300 dpi scan draws in about 300 ms instead
+// of 1450 ms. A loaded page also keeps its decoded images (~29 MB per
+// scanned page), and Android 14+ sends no trim callbacks while the app is
+// visible, so the cap stays small. Tiles are requested page by page, so two
+// pages cover the pages on screen.
+constexpr size_t kLoadedPages = 2;
 
 // PDFium reads the file lazily for as long as the document is open, so the
 // read callback and the descriptor it uses live as long as the document.

@@ -93,9 +93,13 @@ SHA-256 differs from the pinned one; no binaries are committed. To update
 PDFium, change `RELEASE` and the four hashes in
 `build-logic/convention/src/main/kotlin/PdfiumConventionPlugin.kt`.
 
-Each document keeps its four most recently used pages loaded natively, so a
+Each document keeps its two most recently used pages loaded natively, so a
 page drawn as many tiles is parsed once, and text extraction reuses the same
-page. `PdfDocument` and `PdfEngine` are interfaces, so data and ViewModel code
+page. On a Galaxy A52 that draws a 1080 px page of a 300 dpi scan in about
+300 ms instead of 1450 ms, and a page of 20 000 vector lines in about 260 ms
+instead of 1650 ms. A loaded page also keeps its decoded images (about 29 MB
+for a scanned page), so the cache stays at two pages and is emptied whenever
+the reader trims memory. `PdfDocument` and `PdfEngine` are interfaces, so data and ViewModel code
 is tested with fakes.
 
 ## Rendering pipeline
