@@ -106,6 +106,26 @@ class PdfiumRenderTest {
     }
 
     @Test
+    fun cacheHoldsAtMostFourPages() = runBlocking {
+        pdfium.open(TestAssets.uri("outline.pdf")).use { doc ->
+            for (page in 0 until 6) doc.render(page, whiteBitmap(100, 142), Matrix().apply { setScale(0.17f, 0.17f) })
+            assertEquals(4, doc.loadedPageCount())
+        }
+    }
+
+    @Test
+    fun trimMemoryReleasesLoadedPages() = runBlocking {
+        val scale = Matrix().apply { setScale(0.336f, 0.336f) }
+        for (page in 0 until 3) document.render(page, whiteBitmap(200, 283), scale)
+        assertEquals(3, document.loadedPageCount())
+
+        document.trimMemory()
+        assertEquals(0, document.loadedPageCount())
+        val after = whiteBitmap(200, 283).also { document.render(0, it, scale) }
+        assertTrue(hasInk(after))
+    }
+
+    @Test
     fun cachedPagesCloseWithDocument() = runBlocking {
         // Loaded pages must be released with the document, not outlive it.
         repeat(2) {

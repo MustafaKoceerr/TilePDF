@@ -56,10 +56,15 @@ struct NativeDocument {
         return page;
     }
 
-    // Pages first: PDFium requires them closed before their document.
-    void Close() {
+    // Closes every loaded page; later calls load them again.
+    void Trim() {
         for (auto& entry : pages) FPDF_ClosePage(entry.second);
         pages.clear();
+    }
+
+    // Pages first: PDFium requires them closed before their document.
+    void Close() {
+        Trim();
         FPDF_CloseDocument(document);
     }
 };
@@ -168,6 +173,16 @@ Java_com_mustafakoceerr_tilepdf_core_pdf_PdfiumNative_nativeCloseDocument(JNIEnv
     NativeDocument* native = FromHandle(handle);
     native->Close();
     delete native;
+}
+
+JNIEXPORT void JNICALL
+Java_com_mustafakoceerr_tilepdf_core_pdf_PdfiumNative_nativeTrim(JNIEnv*, jclass, jlong handle) {
+    FromHandle(handle)->Trim();
+}
+
+JNIEXPORT jint JNICALL
+Java_com_mustafakoceerr_tilepdf_core_pdf_PdfiumNative_nativeLoadedPageCount(JNIEnv*, jclass, jlong handle) {
+    return static_cast<jint>(FromHandle(handle)->pages.size());
 }
 
 JNIEXPORT jint JNICALL

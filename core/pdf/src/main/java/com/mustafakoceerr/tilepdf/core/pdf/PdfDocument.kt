@@ -29,4 +29,10 @@ interface PdfDocument : Closeable {
 
     /** The table of contents, flattened depth first; empty if there is none. */
     suspend fun outline(): List<OutlineEntry>
+
+    /**
+     * Frees what the engine keeps to make the next render faster, such as
+     * parsed pages. Called when the app is low on memory or hidden.
+     */
+    suspend fun trimMemory()
 }

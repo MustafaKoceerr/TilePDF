@@ -76,6 +76,13 @@ internal object PdfiumNative {
     @JvmStatic
     external fun nativePageToTopLeft(document: Long, index: Int, points: FloatArray): FloatArray?
 
+    /** Closes every page the document keeps loaded; they reload on demand. */
+    @JvmStatic
+    external fun nativeTrim(document: Long)
+
+    @JvmStatic
+    external fun nativeLoadedPageCount(document: Long): Int
+
     /** PDFium's `FPDF_ERR_PASSWORD`. */
     const val ERROR_PASSWORD = 4
 }

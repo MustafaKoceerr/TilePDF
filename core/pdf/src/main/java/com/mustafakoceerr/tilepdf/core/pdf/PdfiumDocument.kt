@@ -3,6 +3,7 @@ package com.mustafakoceerr.tilepdf.core.pdf
 import android.graphics.Bitmap
 import android.graphics.Matrix
 import android.os.ParcelFileDescriptor
+import androidx.annotation.VisibleForTesting
 import com.mustafakoceerr.tilepdf.core.geometry.PdfRect
 import com.mustafakoceerr.tilepdf.model.OutlineEntry
 import com.mustafakoceerr.tilepdf.model.PageText
@@ -121,6 +122,18 @@ class PdfiumDocument internal constructor(
         addChildren(parent = 0L, depth = 0)
         return entries
     }
+
+    override suspend fun trimMemory() {
+        try {
+            withDocument { PdfiumNative.nativeTrim(it) }
+        } catch (_: IllegalStateException) {
+            // Already closed: nothing left to free.
+        }
+    }
+
+    /** Pages PDFium currently keeps loaded for this document. */
+    @VisibleForTesting
+    internal suspend fun loadedPageCount(): Int = withDocument { PdfiumNative.nativeLoadedPageCount(it) }
 
     /** Runs [block] with the native handle, after checking [pageIndex] if given. */
     internal suspend fun <T> withDocument(pageIndex: Int? = null, block: (Long) -> T): T {

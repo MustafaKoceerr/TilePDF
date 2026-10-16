@@ -34,6 +34,8 @@ class FakePdfDocument(private val pages: List<String>) : PdfDocument {
 
     override suspend fun outline(): List<OutlineEntry> = error("unused")
 
+    override suspend fun trimMemory() = Unit
+
     override fun close() {
         closed = true
     }

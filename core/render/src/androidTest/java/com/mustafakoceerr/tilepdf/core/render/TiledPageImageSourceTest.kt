@@ -10,6 +10,8 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.yield
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -143,6 +145,21 @@ class TiledPageImageSourceTest {
 
         // A frame could still be drawing them: left to the garbage collector.
         assertTrue(offScreen.none { it.isRecycled })
+    }
+
+    @Test
+    fun trimmingAlsoTrimsTheDocument() = onMain {
+        var trims = 0
+        val counting = object : PdfDocument by document {
+            override suspend fun trimMemory() {
+                trims++
+            }
+        }
+        val source = TiledPageImageSource(counting, PageRenderer(Dispatchers.IO), scope)
+        source.trimMemory(uiHidden = true)
+        source.trimMemory(uiHidden = false)
+        withTimeout(5_000) { while (trims < 2) yield() }
+        assertEquals(2, trims)
     }
 
     @Test
