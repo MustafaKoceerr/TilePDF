@@ -1,5 +1,7 @@
 package com.mustafakoceerr.tilepdf.feature.reader
 
+import com.mustafakoceerr.tilepdf.feature.reader.components.PageJump
+
 import com.mustafakoceerr.tilepdf.core.geometry.PdfRect
 import com.mustafakoceerr.tilepdf.core.pdf.PageSize
 import com.mustafakoceerr.tilepdf.core.render.PageImageSource
@@ -25,6 +27,10 @@ sealed interface ReaderUiState {
         val search: SearchUiState,
         val toc: TocUiState,
         val selection: SelectionUiState?,
+        /** A jump the page list should make, e.g. after tapping a link. */
+        val jump: PageJump? = null,
+        /** A web or mail link to hand to another app. */
+        val externalLink: String? = null,
     ) : ReaderUiState
 }
 

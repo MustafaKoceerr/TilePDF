@@ -18,6 +18,7 @@
     <string name="reader_go_to_page_confirm">Git</string>
     <string name="reader_toc">İçindekiler</string>
     <string name="reader_more_options">Diğer seçenekler</string>
+    <string name="reader_no_app_for_link">Bu bağlantıyı açacak uygulama yok</string>
     <string name="reader_copied">Kopyalandı</string>
     <string name="reader_error_not_found">Dosya bulunamadı veya erişim izni yok.</string>
     <string name="reader_password_title">Şifre gerekli</string>

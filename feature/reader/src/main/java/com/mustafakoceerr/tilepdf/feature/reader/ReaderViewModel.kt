@@ -16,6 +16,7 @@ import com.mustafakoceerr.tilepdf.di.ApplicationScope
 import com.mustafakoceerr.tilepdf.domain.OpenDocumentUseCase
 import com.mustafakoceerr.tilepdf.domain.OutlineLocator
 import com.mustafakoceerr.tilepdf.domain.OpenedDocument
+import com.mustafakoceerr.tilepdf.feature.reader.components.PageJump
 import com.mustafakoceerr.tilepdf.feature.reader.navigation.ReaderRoute
 import com.mustafakoceerr.tilepdf.model.PageText
 import com.mustafakoceerr.tilepdf.model.ReadingPosition
@@ -68,6 +69,7 @@ class ReaderViewModel @Inject constructor(
      */
     private var position: ReadingPosition? = null
     private val selection = MutableStateFlow<Selection?>(null)
+    private val linkTargets = MutableStateFlow(LinkTargets())
     private var selectionJob: Job? = null
     private val positionUpdates = MutableSharedFlow<ReadingPosition>(extraBufferCapacity = 1)
 
@@ -76,8 +78,9 @@ class ReaderViewModel @Inject constructor(
         preferencesRepository.nightMode,
         searchState,
         toc,
-        selection,
-    ) { document, nightMode, search, toc, selection ->
+        combine(selection, linkTargets, ::Pair),
+    ) { document, nightMode, search, toc, selectionAndLinks ->
+        val (selection, links) = selectionAndLinks
         when (document) {
             DocumentState.Loading -> ReaderUiState.Loading
             is DocumentState.Failed -> ReaderUiState.Error(document.reason)
@@ -91,6 +94,8 @@ class ReaderViewModel @Inject constructor(
                 search = search,
                 toc = toc,
                 selection = selection?.toUiState(),
+                jump = links.jump,
+                externalLink = links.externalLink,
             )
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ReaderUiState.Loading)
@@ -124,6 +129,30 @@ class ReaderViewModel @Inject constructor(
             }
         }
     }
+
+    /**
+     * A tap at top-left point ([x], [y]) on [pageIndex]: clears a selection
+     * if there is one, otherwise follows a link there.
+     */
+    fun onTap(pageIndex: Int, x: Float, y: Float) {
+        if (selection.value != null) {
+            selection.value = null
+            return
+        }
+        val document = openedDocument() ?: return
+        viewModelScope.launch {
+            val link = runCatchingCancellable { document.linkAt(pageIndex, x, y) }.getOrNull()
+            when (val action = linkAction(link, document.pageCount)) {
+                is LinkAction.Jump -> linkTargets.update { it.copy(jump = action.jump) }
+                is LinkAction.Open -> linkTargets.update { it.copy(externalLink = action.uri) }
+                LinkAction.Ignore -> Unit
+            }
+        }
+    }
+
+    fun onJumpHandled() = linkTargets.update { it.copy(jump = null) }
+
+    fun onExternalLinkHandled() = linkTargets.update { it.copy(externalLink = null) }
 
     fun onPositionChanged(position: ReadingPosition) {
         this.position = position
@@ -273,6 +302,9 @@ class ReaderViewModel @Inject constructor(
     }
 
     private fun openedDocument() = (documentState.value as? DocumentState.Opened)?.opened?.document
+
+    /** Where a tapped link leads, until the screen has acted on it. */
+    private data class LinkTargets(val jump: PageJump? = null, val externalLink: String? = null)
 
     /** The page's text is kept so dragging handles needs no reload. */
     private data class Selection(val page: PageText, val range: IntRange) {

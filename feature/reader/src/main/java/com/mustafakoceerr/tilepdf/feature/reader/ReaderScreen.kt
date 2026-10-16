@@ -1,6 +1,8 @@
 package com.mustafakoceerr.tilepdf.feature.reader
 
+import android.content.ActivityNotFoundException
 import android.content.ClipData
+import android.content.Intent
 import android.os.Build
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
@@ -22,6 +24,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -40,6 +43,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mustafakoceerr.tilepdf.core.designsystem.TilePdfIcons
 import com.mustafakoceerr.tilepdf.feature.reader.components.PageJump
@@ -76,6 +80,9 @@ fun ReaderScreen(
         onOpenToc = viewModel::onOpenToc,
         onCloseToc = viewModel::onCloseToc,
         onPasswordEntered = viewModel::onPasswordEntered,
+        onTapPage = viewModel::onTap,
+        onJumpHandled = viewModel::onJumpHandled,
+        onExternalLinkHandled = viewModel::onExternalLinkHandled,
     )
 }
 
@@ -116,6 +123,9 @@ internal fun ReaderScreen(
     onOpenToc: () -> Unit = {},
     onCloseToc: () -> Unit = {},
     onPasswordEntered: (String) -> Unit = {},
+    onTapPage: (pageIndex: Int, x: Float, y: Float) -> Unit = { _, _, _ -> },
+    onJumpHandled: () -> Unit = {},
+    onExternalLinkHandled: () -> Unit = {},
 ) {
     val ready = uiState as? ReaderUiState.Ready
     val search = ready?.search
@@ -125,6 +135,20 @@ internal fun ReaderScreen(
     var goToPageOpen by rememberSaveable { mutableStateOf(false) }
     var menuOpen by remember { mutableStateOf(false) }
     var pageJump by remember { mutableStateOf<PageJump?>(null) }
+    LaunchedEffect(ready?.jump) {
+        ready?.jump?.let { pageJump = it }
+        if (ready?.jump != null) onJumpHandled()
+    }
+    val context = LocalContext.current
+    LaunchedEffect(ready?.externalLink) {
+        val link = ready?.externalLink ?: return@LaunchedEffect
+        try {
+            context.startActivity(Intent(Intent.ACTION_VIEW, link.toUri()).addCategory(Intent.CATEGORY_BROWSABLE))
+        } catch (_: ActivityNotFoundException) {
+            Toast.makeText(context, R.string.reader_no_app_for_link, Toast.LENGTH_SHORT).show()
+        }
+        onExternalLinkHandled()
+    }
     BackHandler(enabled = search?.isActive == true, onBack = searchActions.onClose)
 
     Scaffold(
@@ -217,6 +241,7 @@ internal fun ReaderScreen(
                     onGoToPageOpenChange = { goToPageOpen = it },
                     pageJump = pageJump,
                     onPageJumpHandled = { pageJump = null },
+                    onTapPage = onTapPage,
                     selection = uiState.selection,
                     selectionActions = SelectionActions(
                         onLongPress = onLongPress,

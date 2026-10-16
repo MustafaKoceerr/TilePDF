@@ -94,6 +94,7 @@ internal fun PdfPageList(
     onGoToPageOpenChange: (Boolean) -> Unit,
     pageJump: PageJump?,
     onPageJumpHandled: () -> Unit,
+    onTapPage: (pageIndex: Int, x: Float, y: Float) -> Unit,
     selection: SelectionUiState?,
     selectionActions: SelectionActions,
     modifier: Modifier = Modifier,
@@ -154,7 +155,12 @@ internal fun PdfPageList(
                 .zoomable(
                     zoomState = zoomState,
                     listState = listState,
-                    onTap = { selectionActions.onClear() },
+                    onTap = { position ->
+                        // On a page: the reader clears a selection or follows a link.
+                        pagePointAt(position, listState, zoomState, pageSizes, density)
+                            ?.let { (page, x, y) -> onTapPage(page, x, y) }
+                            ?: selectionActions.onClear()
+                    },
                     onLongPress = { position ->
                         pagePointAt(position, listState, zoomState, pageSizes, density)
                             ?.let { (page, x, y) -> selectionActions.onLongPress(page, x, y) }
