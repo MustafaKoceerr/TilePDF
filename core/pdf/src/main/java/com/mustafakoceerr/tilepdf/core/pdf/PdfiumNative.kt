@@ -53,6 +53,24 @@ internal object PdfiumNative {
     @JvmStatic
     external fun nativeCharBoxes(document: Long, index: Int): FloatArray?
 
+    /** First child of [parent] (0 = outline root); 0 if there is none. */
+    @JvmStatic
+    external fun nativeBookmarkFirstChild(document: Long, parent: Long): Long
+
+    /** Next sibling of [bookmark]; 0 if there is none. */
+    @JvmStatic
+    external fun nativeBookmarkNextSibling(document: Long, bookmark: Long): Long
+
+    @JvmStatic
+    external fun nativeBookmarkTitle(bookmark: Long): String
+
+    /**
+     * `[pageIndex, topPt]`; pageIndex is -1 if the bookmark points nowhere,
+     * topPt is NaN unless it is an XYZ destination with a y.
+     */
+    @JvmStatic
+    external fun nativeBookmarkTarget(document: Long, bookmark: Long): FloatArray
+
     /** PDFium's `FPDF_ERR_PASSWORD`. */
     const val ERROR_PASSWORD = 4
 }

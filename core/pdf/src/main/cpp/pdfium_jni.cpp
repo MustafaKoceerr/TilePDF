@@ -11,6 +11,7 @@
 #include <unistd.h>
 #include <vector>
 
+#include "fpdf_doc.h"
 #include "fpdf_text.h"
 #include "fpdfview.h"
 
@@ -215,6 +216,64 @@ Java_com_mustafakoceerr_tilepdf_core_pdf_PdfiumNative_nativeCharBoxes(
     }
     jfloatArray result = env->NewFloatArray(static_cast<jsize>(boxes.size()));
     env->SetFloatArrayRegion(result, 0, static_cast<jsize>(boxes.size()), boxes.data());
+    return result;
+}
+
+// First child of [parent], or of the outline root when [parent] is 0; 0 if none.
+JNIEXPORT jlong JNICALL
+Java_com_mustafakoceerr_tilepdf_core_pdf_PdfiumNative_nativeBookmarkFirstChild(
+        JNIEnv*, jclass, jlong handle, jlong parent) {
+    return reinterpret_cast<jlong>(FPDFBookmark_GetFirstChild(
+            FromHandle(handle)->document, reinterpret_cast<FPDF_BOOKMARK>(parent)));
+}
+
+JNIEXPORT jlong JNICALL
+Java_com_mustafakoceerr_tilepdf_core_pdf_PdfiumNative_nativeBookmarkNextSibling(
+        JNIEnv*, jclass, jlong handle, jlong bookmark) {
+    return reinterpret_cast<jlong>(FPDFBookmark_GetNextSibling(
+            FromHandle(handle)->document, reinterpret_cast<FPDF_BOOKMARK>(bookmark)));
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_mustafakoceerr_tilepdf_core_pdf_PdfiumNative_nativeBookmarkTitle(JNIEnv* env, jclass, jlong bookmark) {
+    auto* native = reinterpret_cast<FPDF_BOOKMARK>(bookmark);
+    // Byte length of the UTF-16LE title, including the terminating NUL.
+    const unsigned long bytes = FPDFBookmark_GetTitle(native, nullptr, 0);
+    if (bytes <= sizeof(jchar)) return env->NewString(nullptr, 0);
+    std::vector<jchar> title(bytes / sizeof(jchar));
+    FPDFBookmark_GetTitle(native, title.data(), bytes);
+    return env->NewString(title.data(), static_cast<jsize>(title.size() - 1));
+}
+
+// [pageIndex, topPt]: pageIndex -1 if the bookmark points nowhere, topPt NaN
+// unless it is an XYZ destination with a y. Follows GoTo actions.
+JNIEXPORT jfloatArray JNICALL
+Java_com_mustafakoceerr_tilepdf_core_pdf_PdfiumNative_nativeBookmarkTarget(
+        JNIEnv* env, jclass, jlong handle, jlong bookmark) {
+    FPDF_DOCUMENT document = FromHandle(handle)->document;
+    auto* native = reinterpret_cast<FPDF_BOOKMARK>(bookmark);
+    FPDF_DEST dest = FPDFBookmark_GetDest(document, native);
+    if (!dest) {
+        FPDF_ACTION action = FPDFBookmark_GetAction(native);
+        if (action && FPDFAction_GetType(action) == PDFACTION_GOTO) dest = FPDFAction_GetDest(document, action);
+    }
+    jfloat target[] = {-1, NAN};
+    if (dest) {
+        const int pageIndex = FPDFDest_GetDestPageIndex(document, dest);
+        target[0] = static_cast<jfloat>(pageIndex);
+        FPDF_BOOL hasX = 0, hasY = 0, hasZoom = 0;
+        FS_FLOAT x = 0, y = 0, zoom = 0;
+        if (pageIndex >= 0 && FPDFDest_GetLocationInPage(dest, &hasX, &hasY, &hasZoom, &x, &y, &zoom) && hasY) {
+            FPDF_PAGE page = FPDF_LoadPage(document, pageIndex);
+            if (page) {
+                float ignoredX = 0;
+                PageToTopLeft(page, hasX ? x : 0, y, &ignoredX, &target[1]);
+                FPDF_ClosePage(page);
+            }
+        }
+    }
+    jfloatArray result = env->NewFloatArray(2);
+    env->SetFloatArrayRegion(result, 0, 2, target);
     return result;
 }
 

@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import android.graphics.Matrix
 import android.os.ParcelFileDescriptor
 import com.mustafakoceerr.tilepdf.core.geometry.PdfRect
+import com.mustafakoceerr.tilepdf.model.OutlineEntry
 import com.mustafakoceerr.tilepdf.model.PageText
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -72,6 +73,35 @@ class PdfiumDocument internal constructor(
         return builder.build(pageIndex)
     }
 
+    /**
+     * The table of contents, flattened depth first. Entries with a blank title
+     * or no target page are skipped but their children are kept; `topPt` is
+     * set only for destinations that give a y.
+     */
+    suspend fun outline(): List<OutlineEntry> = withDocument { handle ->
+        val entries = mutableListOf<OutlineEntry>()
+        // Malformed files can link bookmarks into a cycle.
+        val visited = HashSet<Long>()
+
+        fun addChildren(parent: Long, depth: Int) {
+            var bookmark = PdfiumNative.nativeBookmarkFirstChild(handle, parent)
+            while (bookmark != 0L && visited.add(bookmark) && entries.size < MAX_OUTLINE_ENTRIES) {
+                val title = PdfiumNative.nativeBookmarkTitle(bookmark).trim()
+                val (page, top) = PdfiumNative.nativeBookmarkTarget(handle, bookmark)
+                val pageIndex = page.toInt()
+                if (title.isNotEmpty() && pageIndex in 0 until pageCount) {
+                    val topPt = top.takeUnless { it.isNaN() }?.coerceIn(0f, pageSizes[pageIndex].heightPt.toFloat())
+                    entries += OutlineEntry(title, pageIndex, topPt, depth)
+                }
+                addChildren(bookmark, depth + 1)
+                bookmark = PdfiumNative.nativeBookmarkNextSibling(handle, bookmark)
+            }
+        }
+
+        addChildren(parent = 0L, depth = 0)
+        entries
+    }
+
     /** Runs [block] with the native handle, after checking [pageIndex] if given. */
     internal suspend fun <T> withDocument(pageIndex: Int? = null, block: (Long) -> T): T {
         if (pageIndex != null) {
@@ -100,3 +130,6 @@ class PdfiumDocument internal constructor(
         }
     }
 }
+
+/** Stops pathological outlines from flooding the table of contents. */
+private const val MAX_OUTLINE_ENTRIES = 10_000
