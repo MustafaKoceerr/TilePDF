@@ -55,6 +55,10 @@ gradlePlugin {
             id = libs.plugins.tilepdf.hilt.get().pluginId
             implementationClass = "HiltConventionPlugin"
         }
+        register("pdfium") {
+            id = libs.plugins.tilepdf.pdfium.get().pluginId
+            implementationClass = "PdfiumConventionPlugin"
+        }
         register("jvmLibrary") {
             id = libs.plugins.tilepdf.jvm.library.get().pluginId
             implementationClass = "JvmLibraryConventionPlugin"

@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.tilepdf.android.library)
     alias(libs.plugins.tilepdf.hilt)
+    alias(libs.plugins.tilepdf.pdfium)
 }
 
 dependencies {

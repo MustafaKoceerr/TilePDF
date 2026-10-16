@@ -79,3 +79,4 @@ tilepdf-android-feature = { id = "tilepdf.android.feature" }
 tilepdf-android-room = { id = "tilepdf.android.room" }
 tilepdf-hilt = { id = "tilepdf.hilt" }
 tilepdf-jvm-library = { id = "tilepdf.jvm.library" }
+tilepdf-pdfium = { id = "tilepdf.pdfium" }
