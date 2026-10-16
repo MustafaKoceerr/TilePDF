@@ -21,6 +21,13 @@ interface DocumentRepository {
     /** Deletes the private copy behind [uri], if it is one; never a user's file. */
     suspend fun forget(uri: String)
 
+    /**
+     * Deletes every private copy not in [keep], and copies left half-written:
+     * copies of documents that never reached the library, e.g. a password
+     * prompt that was cancelled.
+     */
+    suspend fun forgetCopiesExcept(keep: Set<String>)
+
     /** URIs the app can still open: persisted read grants and private copies. */
     suspend fun accessibleUris(): Set<String>
 

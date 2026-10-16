@@ -7,6 +7,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.rememberNavController
 import com.mustafakoceerr.tilepdf.feature.library.navigation.LibraryRoute
 import com.mustafakoceerr.tilepdf.feature.library.navigation.libraryScreen
+import com.mustafakoceerr.tilepdf.feature.reader.navigation.ReaderRoute
 import com.mustafakoceerr.tilepdf.feature.reader.navigation.navigateToReader
 import com.mustafakoceerr.tilepdf.feature.reader.navigation.readerScreen
 
@@ -23,6 +24,9 @@ fun TilePdfNavHost(
     val navController = rememberNavController()
     LaunchedEffect(openDocument) {
         if (openDocument != null) {
+            // A reader already showing another PDF must go: navigating single-top
+            // would only swap its arguments and keep the old document on screen.
+            navController.popBackStack<ReaderRoute>(inclusive = true)
             navController.navigateToReader(openDocument)
             onDocumentOpened()
         }

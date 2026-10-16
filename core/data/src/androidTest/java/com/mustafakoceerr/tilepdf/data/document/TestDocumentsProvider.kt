@@ -15,7 +15,8 @@ import kotlin.concurrent.thread
  * Serves the test PDFs the way other apps' providers do:
  * - `sized/<name>`: a real file descriptor with a known size;
  * - `pipe/<name>`: a pipe with no size, written in 4 KB chunks;
- * - `broken/<name>`: a pipe that fails after 1 KB.
+ * - `broken/<name>`: a pipe that fails after 1 KB;
+ * - `throwing/<name>`: a provider that throws an unchecked exception.
  */
 class TestDocumentsProvider : ContentProvider() {
 
@@ -27,6 +28,8 @@ class TestDocumentsProvider : ContentProvider() {
             "sized" -> ParcelFileDescriptor.open(materialize(name), ParcelFileDescriptor.MODE_READ_ONLY)
             "pipe" -> pipe(name, failAfter = null)
             "broken" -> pipe(name, failAfter = 1024)
+            // A misbehaving provider: its exception crosses Binder into the caller.
+            "throwing" -> throw IllegalArgumentException("Provider bug for $uri")
             else -> throw IllegalArgumentException("Unknown $uri")
         }
     }

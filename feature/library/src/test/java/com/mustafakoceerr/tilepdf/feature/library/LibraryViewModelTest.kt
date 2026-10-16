@@ -46,12 +46,14 @@ class LibraryViewModelTest {
         override suspend fun forget(uri: String) {
             forgotten += uri
         }
+        override suspend fun forgetCopiesExcept(keep: Set<String>) = Unit
         override suspend fun open(uri: String, password: String?): PdfDocument = error("unused")
     }
 
     private class Library : LibraryRepository {
         val removed = mutableListOf<String>()
         override fun observeDocuments(): Flow<List<LibraryDocument>> = emptyFlow()
+        override suspend fun displayName(uri: String): String? = null
         override suspend fun recordOpened(uri: String, displayName: String, pageCount: Int) = Unit
         override suspend fun readingPosition(uri: String): ReadingPosition? = null
         override suspend fun saveReadingPosition(uri: String, position: ReadingPosition) = Unit

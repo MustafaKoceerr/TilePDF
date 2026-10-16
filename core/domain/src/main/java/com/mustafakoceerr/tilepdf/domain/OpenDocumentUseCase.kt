@@ -35,7 +35,10 @@ class OpenDocumentUseCase @Inject constructor(
         val prepared = documentRepository.prepare(uri)
         val document = documentRepository.open(prepared, password)
         try {
-            val displayName = documentRepository.displayName(uri) ?: uri.substringAfterLast('/')
+            // A private copy has no name of its own; the library kept the real one.
+            val displayName = documentRepository.displayName(uri)
+                ?: libraryRepository.displayName(prepared)
+                ?: uri.substringAfterLast('/')
             libraryRepository.recordOpened(prepared, displayName, document.pageCount)
             return OpenedDocument(
                 document = document,
