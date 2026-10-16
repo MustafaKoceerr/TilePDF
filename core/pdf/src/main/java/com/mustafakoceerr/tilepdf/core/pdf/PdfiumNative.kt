@@ -1,5 +1,7 @@
 package com.mustafakoceerr.tilepdf.core.pdf
 
+import android.graphics.Bitmap
+
 /**
  * Raw entry points of libtilepdf_pdfium. Callers must run on the PDF
  * dispatcher: PDFium keeps global state and is not thread-safe. Document
@@ -31,6 +33,14 @@ internal object PdfiumNative {
     /** `[width, height]` in points with page rotation applied; empty on failure. */
     @JvmStatic
     external fun nativePageSize(document: Long, index: Int): FloatArray
+
+    /**
+     * Renders page [index] into an ARGB_8888 [bitmap] without clearing it.
+     * [matrix] is PDFium's `{a, b, c, d, e, f}` from top-left page points to
+     * bitmap pixels. Returns false if the page or bitmap couldn't be used.
+     */
+    @JvmStatic
+    external fun nativeRender(document: Long, index: Int, bitmap: Bitmap, matrix: FloatArray): Boolean
 
     /** PDFium's `FPDF_ERR_PASSWORD`. */
     const val ERROR_PASSWORD = 4

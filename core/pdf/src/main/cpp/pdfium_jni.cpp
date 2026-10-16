@@ -1,6 +1,7 @@
 // JNI bridge to PDFium. Every entry point is called from Kotlin's single PDF
 // dispatcher, so PDFium's global state is never touched concurrently.
 
+#include <android/bitmap.h>
 #include <jni.h>
 
 #include <cerrno>
@@ -94,6 +95,43 @@ Java_com_mustafakoceerr_tilepdf_core_pdf_PdfiumNative_nativePageSize(
     const jfloat values[] = {size.width, size.height};
     env->SetFloatArrayRegion(result, 0, 2, values);
     return result;
+}
+
+// Renders page [index] into an RGBA_8888 Android bitmap. [matrix] is
+// {a, b, c, d, e, f} mapping top-left page points to bitmap pixels. The
+// bitmap is not cleared first. Returns false if nothing could be rendered.
+JNIEXPORT jboolean JNICALL
+Java_com_mustafakoceerr_tilepdf_core_pdf_PdfiumNative_nativeRender(
+        JNIEnv* env, jclass, jlong handle, jint index, jobject bitmap, jfloatArray matrix) {
+    AndroidBitmapInfo info{};
+    if (AndroidBitmap_getInfo(env, bitmap, &info) != ANDROID_BITMAP_RESULT_SUCCESS ||
+        info.format != ANDROID_BITMAP_FORMAT_RGBA_8888 || env->GetArrayLength(matrix) != 6) {
+        return JNI_FALSE;
+    }
+    FPDF_PAGE page = FPDF_LoadPage(FromHandle(handle)->document, index);
+    if (!page) return JNI_FALSE;
+
+    void* pixels = nullptr;
+    if (AndroidBitmap_lockPixels(env, bitmap, &pixels) != ANDROID_BITMAP_RESULT_SUCCESS) {
+        FPDF_ClosePage(page);
+        return JNI_FALSE;
+    }
+    jfloat m[6];
+    env->GetFloatArrayRegion(matrix, 0, 6, m);
+    const FS_MATRIX transform{m[0], m[1], m[2], m[3], m[4], m[5]};
+    const FS_RECTF clip{0, 0, static_cast<float>(info.width), static_cast<float>(info.height)};
+
+    FPDF_BITMAP target = FPDFBitmap_CreateEx(
+            static_cast<int>(info.width), static_cast<int>(info.height), FPDFBitmap_BGRA,
+            pixels, static_cast<int>(info.stride));
+    if (target) {
+        // REVERSE_BYTE_ORDER writes RGBA, which is Android's ARGB_8888 layout.
+        FPDF_RenderPageBitmapWithMatrix(target, page, &transform, &clip, FPDF_ANNOT | FPDF_REVERSE_BYTE_ORDER);
+        FPDFBitmap_Destroy(target);
+    }
+    AndroidBitmap_unlockPixels(env, bitmap);
+    FPDF_ClosePage(page);
+    return target ? JNI_TRUE : JNI_FALSE;
 }
 
 }  // extern "C"
