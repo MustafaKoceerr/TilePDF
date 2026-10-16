@@ -35,6 +35,7 @@ class FakePdfDocument(private val pages: List<String>) : PdfDocument {
     override suspend fun outline(): List<OutlineEntry> = error("unused")
 
     override suspend fun trimMemory() = Unit
+    override suspend fun linkAt(pageIndex: Int, x: Float, y: Float): com.mustafakoceerr.tilepdf.core.pdf.PdfLink? = null
 
     override fun close() {
         closed = true

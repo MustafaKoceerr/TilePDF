@@ -123,6 +123,20 @@ class PdfiumDocument internal constructor(
         return entries
     }
 
+    override suspend fun linkAt(pageIndex: Int, x: Float, y: Float): PdfLink? = withDocument(pageIndex) { handle ->
+        val target = PdfiumNative.nativeLinkTargetAt(handle, pageIndex, x, y)
+        if (target != null) {
+            val page = target[0].toInt()
+            val topPt = if (target[2].isNaN() || page !in 0 until pageCount) null else {
+                PdfiumNative.nativePageToTopLeft(handle, page, floatArrayOf(target[1], target[2]))
+                    ?.get(1)?.coerceIn(0f, pageSizes[page].heightPt.toFloat())
+            }
+            PdfLink.GoTo(page, topPt)
+        } else {
+            PdfiumNative.nativeLinkUriAt(handle, pageIndex, x, y)?.let(PdfLink::Uri)
+        }
+    }
+
     override suspend fun trimMemory() {
         try {
             withDocument { PdfiumNative.nativeTrim(it) }

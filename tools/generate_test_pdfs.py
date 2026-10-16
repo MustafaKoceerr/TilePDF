@@ -13,6 +13,8 @@ Writes to core/testing/src/main/assets/:
 - text-dense.pdf 80 A4 pages of dense text; text-provider tests.
 - encrypted.pdf  1 A4 page, RC4 40-bit (R2); user password "secret",
                  owner password "owner"; password handling.
+- links.pdf      3 pages; page 1 links to page 3, a web URI and a
+                 javascript: URI; links.
 - outline.pdf    12 pages with an outline covering XYZ, Fit, named and GoTo
                  destinations and UTF-16 Turkish titles; table of contents.
 """
@@ -212,8 +214,38 @@ def outline():
     write_pdf(objects, catalog_id, "outline.pdf")
 
 
+def links():
+    # Page 1 has three link annotations: a GoTo to page 3 (XYZ, 200 pt from
+    # its top), a web URI and a javascript: URI the reader must not follow.
+    def text(label, y):
+        return f"BT /F1 24 Tf 80 {y} Td ({label}) Tj ET"
+    page1 = stream("\n".join([
+        text("Go to page 3", 738), text("Website", 638), text("Script", 538),
+    ]))
+    page = ("<< /Type /Page /Parent 11 0 R /MediaBox [0 0 595 842] "
+            "/Resources << /Font << /F1 1 0 R >> >> /Contents {content} 0 R{annots} >>")
+    objects = [
+        FONT,
+        page1,
+        page.format(content=2, annots=" /Annots [8 0 R 9 0 R 10 0 R]"),
+        stream(text("Page 2", 742)),
+        page.format(content=4, annots=""),
+        stream(text("Page 3", 742)),
+        page.format(content=6, annots=""),
+        "<< /Type /Annot /Subtype /Link /Rect [72 730 320 760] /Border [0 0 0] /Dest [7 0 R /XYZ 0 642 0] >>",
+        "<< /Type /Annot /Subtype /Link /Rect [72 630 320 660] /Border [0 0 0] "
+        "/A << /S /URI /URI (https://example.com/tilepdf) >> >>",
+        "<< /Type /Annot /Subtype /Link /Rect [72 530 320 560] /Border [0 0 0] "
+        "/A << /S /URI /URI (javascript:alert\\(1\\)) >> >>",
+        "<< /Type /Pages /Kids [3 0 R 5 0 R 7 0 R] /Count 3 >>",
+        "<< /Type /Catalog /Pages 11 0 R >>",
+    ]
+    write_pdf(objects, 12, "links.pdf")
+
+
 if __name__ == "__main__":
     sample()
     text_dense()
     outline()
     encrypted()
+    links()
