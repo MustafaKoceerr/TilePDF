@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+        <!-- Stands in for other apps' document providers in tests. -->
+        <provider
+            android:name="com.mustafakoceerr.tilepdf.data.document.TestDocumentsProvider"
+            android:authorities="com.mustafakoceerr.tilepdf.core.data.test.files"
+            android:exported="false" />
+    </application>
+</manifest>

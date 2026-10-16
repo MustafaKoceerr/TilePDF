@@ -8,7 +8,20 @@ interface DocumentRepository {
     /** Keeps read access to [uri] across app restarts, when the provider allows it. */
     fun persistAccess(uri: String)
 
-    /** URIs the app still holds a persisted read grant for; one system call. */
+    /**
+     * A URI for [uri] the app can open now and reopen after a restart: [uri]
+     * itself when its provider reports a size and a read grant is (or can be)
+     * persisted, otherwise a private copy of the file.
+     *
+     * @throws java.io.FileNotFoundException if [uri] can't be read.
+     * @throws java.io.IOException if copying fails; no partial copy is left.
+     */
+    suspend fun prepare(uri: String): String
+
+    /** Deletes the private copy behind [uri], if it is one; never a user's file. */
+    suspend fun forget(uri: String)
+
+    /** URIs the app can still open: persisted read grants and private copies. */
     suspend fun accessibleUris(): Set<String>
 
     /** Name shown to the user, e.g. `report.pdf`. */
