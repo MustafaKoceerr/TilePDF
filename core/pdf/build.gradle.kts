@@ -8,4 +8,6 @@ dependencies {
     api(projects.core.model)
     implementation(projects.core.common)
     implementation(libs.androidx.core.ktx)
+
+    androidTestImplementation(projects.core.testing)
 }
