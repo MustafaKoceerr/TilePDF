@@ -37,6 +37,15 @@ interface PageImageSource {
      *   instead of waiting for a garbage collection.
      */
     fun trimMemory(uiHidden: Boolean)
+
+    /**
+     * The page's content changed (an annotation was hidden or shown): its
+     * draft and tiles are rendered again; what's on screen stays until then.
+     */
+    fun invalidate(pageIndex: Int)
+
+    /** Changes each time [pageIndex] is invalidated; observable from composition. */
+    fun version(pageIndex: Int): Int
 }
 
 class RenderedTile(val tile: Tile, val image: ImageBitmap)

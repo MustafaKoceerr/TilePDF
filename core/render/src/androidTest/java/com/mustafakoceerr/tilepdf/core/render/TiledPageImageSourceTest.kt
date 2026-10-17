@@ -177,6 +177,31 @@ class TiledPageImageSourceTest {
         }
     }
 
+    @Test
+    fun invalidateRerendersPage() = onMain {
+        val rendered = java.util.Collections.synchronizedList(mutableListOf<Int>())
+        val counting = object : PdfDocument by document {
+            override suspend fun render(pageIndex: Int, bitmap: android.graphics.Bitmap, transform: android.graphics.Matrix) {
+                rendered += pageIndex
+                document.render(pageIndex, bitmap, transform)
+            }
+        }
+        val source = TiledPageImageSource(counting, renderer, scope)
+        source.requestTiles(allTiles(page = 0, renderWidth = 1000) + allTiles(page = 1, renderWidth = 1000))
+        source.awaitRenders()
+        rendered.clear()
+
+        source.invalidate(0)
+        // The old tiles stay on screen until their replacements arrive.
+        assertEquals(setOf(1000), source.renderedWidths(0))
+        source.awaitRenders()
+
+        assertEquals(List(allTiles(page = 0, renderWidth = 1000).size) { 0 }, rendered.toList())
+        assertEquals(1, source.version(0))
+        assertEquals(0, source.version(1))
+        assertEquals(setOf(1000), source.renderedWidths(0))
+    }
+
     private fun allTiles(page: Int, renderWidth: Int): List<Tile> {
         val height = document.pageSizes[page].heightForWidth(renderWidth)
         return TileGrid(page, renderWidth, height)

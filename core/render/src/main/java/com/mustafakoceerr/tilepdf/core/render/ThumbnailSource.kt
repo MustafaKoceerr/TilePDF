@@ -27,4 +27,9 @@ class ThumbnailSource(
     }
 
     fun trimMemory() = cache.evictAll()
+
+    /** Drops [pageIndex]'s thumbnail: the page changed. */
+    fun invalidate(pageIndex: Int) {
+        cache.remove(pageIndex)
+    }
 }

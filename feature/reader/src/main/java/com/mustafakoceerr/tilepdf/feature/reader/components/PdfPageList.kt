@@ -25,6 +25,7 @@ import com.mustafakoceerr.tilepdf.core.pdf.PageSize
 import com.mustafakoceerr.tilepdf.core.render.PageImageSource
 import com.mustafakoceerr.tilepdf.feature.reader.SelectionActions
 import com.mustafakoceerr.tilepdf.feature.reader.SelectionUiState
+import com.mustafakoceerr.tilepdf.model.Annotation
 import com.mustafakoceerr.tilepdf.model.PageTheme
 import com.mustafakoceerr.tilepdf.model.ReadingPosition
 import com.mustafakoceerr.tilepdf.model.SearchMatch
@@ -54,6 +55,8 @@ internal fun PdfPageList(
     selection: SelectionUiState?,
     selectionActions: SelectionActions,
     modifier: Modifier = Modifier,
+    /** TilePDF's annotations by page. */
+    annotations: Map<Int, List<Annotation>> = emptyMap(),
 ) {
     val matchesByPage = remember(matches) { matches.groupBy { it.pageIndex } }
 
@@ -144,6 +147,7 @@ internal fun PdfPageList(
                     currentMatch = currentMatch,
                     selection = selection?.takeIf { it.pageIndex == pageIndex },
                     selectionActions = selectionActions,
+                    annotations = annotations[pageIndex].orEmpty(),
                 )
             }
         }

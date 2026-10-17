@@ -58,10 +58,15 @@ class TiledPageImageSource(
     /** Render width each on-screen page was last requested at. */
     private var requestedWidths: Map<Int, Int> = emptyMap()
 
+    /** The latest request as given, to restart a pending render. */
+    private var requestedTileList: List<Tile> = emptyList()
+
     /** Tiles each on-screen page needs, from the latest request. */
     private var requestedTiles: Map<Int, List<TileKey>> = emptyMap()
 
     private val draftCache = BitmapCache<Int>(DRAFT_CACHE_BYTES)
+
+    private val versions = mutableStateMapOf<Int, Int>()
     /** Set while trimming for a hidden UI: evicted bitmaps are freed, not pooled. */
     private var recycleEvicted = false
 
@@ -82,6 +87,7 @@ class TiledPageImageSource(
                 .also { draftCache.put(pageIndex, it) }
 
     override fun requestTiles(tiles: List<Tile>) {
+        requestedTileList = tiles
         val wanted = tiles.mapTo(HashSet()) { it.key }
         requestedTiles = tiles.groupBy({ it.key.pageIndex }, { it.key })
         requestedWidths = requestedTiles.mapValues { (_, keys) -> keys.first().renderWidth }
@@ -147,6 +153,32 @@ class TiledPageImageSource(
         scope.launch { document.trimMemory() }
     }
 
+    override fun version(pageIndex: Int): Int = versions[pageIndex] ?: 0
+
+    override fun invalidate(pageIndex: Int) {
+        draftCache.remove(pageIndex)
+        // Removing doesn't count as eviction, so shown tiles are marked here.
+        for (key in tileCache.snapshot().keys.filter { it.pageIndex == pageIndex }) {
+            val bitmap = tileCache.remove(key) ?: continue
+            if (key in liveTiles || key in fallbackTiles) evictedWhileShown += key else bitmapPool.release(bitmap)
+        }
+        fallbackTiles.keys.filter { it.pageIndex == pageIndex }.forEach { discard(fallbackTiles, it) }
+        // Live tiles stay on screen and are rendered again in place.
+        val stale = liveTiles.values.filter { it.tile.key.pageIndex == pageIndex }.map { it.tile } +
+            pendingRenders.keys.filter { it.pageIndex == pageIndex }.mapNotNull { key -> requestedTile(key) }
+        for (tile in stale.distinctBy { it.key }) {
+            pendingRenders.remove(tile.key)?.cancel()
+            val job = render(tile)
+            pendingRenders[tile.key] = job
+            job.start()
+        }
+        versions[pageIndex] = version(pageIndex) + 1
+    }
+
+    /** The tile of a pending render, rebuilt from its key's grid. */
+    private fun requestedTile(key: TileKey): Tile? =
+        requestedTileList.firstOrNull { it.key == key }
+
     @VisibleForTesting
     internal suspend fun awaitRenders() = pendingRenders.values.toList().joinAll()
 
@@ -168,7 +200,9 @@ class TiledPageImageSource(
         pendingRenders.remove(tile.key)
         // On screen before cached: if the cache evicts it straight away, it
         // must count as shown rather than go to the pool while being drawn.
-        liveTiles[tile.key] = RenderedTile(tile, bitmap.asImageBitmap())
+        val replaced = liveTiles.put(tile.key, RenderedTile(tile, bitmap.asImageBitmap()))
+        // An invalidated tile's old bitmap, out of the cache, is free once replaced.
+        if (replaced != null && evictedWhileShown.remove(tile.key)) bitmapPool.release(replaced.image.asAndroidBitmap())
         tileCache.put(tile.key, bitmap)
         dropFallbackIfCovered(tile.key.pageIndex)
     }

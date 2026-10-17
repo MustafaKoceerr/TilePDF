@@ -48,6 +48,7 @@ import com.mustafakoceerr.tilepdf.core.render.TileGrid
 import com.mustafakoceerr.tilepdf.core.render.tilesFor
 import com.mustafakoceerr.tilepdf.feature.reader.SelectionActions
 import com.mustafakoceerr.tilepdf.feature.reader.SelectionUiState
+import com.mustafakoceerr.tilepdf.model.Annotation
 import com.mustafakoceerr.tilepdf.model.PageTheme
 import com.mustafakoceerr.tilepdf.model.SearchMatch
 import kotlinx.coroutines.FlowPreview
@@ -84,6 +85,8 @@ internal fun PdfPagePager(
     selection: SelectionUiState?,
     selectionActions: SelectionActions,
     modifier: Modifier = Modifier,
+    /** TilePDF's annotations by page. */
+    annotations: Map<Int, List<Annotation>> = emptyMap(),
 ) {
     val matchesByPage = remember(matches) { matches.groupBy { it.pageIndex } }
 
@@ -153,6 +156,7 @@ internal fun PdfPagePager(
                     currentMatch = currentMatch,
                     selection = selection?.takeIf { it.pageIndex == pageIndex },
                     selectionActions = selectionActions,
+                    annotations = annotations[pageIndex].orEmpty(),
                     modifier = Modifier
                         .offset { IntOffset(fitted.left, fitted.top) }
                         .graphicsLayer {
