@@ -84,7 +84,7 @@
   - `./gradlew bundleRelease`;
   - Play App Signing;
   - where the bundle lands.
-- Modify: `app/build.gradle.kts`: `signingConfigs.create("release")` only when the result is `Configured`; release uses it; `Incomplete` throws `GradleException(result.message)`; `Unsigned` logs one warning.
+- Modify: `app/build.gradle.kts`: `signingConfigs.create("release")` only when the result is `Configured`; release uses it; `Incomplete` throws `GradleException(result.message)`; `Unsigned` logs one warning. Task 1's local `-Ptilepdf.signReleaseWithDebug=true` applies only when the result is `Unsigned`, and never overrides real signing.
 
 **Interfaces:**
 - Produces:
