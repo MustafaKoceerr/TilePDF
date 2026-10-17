@@ -8,4 +8,6 @@ data class LibraryDocument(
     val pageCount: Int,
     val position: ReadingPosition,
     val lastOpenedAt: Long,
+    val addedAt: Long = 0,
+    val favorite: Boolean = false,
 )

@@ -19,5 +19,7 @@ interface LibraryRepository {
 
     suspend fun saveReadingPosition(uri: String, position: ReadingPosition)
 
+    suspend fun setFavorite(uri: String, favorite: Boolean)
+
     suspend fun remove(uri: String)
 }

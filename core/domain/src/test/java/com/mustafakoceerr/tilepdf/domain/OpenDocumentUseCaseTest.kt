@@ -127,6 +127,7 @@ class OpenDocumentUseCaseTest {
         }
         override suspend fun readingPosition(uri: String): ReadingPosition? = position
         override suspend fun saveReadingPosition(uri: String, position: ReadingPosition) = Unit
+        override suspend fun setFavorite(uri: String, favorite: Boolean) = Unit
         override suspend fun remove(uri: String) = Unit
     }
 

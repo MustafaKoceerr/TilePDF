@@ -34,6 +34,7 @@ class SaveAsCopyUseCaseTest {
         }
         override suspend fun readingPosition(uri: String): ReadingPosition? = error("unused")
         override suspend fun saveReadingPosition(uri: String, position: ReadingPosition) = error("unused")
+        override suspend fun setFavorite(uri: String, favorite: Boolean) = error("unused")
         override suspend fun remove(uri: String) {
             events += "remove $uri"
         }

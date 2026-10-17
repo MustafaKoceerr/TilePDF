@@ -37,6 +37,9 @@ abstract class DocumentDao {
         panFraction: Float,
     )
 
+    @Query("UPDATE documents SET favorite = :favorite WHERE uri = :uri")
+    abstract suspend fun setFavorite(uri: String, favorite: Boolean)
+
     @Query("DELETE FROM documents WHERE uri = :uri")
     abstract suspend fun delete(uri: String)
 

@@ -32,5 +32,7 @@ class OfflineLibraryRepository @Inject constructor(
             position.panFraction,
         )
 
+    override suspend fun setFavorite(uri: String, favorite: Boolean) = dao.setFavorite(uri, favorite)
+
     override suspend fun remove(uri: String) = dao.delete(uri)
 }

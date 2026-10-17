@@ -57,6 +57,7 @@ class LibraryViewModelTest {
         override suspend fun recordOpened(uri: String, displayName: String, pageCount: Int) = Unit
         override suspend fun readingPosition(uri: String): ReadingPosition? = null
         override suspend fun saveReadingPosition(uri: String, position: ReadingPosition) = Unit
+        override suspend fun setFavorite(uri: String, favorite: Boolean) = Unit
         override suspend fun remove(uri: String) {
             removed += uri
         }
