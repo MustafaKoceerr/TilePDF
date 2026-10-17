@@ -47,7 +47,7 @@ class AnnotationSaver @Inject constructor(
         val draft = repository.observe(uri).first()
         if (draft == null || !draft.dirty) return SaveResult.NothingToSave
         // Another app changed the file: overwriting would lose its changes.
-        if (files.stamp(uri) != draft.base) return failed(uri, SaveError.FileChanged)
+        if (files.stampOrUnknown(uri) != draft.base) return failed(uri, SaveError.FileChanged)
         return when (val outcome = write(uri, draft, draft.removedForeign, target = uri)) {
             Outcome.Unchanged -> {
                 repository.markSaved(uri, draft, draft.base)
@@ -64,7 +64,7 @@ class AnnotationSaver @Inject constructor(
     override suspend fun saveCopy(uri: String, target: String): SaveResult {
         val draft = repository.observe(uri).first() ?: return SaveResult.NothingToSave
         // "#index" keys only hold for the file version the draft is based on.
-        val removed = if (files.stamp(uri) == draft.base) {
+        val removed = if (files.stampOrUnknown(uri) == draft.base) {
             draft.removedForeign
         } else {
             draft.removedForeign.filterNot { it.key.startsWith("#") }.toSet()
@@ -116,7 +116,7 @@ class AnnotationSaver @Inject constructor(
             } catch (_: UnsupportedOperationException) {
                 return Outcome.Error(SaveError.NoWritePermission)
             }
-            return Outcome.Written(files.stamp(target) ?: FileStamp(temp.length(), null))
+            return Outcome.Written(files.stampOrUnknown(target))
         } catch (e: CancellationException) {
             throw e
         } catch (_: IOException) {

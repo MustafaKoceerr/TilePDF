@@ -13,6 +13,15 @@ fun interface FileStamps {
     suspend fun stamp(uri: String): FileStamp?
 }
 
+/**
+ * Stands for the version of a file whose provider won't tell. Every such
+ * file compares equal to it, so other apps' changes go unnoticed there, but
+ * saving still works.
+ */
+internal val UNKNOWN_STAMP = FileStamp(size = -1, lastModified = null)
+
+internal suspend fun FileStamps.stampOrUnknown(uri: String): FileStamp = stamp(uri) ?: UNKNOWN_STAMP
+
 /** Each document's annotation draft: what TilePDF changed until it is in the file. */
 interface AnnotationRepository {
 

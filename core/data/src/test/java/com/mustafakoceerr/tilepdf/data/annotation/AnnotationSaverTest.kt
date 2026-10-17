@@ -82,6 +82,16 @@ class AnnotationSaverTest {
     }
 
     @Test
+    fun fileWithoutStampStillSaves() = runTest {
+        // The provider can't be queried for size or date: changes can't be detected, but saving must work.
+        files.pdfs[uri] = FakePdf()
+        repository.prepare(uri, FakePdfDocument(List(3) { "" }))
+        repository.update(uri, listOf(note("tilepdf-a")), emptySet())
+
+        assertEquals(SaveResult.Saved(uri), saver.save(uri))
+    }
+
+    @Test
     fun noWriteAccessKeepsDraft() = runTest {
         givenDraft(listOf(note("tilepdf-a")))
         files.replaceFailure = SecurityException("read only")

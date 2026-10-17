@@ -12,9 +12,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 
-/** Stand-in base for a file whose version couldn't be read: never matches a real one. */
-private val UNKNOWN_STAMP = FileStamp(size = -1, lastModified = null)
-
 class OfflineAnnotationRepository internal constructor(
     private val dao: AnnotationDraftDao,
     private val stamps: FileStamps,
@@ -27,7 +24,7 @@ class OfflineAnnotationRepository internal constructor(
     override fun observe(uri: String): Flow<AnnotationDraft?> = dao.observe(uri).map { it?.toDraft() }
 
     override suspend fun prepare(uri: String, document: PdfDocument): AnnotationDraft {
-        val current = stamps.stamp(uri) ?: UNKNOWN_STAMP
+        val current = stamps.stampOrUnknown(uri)
         val stored = dao.get(uri)?.toDraft()
         if (stored != null && stored.base == current) return stored
         if (stored != null && stored.dirty) {
