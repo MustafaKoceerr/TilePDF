@@ -20,6 +20,10 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        // Only the developer's own libraries come from JitPack.
+        maven("https://jitpack.io") {
+            content { includeGroupByRegex("com\\.github\\.MustafaKoceerr.*") }
+        }
     }
 }
 
