@@ -89,4 +89,5 @@
     <string name="annotation_color_red">Red</string>
     <string name="annotation_color_black">Black</string>
     <string name="annotation_width_value">Width %1$d pt</string>
+    <string name="reader_toc_close">Close contents</string>
 </resources>

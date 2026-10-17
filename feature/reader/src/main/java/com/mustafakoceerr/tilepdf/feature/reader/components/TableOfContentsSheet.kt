@@ -2,6 +2,12 @@ package com.mustafakoceerr.tilepdf.feature.reader.components
 
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -15,6 +21,7 @@ import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.PrimaryTabRow
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -22,6 +29,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -58,26 +66,77 @@ internal fun TableOfContentsSheet(
     onSelectAnnotation: (AnnotationListItem) -> Unit = {},
     onDeleteAnnotation: (AnnotationTarget) -> Unit = {},
 ) {
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        TocContent(outline, currentIndex, bookmarks, onSelect, onSelectPage, annotations, onSelectAnnotation, onDeleteAnnotation)
+    }
+}
+
+/**
+ * The same tabs as [TableOfContentsSheet], in a panel beside the pages on
+ * large screens. Choosing something doesn't close it; [onClose] does.
+ */
+@Composable
+internal fun TableOfContentsPanel(
+    outline: List<OutlineEntry>,
+    currentIndex: Int,
+    bookmarks: List<Bookmark>,
+    onSelect: (OutlineEntry) -> Unit,
+    onSelectPage: (pageIndex: Int) -> Unit,
+    onClose: () -> Unit,
+    annotations: List<AnnotationListItem> = emptyList(),
+    onSelectAnnotation: (AnnotationListItem) -> Unit = {},
+    onDeleteAnnotation: (AnnotationTarget) -> Unit = {},
+    modifier: Modifier = Modifier,
+) {
+    Surface(tonalElevation = 1.dp, modifier = modifier.width(TocPanelWidth).fillMaxHeight()) {
+        TocContent(
+            outline, currentIndex, bookmarks, onSelect, onSelectPage, annotations, onSelectAnnotation, onDeleteAnnotation,
+            modifier = Modifier.statusBarsPadding().navigationBarsPadding(),
+            trailing = {
+                IconButton(onClick = onClose) {
+                    Icon(painterResource(TilePdfIcons.Close), contentDescription = stringResource(R.string.reader_toc_close))
+                }
+            },
+        )
+    }
+}
+
+/** Tabs for contents, bookmarks and annotations, with [trailing] beside them. */
+@Composable
+private fun TocContent(
+    outline: List<OutlineEntry>,
+    currentIndex: Int,
+    bookmarks: List<Bookmark>,
+    onSelect: (OutlineEntry) -> Unit,
+    onSelectPage: (pageIndex: Int) -> Unit,
+    annotations: List<AnnotationListItem>,
+    onSelectAnnotation: (AnnotationListItem) -> Unit,
+    onDeleteAnnotation: (AnnotationTarget) -> Unit,
+    modifier: Modifier = Modifier,
+    trailing: (@Composable () -> Unit)? = null,
+) {
     // Documents without an outline open straight on their bookmarks.
     var tab by rememberSaveable { mutableIntStateOf(if (outline.isEmpty()) BOOKMARKS_TAB else CONTENTS_TAB) }
-
-    ModalBottomSheet(onDismissRequest = onDismiss) {
-        PrimaryTabRow(selectedTabIndex = tab) {
-            Tab(
-                selected = tab == CONTENTS_TAB,
-                onClick = { tab = CONTENTS_TAB },
-                text = { Text(stringResource(R.string.reader_toc)) },
-            )
-            Tab(
-                selected = tab == BOOKMARKS_TAB,
-                onClick = { tab = BOOKMARKS_TAB },
-                text = { Text(stringResource(R.string.reader_bookmarks)) },
-            )
-            Tab(
-                selected = tab == ANNOTATIONS_TAB,
-                onClick = { tab = ANNOTATIONS_TAB },
-                text = { Text(stringResource(R.string.reader_annotations)) },
-            )
+    Column(modifier) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            PrimaryTabRow(selectedTabIndex = tab, modifier = Modifier.weight(1f)) {
+                Tab(
+                    selected = tab == CONTENTS_TAB,
+                    onClick = { tab = CONTENTS_TAB },
+                    text = { Text(stringResource(R.string.reader_toc)) },
+                )
+                Tab(
+                    selected = tab == BOOKMARKS_TAB,
+                    onClick = { tab = BOOKMARKS_TAB },
+                    text = { Text(stringResource(R.string.reader_bookmarks)) },
+                )
+                Tab(
+                    selected = tab == ANNOTATIONS_TAB,
+                    onClick = { tab = ANNOTATIONS_TAB },
+                    text = { Text(stringResource(R.string.reader_annotations)) },
+                )
+            }
+            trailing?.invoke()
         }
         when (tab) {
             CONTENTS_TAB -> OutlineList(outline, currentIndex, onSelect)
