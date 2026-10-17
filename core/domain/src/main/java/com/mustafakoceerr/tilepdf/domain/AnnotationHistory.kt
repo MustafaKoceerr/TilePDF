@@ -30,6 +30,11 @@ class AnnotationHistory(initial: AnnotationState, private val limit: Int = 100) 
 
     fun removeForeign(ref: ForeignRef): AnnotationState = edit { it.copy(removedForeign = it.removedForeign + ref) }
 
+    /** Removes several of ours and other apps' annotations as one step: an eraser gesture. */
+    fun removeAll(ids: Set<String>, refs: Set<ForeignRef>): AnnotationState = edit { current ->
+        AnnotationState(current.annotations.filterNot { it.id in ids }, current.removedForeign + refs)
+    }
+
     /** Swaps annotation [old] for [new] in place, as one step: how a note is edited. */
     fun replace(old: String, new: Annotation): AnnotationState = edit { current ->
         current.copy(annotations = current.annotations.map { if (it.id == old) new else it })
