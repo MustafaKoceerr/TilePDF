@@ -232,7 +232,9 @@ class ReaderViewModel @Inject constructor(
 
     fun onReadingModeSelected(mode: ReadingMode) {
         // The other page view starts where this one is now.
-        (documentState.value as? DocumentState.Opened)?.let { startPosition.value = position ?: it.opened.position }
+        (documentState.value as? DocumentState.Opened)?.opened?.let { opened ->
+            startPosition.value = positionForModeSwitch(position ?: opened.position, opened.document.pageCount)
+        }
         viewModelScope.launch { preferencesRepository.setReadingMode(mode) }
     }
 
