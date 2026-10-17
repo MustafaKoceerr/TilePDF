@@ -1,0 +1,24 @@
+<resources>
+    <string name="library_title">Kütüphane</string>
+    <string name="library_open_pdf">PDF Aç</string>
+    <string name="library_empty">Henüz bir PDF açmadın.\nBaşlamak için \"PDF Aç\"a dokun.</string>
+    <string name="library_page_progress">Sayfa %1$d / %2$d</string>
+    <string name="library_remove">Kütüphaneden kaldır</string>
+    <string name="library_no_access">Erişim izni yok, dosyayı yeniden aç</string>
+    <string name="library_all">Tümü</string>
+    <string name="library_favorites">Favoriler</string>
+    <string name="library_favorite_add">Favorilere ekle</string>
+    <string name="library_favorite_remove">Favorilerden çıkar</string>
+    <string name="library_sort">Sırala</string>
+    <string name="library_sort_recent">Son açılan</string>
+    <string name="library_sort_name">Ada göre</string>
+    <string name="library_sort_added">Eklenme tarihi</string>
+    <string name="library_search">Ara</string>
+    <string name="library_search_hint">Kütüphanede ara</string>
+    <string name="library_search_close">Aramayı kapat</string>
+    <string name="library_removed">Kütüphaneden kaldırıldı</string>
+    <string name="library_undo">Geri al</string>
+    <string name="library_more">Diğer seçenekler</string>
+    <string name="library_no_favorites">Henüz favori yok</string>
+    <string name="library_no_results">Sonuç yok</string>
+</resources>
