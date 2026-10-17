@@ -11,8 +11,8 @@ data object SettingsRoute
 
 fun NavController.navigateToSettings() = navigate(SettingsRoute)
 
-fun NavGraphBuilder.settingsScreen(onBack: () -> Unit) {
+fun NavGraphBuilder.settingsScreen(onBack: () -> Unit, onOpenAbout: () -> Unit) {
     composable<SettingsRoute> {
-        SettingsScreen(onBack = onBack)
+        SettingsScreen(onBack = onBack, onOpenAbout = onOpenAbout)
     }
 }

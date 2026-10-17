@@ -1,6 +1,7 @@
 package com.mustafakoceerr.tilepdf.feature.settings
 
 import androidx.annotation.StringRes
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -17,6 +18,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
@@ -45,6 +47,7 @@ import com.mustafakoceerr.tilepdf.ui.theme.TilePDFTheme
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,
+    onOpenAbout: () -> Unit,
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -54,6 +57,7 @@ fun SettingsScreen(
         onThemeModeSelected = viewModel::onThemeModeSelected,
         onDynamicColorChanged = viewModel::onDynamicColorChanged,
         onLanguageSelected = viewModel::onLanguageSelected,
+        onOpenAbout = onOpenAbout,
     )
 }
 
@@ -65,6 +69,7 @@ internal fun SettingsScreen(
     onThemeModeSelected: (ThemeMode) -> Unit = {},
     onDynamicColorChanged: (Boolean) -> Unit = {},
     onLanguageSelected: (AppLanguage) -> Unit = {},
+    onOpenAbout: () -> Unit = {},
 ) {
     Scaffold(
         topBar = {
@@ -116,6 +121,11 @@ internal fun SettingsScreen(
                         )
                     }
                 }
+                HorizontalDivider(Modifier.padding(vertical = 8.dp))
+                ListItem(
+                    headlineContent = { Text(stringResource(R.string.settings_about)) },
+                    modifier = Modifier.clickable(onClick = onOpenAbout),
+                )
             }
         }
     }

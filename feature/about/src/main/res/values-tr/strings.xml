@@ -1,0 +1,10 @@
+<resources>
+    <string name="about_title">TilePDF hakkında</string>
+    <string name="about_back">Geri</string>
+    <string name="about_version">Sürüm %1$s</string>
+    <string name="about_offline">TilePDF internet bağlantısı olmadan çalışır. Dosyaların ve notların bu cihazda kalır.</string>
+    <string name="about_pdfium">PDFium ve bileşenleri</string>
+    <string name="about_libraries">Açık kaynak kütüphaneler</string>
+    <string name="about_libraries_summary">TilePDF\'in kullandığı kütüphaneler ve lisansları</string>
+    <string name="about_close">Kapat</string>
+</resources>

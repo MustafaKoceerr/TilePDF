@@ -5,6 +5,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.rememberNavController
+import com.mustafakoceerr.tilepdf.R
+import com.mustafakoceerr.tilepdf.feature.about.navigation.aboutScreen
+import com.mustafakoceerr.tilepdf.feature.about.navigation.navigateToAbout
 import com.mustafakoceerr.tilepdf.feature.library.navigation.LibraryRoute
 import com.mustafakoceerr.tilepdf.feature.library.navigation.libraryScreen
 import com.mustafakoceerr.tilepdf.feature.reader.navigation.ReaderRoute
@@ -42,7 +45,8 @@ fun TilePdfNavHost(
             onOpenDocument = navController::navigateToReader,
             onOpenSettings = navController::navigateToSettings,
         )
-        settingsScreen(onBack = navController::popBackStack)
+        settingsScreen(onBack = navController::popBackStack, onOpenAbout = navController::navigateToAbout)
+        aboutScreen(onBack = navController::popBackStack, librariesRes = R.raw.aboutlibraries)
         readerScreen(
             onBack = navController::popBackStack,
             onOpenDocument = { uri ->

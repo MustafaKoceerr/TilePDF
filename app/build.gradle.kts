@@ -5,6 +5,7 @@ plugins {
     alias(libs.plugins.tilepdf.android.application)
     alias(libs.plugins.tilepdf.android.application.compose)
     alias(libs.plugins.tilepdf.hilt)
+    alias(libs.plugins.aboutlibraries.android)
 }
 
 android {
@@ -54,11 +55,27 @@ android {
     }
 }
 
+// Licenses of every bundled library, shown on the About screen. The build may
+// fetch standard license texts (e.g. Apache-2.0) from SPDX when a dependency's
+// metadata names the license without its text; the app itself never goes online.
+aboutLibraries {
+    offlineMode = false
+    collect {
+        filterVariants.add("release")
+        // The developer's own JitPack libraries publish no license in their POMs.
+        configPath = file("../config/aboutlibraries")
+    }
+    export {
+        excludeFields.addAll("developers", "funding")
+    }
+}
+
 dependencies {
     implementation(projects.core.common)
     implementation(projects.core.data)
     implementation(projects.core.designsystem)
     implementation(projects.core.domain)
+    implementation(projects.feature.about)
     implementation(projects.feature.library)
     implementation(projects.feature.reader)
     implementation(projects.feature.settings)
