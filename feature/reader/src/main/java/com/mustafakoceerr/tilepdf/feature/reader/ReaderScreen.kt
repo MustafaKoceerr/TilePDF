@@ -41,6 +41,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -72,12 +73,14 @@ import com.mustafakoceerr.tilepdf.core.designsystem.TilePdfIcons
 import com.mustafakoceerr.tilepdf.feature.reader.components.PageJump
 import com.mustafakoceerr.tilepdf.feature.reader.components.PasswordDialog
 import com.mustafakoceerr.tilepdf.feature.reader.components.PdfPageList
+import com.mustafakoceerr.tilepdf.feature.reader.components.PdfPagePager
 import com.mustafakoceerr.tilepdf.feature.reader.components.ReaderSettingsSheet
 import com.mustafakoceerr.tilepdf.feature.reader.components.SearchTopBar
 import com.mustafakoceerr.tilepdf.feature.reader.components.TableOfContentsSheet
 import com.mustafakoceerr.tilepdf.feature.reader.components.ThumbnailGrid
 import com.mustafakoceerr.tilepdf.feature.reader.components.TrimMemoryEffect
 import com.mustafakoceerr.tilepdf.model.PageTheme
+import com.mustafakoceerr.tilepdf.model.ReadingMode
 import com.mustafakoceerr.tilepdf.model.ReadingPosition
 import com.mustafakoceerr.tilepdf.ui.theme.TilePDFTheme
 import kotlinx.coroutines.launch
@@ -112,6 +115,7 @@ fun ReaderScreen(
         onExternalLinkHandled = viewModel::onExternalLinkHandled,
         onToggleBookmark = viewModel::onToggleBookmark,
         onPageThemeSelected = viewModel::onPageThemeSelected,
+        onReadingModeSelected = viewModel::onReadingModeSelected,
         onKeepScreenOnChange = viewModel::onKeepScreenOnChange,
     )
 }
@@ -158,6 +162,7 @@ internal fun ReaderScreen(
     onExternalLinkHandled: () -> Unit = {},
     onToggleBookmark: () -> Unit = {},
     onPageThemeSelected: (PageTheme) -> Unit = {},
+    onReadingModeSelected: (ReadingMode) -> Unit = {},
     onKeepScreenOnChange: (Boolean) -> Unit = {},
 ) {
     val ready = uiState as? ReaderUiState.Ready
@@ -272,30 +277,25 @@ internal fun ReaderScreen(
                     onSubmit = onPasswordEntered,
                     onCancel = onBack,
                 )
-                is ReaderUiState.Ready -> PdfPageList(
-                    pageSizes = uiState.pageSizes,
-                    pageImages = uiState.pageImages,
-                    initialPosition = uiState.initialPosition,
-                    pageTheme = uiState.preferences.pageTheme,
-                    matches = uiState.search.matches,
-                    currentMatch = uiState.search.currentMatch,
-                    onPositionChanged = onPositionChanged,
-                    goToPageOpen = goToPageOpen,
-                    onGoToPageOpenChange = { goToPageOpen = it },
-                    pageJump = pageJump,
-                    onPageJumpHandled = { pageJump = null },
-                    onTapPage = onTapPage,
-                    onTapOutsidePage = onTapOutsidePage,
-                    chromePadding = chromePadding(),
-                    selection = uiState.selection,
-                    selectionActions = SelectionActions(
-                        onLongPress = onLongPress,
-                        onDragHandle = onDragSelectionHandle,
-                        onCopy = copySelection,
-                        onSelectAll = onSelectAllOnPage,
-                        onClear = onClearSelection,
-                    ),
-                )
+                is ReaderUiState.Ready -> key(uiState.preferences.readingMode) {
+                    ReaderPages(
+                        ready = uiState,
+                        goToPageOpen = goToPageOpen,
+                        onGoToPageOpenChange = { goToPageOpen = it },
+                        pageJump = pageJump,
+                        onPageJumpHandled = { pageJump = null },
+                        onPositionChanged = onPositionChanged,
+                        onTapPage = onTapPage,
+                        onTapOutsidePage = onTapOutsidePage,
+                        selectionActions = SelectionActions(
+                            onLongPress = onLongPress,
+                            onDragHandle = onDragSelectionHandle,
+                            onCopy = copySelection,
+                            onSelectAll = onSelectAllOnPage,
+                            onClear = onClearSelection,
+                        ),
+                    )
+                }
             }
         }
         // Over the pages, not above them: hiding it doesn't move the pages.
@@ -332,6 +332,7 @@ internal fun ReaderScreen(
             ReaderSettingsSheet(
                 preferences = ready.preferences,
                 onPageThemeSelected = onPageThemeSelected,
+                onReadingModeSelected = onReadingModeSelected,
                 onKeepScreenOnChange = onKeepScreenOnChange,
                 onDismiss = { settingsOpen = false },
             )
@@ -346,6 +347,59 @@ internal fun ReaderScreen(
                 onDismiss = { pagesOpen = false },
             )
         }
+    }
+}
+
+/** The pages, scrolled or swiped as the reading mode says. */
+@Composable
+private fun ReaderPages(
+    ready: ReaderUiState.Ready,
+    goToPageOpen: Boolean,
+    onGoToPageOpenChange: (Boolean) -> Unit,
+    pageJump: PageJump?,
+    onPageJumpHandled: () -> Unit,
+    onPositionChanged: (ReadingPosition) -> Unit,
+    onTapPage: (pageIndex: Int, x: Float, y: Float) -> Unit,
+    onTapOutsidePage: () -> Unit,
+    selectionActions: SelectionActions,
+) {
+    when (ready.preferences.readingMode) {
+        ReadingMode.Vertical -> PdfPageList(
+            pageSizes = ready.pageSizes,
+            pageImages = ready.pageImages,
+            initialPosition = ready.initialPosition,
+            pageTheme = ready.preferences.pageTheme,
+            matches = ready.search.matches,
+            currentMatch = ready.search.currentMatch,
+            onPositionChanged = onPositionChanged,
+            goToPageOpen = goToPageOpen,
+            onGoToPageOpenChange = onGoToPageOpenChange,
+            pageJump = pageJump,
+            onPageJumpHandled = onPageJumpHandled,
+            onTapPage = onTapPage,
+            onTapOutsidePage = onTapOutsidePage,
+            chromePadding = chromePadding(),
+            selection = ready.selection,
+            selectionActions = selectionActions,
+        )
+        ReadingMode.Horizontal -> PdfPagePager(
+            pageSizes = ready.pageSizes,
+            pageImages = ready.pageImages,
+            initialPage = ready.initialPosition.pageIndex,
+            pageTheme = ready.preferences.pageTheme,
+            matches = ready.search.matches,
+            currentMatch = ready.search.currentMatch,
+            onPageChanged = { onPositionChanged(ReadingPosition(pageIndex = it)) },
+            goToPageOpen = goToPageOpen,
+            onGoToPageOpenChange = onGoToPageOpenChange,
+            pageJump = pageJump,
+            onPageJumpHandled = onPageJumpHandled,
+            onTapPage = onTapPage,
+            onTapOutsidePage = onTapOutsidePage,
+            chromePadding = chromePadding(),
+            selection = ready.selection,
+            selectionActions = selectionActions,
+        )
     }
 }
 

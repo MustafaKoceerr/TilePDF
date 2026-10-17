@@ -77,6 +77,9 @@ class ReaderViewModel @Inject constructor(
     private val linkTargets = MutableStateFlow(LinkTargets())
     private val currentPage = MutableStateFlow(0)
     private val fullScreen = MutableStateFlow(false)
+
+    /** Where the page view starts: the saved position, or the latest one after a mode change. */
+    private val startPosition = MutableStateFlow<ReadingPosition?>(null)
     private var selectionJob: Job? = null
     private val positionUpdates = MutableSharedFlow<ReadingPosition>(extraBufferCapacity = 1)
 
@@ -85,9 +88,9 @@ class ReaderViewModel @Inject constructor(
         preferencesRepository.preferences,
         searchState,
         toc,
-        combine(selection, linkTargets, currentPage, fullScreen, ::PageState),
+        combine(selection, linkTargets, currentPage, fullScreen, startPosition, ::PageState),
     ) { document, preferences, search, toc, pageState ->
-        val (selection, links, page, fullScreen) = pageState
+        val (selection, links, page, fullScreen, start) = pageState
         when (document) {
             DocumentState.Loading -> ReaderUiState.Loading
             is DocumentState.Failed -> ReaderUiState.Error(document.reason)
@@ -97,7 +100,7 @@ class ReaderViewModel @Inject constructor(
                 pageSizes = document.opened.document.pageSizes,
                 pageImages = document.pageImages,
                 thumbnails = document.thumbnails,
-                initialPosition = document.opened.position,
+                initialPosition = start ?: document.opened.position,
                 preferences = preferences,
                 search = search,
                 toc = toc,
@@ -228,6 +231,8 @@ class ReaderViewModel @Inject constructor(
     }
 
     fun onReadingModeSelected(mode: ReadingMode) {
+        // The other page view starts where this one is now.
+        (documentState.value as? DocumentState.Opened)?.let { startPosition.value = position ?: it.opened.position }
         viewModelScope.launch { preferencesRepository.setReadingMode(mode) }
     }
 
@@ -361,6 +366,7 @@ class ReaderViewModel @Inject constructor(
         val links: LinkTargets,
         val currentPage: Int,
         val fullScreen: Boolean,
+        val startPosition: ReadingPosition?,
     )
 
     /** Where a tapped link leads, until the screen has acted on it. */

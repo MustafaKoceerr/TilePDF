@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import com.mustafakoceerr.tilepdf.feature.reader.R
 import com.mustafakoceerr.tilepdf.model.PageTheme
 import com.mustafakoceerr.tilepdf.model.ReaderPreferences
+import com.mustafakoceerr.tilepdf.model.ReadingMode
 
 /** Reader settings that apply to every document. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -31,6 +32,7 @@ import com.mustafakoceerr.tilepdf.model.ReaderPreferences
 internal fun ReaderSettingsSheet(
     preferences: ReaderPreferences,
     onPageThemeSelected: (PageTheme) -> Unit,
+    onReadingModeSelected: (ReadingMode) -> Unit,
     onKeepScreenOnChange: (Boolean) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -39,6 +41,13 @@ internal fun ReaderSettingsSheet(
             modifier = Modifier.padding(start = 24.dp, end = 24.dp, bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
+            ChoiceRow(
+                title = R.string.reader_layout,
+                options = ReadingMode.entries,
+                selected = preferences.readingMode,
+                label = ReadingMode::labelRes,
+                onSelect = onReadingModeSelected,
+            )
             ChoiceRow(
                 title = R.string.reader_theme,
                 options = PageTheme.entries,
@@ -91,6 +100,13 @@ private fun <T> ChoiceRow(
         }
     }
 }
+
+@get:StringRes
+private val ReadingMode.labelRes: Int
+    get() = when (this) {
+        ReadingMode.Vertical -> R.string.reader_layout_vertical
+        ReadingMode.Horizontal -> R.string.reader_layout_horizontal
+    }
 
 @get:StringRes
 private val PageTheme.labelRes: Int

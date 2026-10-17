@@ -4,6 +4,9 @@
     <string name="cancel">İptal</string>
     <string name="reader_page_description">Sayfa %1$d</string>
     <string name="reader_settings">Okuma ayarları</string>
+    <string name="reader_layout">Sayfa düzeni</string>
+    <string name="reader_layout_vertical">Dikey</string>
+    <string name="reader_layout_horizontal">Yatay</string>
     <string name="reader_theme">Tema</string>
     <string name="reader_theme_light">Açık</string>
     <string name="reader_theme_night">Gece</string>
