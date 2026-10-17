@@ -82,6 +82,10 @@ kaydedilince taslak kopyaya geçer ve okuyucu kopyayı açar.
 
 ## Spec'ten farklar
 
+0. Açıklama arayüzü ayrı bir `feature:annotation` modülünde değil,
+   `feature:reader` içinde (`feature.reader.annotation` paketi). Feature
+   modülleri birbirine bağımlı olamaz ve bu arayüz okuyucu ekranının parçası.
+
 1. Spec "kaydedilmiş olanları PDFium render eder" diyor. Kendi
    açıklamalarımızı kayıttan sonra da Compose çizer; PDFium yalnızca yabancı
    açıklamaları çizer. Böylece kayıttan sonra açık okuyucuda açıklamalar
