@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
@@ -84,6 +85,9 @@ internal fun PdfPageList(
     pageJump: PageJump?,
     onPageJumpHandled: () -> Unit,
     onTapPage: (pageIndex: Int, x: Float, y: Float) -> Unit,
+    onTapOutsidePage: () -> Unit,
+    /** Room for the bars at the top and bottom, kept even while they're hidden. */
+    chromePadding: PaddingValues,
     selection: SelectionUiState?,
     selectionActions: SelectionActions,
     modifier: Modifier = Modifier,
@@ -145,10 +149,10 @@ internal fun PdfPageList(
                     zoomState = zoomState,
                     listState = listState,
                     onTap = { position ->
-                        // On a page: the reader clears a selection or follows a link.
+                        // The reader clears a selection, follows a link or toggles full screen.
                         pagePointAt(position, listState, zoomState, pageSizes, density)
                             ?.let { (page, x, y) -> onTapPage(page, x, y) }
-                            ?: selectionActions.onClear()
+                            ?: onTapOutsidePage()
                     },
                     onLongPress = { position ->
                         pagePointAt(position, listState, zoomState, pageSizes, density)
@@ -159,8 +163,10 @@ internal fun PdfPageList(
             // proportionally; otherwise page heights would grow by a slightly
             // different factor than the zoom and the scroll anchor would drift.
             contentPadding = PaddingValues(
-                horizontal = PAGE_GAP * zoomState.scale,
-                vertical = PAGE_GAP,
+                start = PAGE_GAP * zoomState.scale,
+                end = PAGE_GAP * zoomState.scale,
+                top = chromePadding.calculateTopPadding() + PAGE_GAP,
+                bottom = chromePadding.calculateBottomPadding() + PAGE_GAP,
             ),
             verticalArrangement = Arrangement.spacedBy(PAGE_GAP),
         ) {
@@ -183,7 +189,7 @@ internal fun PdfPageList(
             listState = listState,
             pageCount = pageSizes.size,
             onRequestGoToPage = { onGoToPageOpenChange(true) },
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize().padding(chromePadding),
         )
 
         if (goToPageOpen) {

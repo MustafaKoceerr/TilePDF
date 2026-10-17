@@ -34,7 +34,8 @@ class LinkActionTest {
     }
 
     @Test
-    fun noLinkIsIgnored() {
-        assertEquals(LinkAction.Ignore, linkAction(null, pageCount = 3))
+    fun nullIsNoLink() {
+        // Not a link at all: the tap toggles full screen instead.
+        assertEquals(LinkAction.NoLink, linkAction(null, pageCount = 3))
     }
 }

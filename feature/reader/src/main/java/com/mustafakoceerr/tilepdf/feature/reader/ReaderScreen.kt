@@ -6,8 +6,21 @@ import android.content.Intent
 import android.os.Build
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.LocalActivity
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.background
 import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.navigationBarsIgnoringVisibility
+import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.imePadding
@@ -22,6 +35,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -49,6 +63,8 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.DialogWindowProvider
 import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -91,6 +107,7 @@ fun ReaderScreen(
         onCloseToc = viewModel::onCloseToc,
         onPasswordEntered = viewModel::onPasswordEntered,
         onTapPage = viewModel::onTap,
+        onTapOutsidePage = viewModel::onTapOutsidePage,
         onJumpHandled = viewModel::onJumpHandled,
         onExternalLinkHandled = viewModel::onExternalLinkHandled,
         onToggleBookmark = viewModel::onToggleBookmark,
@@ -136,6 +153,7 @@ internal fun ReaderScreen(
     onCloseToc: () -> Unit = {},
     onPasswordEntered: (String) -> Unit = {},
     onTapPage: (pageIndex: Int, x: Float, y: Float) -> Unit = { _, _, _ -> },
+    onTapOutsidePage: () -> Unit = {},
     onJumpHandled: () -> Unit = {},
     onExternalLinkHandled: () -> Unit = {},
     onToggleBookmark: () -> Unit = {},
@@ -169,73 +187,74 @@ internal fun ReaderScreen(
     BackHandler(enabled = search?.isActive == true, onBack = searchActions.onClose)
     KeepScreenOnEffect(ready?.preferences?.keepScreenOn == true)
 
-    Scaffold(
-        topBar = {
-            if (search?.isActive == true) {
-                SearchTopBar(
-                    state = search,
-                    onQueryChange = searchActions.onQueryChange,
-                    onPrevious = searchActions.onPrevious,
-                    onNext = searchActions.onNext,
-                    onClose = searchActions.onClose,
-                )
-            } else {
-                TopAppBar(
-                    title = {
-                        Text(
-                            text = ready?.title ?: stringResource(R.string.reader_untitled),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
+    val fullScreen = ready?.isFullScreen == true
+    SystemBarsEffect(hidden = fullScreen)
+
+    val topBar: @Composable () -> Unit = {
+        if (search?.isActive == true) {
+            SearchTopBar(
+                state = search,
+                onQueryChange = searchActions.onQueryChange,
+                onPrevious = searchActions.onPrevious,
+                onNext = searchActions.onNext,
+                onClose = searchActions.onClose,
+            )
+        } else {
+            TopAppBar(
+                title = {
+                    Text(
+                        text = ready?.title ?: stringResource(R.string.reader_untitled),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            painter = painterResource(TilePdfIcons.ArrowBack),
+                            contentDescription = stringResource(R.string.navigate_back),
                         )
-                    },
-                    navigationIcon = {
-                        IconButton(onClick = onBack) {
+                    }
+                },
+                actions = {
+                    if (ready != null) {
+                        IconButton(onClick = { pagesOpen = true }) {
                             Icon(
-                                painter = painterResource(TilePdfIcons.ArrowBack),
-                                contentDescription = stringResource(R.string.navigate_back),
+                                painter = painterResource(TilePdfIcons.Grid),
+                                contentDescription = stringResource(R.string.reader_pages),
                             )
                         }
-                    },
-                    actions = {
-                        if (ready != null) {
-                            IconButton(onClick = { pagesOpen = true }) {
-                                Icon(
-                                    painter = painterResource(TilePdfIcons.Grid),
-                                    contentDescription = stringResource(R.string.reader_pages),
-                                )
-                            }
-                            // Always there: it also holds the bookmarks.
-                            IconButton(onClick = onOpenToc) {
-                                Icon(
-                                    painter = painterResource(TilePdfIcons.Toc),
-                                    contentDescription = stringResource(R.string.reader_toc),
-                                )
-                            }
-                            IconButton(onClick = searchActions.onOpen) {
-                                Icon(
-                                    painter = painterResource(TilePdfIcons.Search),
-                                    contentDescription = stringResource(R.string.reader_search),
-                                )
-                            }
-                            OverflowMenu(
-                                expanded = menuOpen,
-                                onExpandedChange = { menuOpen = it },
-                                bookmarked = ready.isCurrentPageBookmarked,
-                                onToggleBookmark = onToggleBookmark,
-                                onGoToPage = { goToPageOpen = true },
-                                onOpenSettings = { settingsOpen = true },
+                        // Always there: it also holds the bookmarks.
+                        IconButton(onClick = onOpenToc) {
+                            Icon(
+                                painter = painterResource(TilePdfIcons.Toc),
+                                contentDescription = stringResource(R.string.reader_toc),
                             )
                         }
-                    },
-                )
-            }
-        },
-    ) { innerPadding ->
+                        IconButton(onClick = searchActions.onOpen) {
+                            Icon(
+                                painter = painterResource(TilePdfIcons.Search),
+                                contentDescription = stringResource(R.string.reader_search),
+                            )
+                        }
+                        OverflowMenu(
+                            expanded = menuOpen,
+                            onExpandedChange = { menuOpen = it },
+                            bookmarked = ready.isCurrentPageBookmarked,
+                            onToggleBookmark = onToggleBookmark,
+                            onGoToPage = { goToPageOpen = true },
+                            onOpenSettings = { settingsOpen = true },
+                        )
+                    }
+                },
+            )
+        }
+    }
+
+    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
-                .consumeWindowInsets(innerPadding)
                 // Edge-to-edge: the keyboard overlaps unless we shrink for it,
                 // and search would scroll matches behind the keyboard.
                 .imePadding(),
@@ -266,6 +285,8 @@ internal fun ReaderScreen(
                     pageJump = pageJump,
                     onPageJumpHandled = { pageJump = null },
                     onTapPage = onTapPage,
+                    onTapOutsidePage = onTapOutsidePage,
+                    chromePadding = chromePadding(),
                     selection = uiState.selection,
                     selectionActions = SelectionActions(
                         onLongPress = onLongPress,
@@ -276,6 +297,14 @@ internal fun ReaderScreen(
                     ),
                 )
             }
+        }
+        // Over the pages, not above them: hiding it doesn't move the pages.
+        AnimatedVisibility(
+            visible = !fullScreen,
+            enter = fadeIn() + slideInVertically { -it },
+            exit = fadeOut() + slideOutVertically { -it },
+        ) {
+            topBar()
         }
     }
 
@@ -362,6 +391,36 @@ private fun PagesDialog(ready: ReaderUiState.Ready, onSelect: (Int) -> Unit, onD
                 modifier = Modifier.padding(innerPadding).consumeWindowInsets(innerPadding),
             )
         }
+    }
+}
+
+/**
+ * Room the bars take at the top and bottom, whether or not they are showing,
+ * so the pages keep their place when the bars hide.
+ */
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
+@Composable
+private fun chromePadding(): PaddingValues {
+    val statusBar = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding()
+    val navigationBar = WindowInsets.navigationBarsIgnoringVisibility.asPaddingValues().calculateBottomPadding()
+    return PaddingValues(top = statusBar + TopAppBarDefaults.TopAppBarExpandedHeight, bottom = navigationBar)
+}
+
+/** Hides the status and navigation bars while [hidden]; a swipe from the edge shows them briefly. */
+@Composable
+private fun SystemBarsEffect(hidden: Boolean) {
+    val window = LocalActivity.current?.window ?: return
+    val view = LocalView.current
+    DisposableEffect(window, view, hidden) {
+        val controller = WindowCompat.getInsetsController(window, view)
+        if (hidden) {
+            controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            controller.hide(WindowInsetsCompat.Type.systemBars())
+        } else {
+            controller.show(WindowInsetsCompat.Type.systemBars())
+        }
+        // Leaving the reader always brings them back.
+        onDispose { controller.show(WindowInsetsCompat.Type.systemBars()) }
     }
 }
 

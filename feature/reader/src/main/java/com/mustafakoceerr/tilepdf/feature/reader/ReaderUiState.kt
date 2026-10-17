@@ -40,6 +40,8 @@ sealed interface ReaderUiState {
         val currentPage: Int = 0,
         /** Whether [currentPage] is bookmarked. */
         val isCurrentPageBookmarked: Boolean = false,
+        /** Bars hidden; a tap on the page brings them back. */
+        val isFullScreen: Boolean = false,
     ) : ReaderUiState
 }
 

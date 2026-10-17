@@ -10,7 +10,11 @@ internal sealed interface LinkAction {
     /** Hand [uri] to another app (browser, mail). */
     data class Open(val uri: String) : LinkAction
 
+    /** A link the reader won't follow; the tap does nothing. */
     data object Ignore : LinkAction
+
+    /** No link there: the tap belongs to the page itself. */
+    data object NoLink : LinkAction
 }
 
 /**
@@ -22,7 +26,7 @@ internal fun linkAction(link: PdfLink?, pageCount: Int): LinkAction = when (link
         if (link.pageIndex in 0 until pageCount) LinkAction.Jump(PageJump(link.pageIndex, link.topPt)) else LinkAction.Ignore
     is PdfLink.Uri ->
         if (link.uri.substringBefore(':', "").lowercase() in OPENABLE_SCHEMES) LinkAction.Open(link.uri) else LinkAction.Ignore
-    null -> LinkAction.Ignore
+    null -> LinkAction.NoLink
 }
 
 private val OPENABLE_SCHEMES = setOf("http", "https", "mailto")

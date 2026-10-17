@@ -76,6 +76,7 @@ class ReaderViewModel @Inject constructor(
     private val selection = MutableStateFlow<Selection?>(null)
     private val linkTargets = MutableStateFlow(LinkTargets())
     private val currentPage = MutableStateFlow(0)
+    private val fullScreen = MutableStateFlow(false)
     private var selectionJob: Job? = null
     private val positionUpdates = MutableSharedFlow<ReadingPosition>(extraBufferCapacity = 1)
 
@@ -84,9 +85,9 @@ class ReaderViewModel @Inject constructor(
         preferencesRepository.preferences,
         searchState,
         toc,
-        combine(selection, linkTargets, currentPage, ::Triple),
-    ) { document, preferences, search, toc, selectionAndLinks ->
-        val (selection, links, page) = selectionAndLinks
+        combine(selection, linkTargets, currentPage, fullScreen, ::PageState),
+    ) { document, preferences, search, toc, pageState ->
+        val (selection, links, page, fullScreen) = pageState
         when (document) {
             DocumentState.Loading -> ReaderUiState.Loading
             is DocumentState.Failed -> ReaderUiState.Error(document.reason)
@@ -105,6 +106,7 @@ class ReaderViewModel @Inject constructor(
                 externalLink = links.externalLink,
                 currentPage = page,
                 isCurrentPageBookmarked = toc.bookmarks.any { it.pageIndex == page },
+                isFullScreen = fullScreen,
             )
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ReaderUiState.Loading)
@@ -158,8 +160,23 @@ class ReaderViewModel @Inject constructor(
                 is LinkAction.Jump -> linkTargets.update { it.copy(jump = action.jump) }
                 is LinkAction.Open -> linkTargets.update { it.copy(externalLink = action.uri) }
                 LinkAction.Ignore -> Unit
+                LinkAction.NoLink -> toggleFullScreen()
             }
         }
+    }
+
+    /** A tap between pages: clears a selection, otherwise toggles full screen. */
+    fun onTapOutsidePage() {
+        if (selection.value != null) {
+            selection.value = null
+        } else {
+            toggleFullScreen()
+        }
+    }
+
+    /** The search bar stays while searching, so the query can still be edited. */
+    private fun toggleFullScreen() {
+        if (!searchState.value.isActive) fullScreen.update { !it }
     }
 
     /** Bookmarks the page at the top of the screen, or removes its bookmark. */
@@ -185,6 +202,7 @@ class ReaderViewModel @Inject constructor(
     }
 
     fun onOpenToc() {
+        fullScreen.value = false
         val opened = (documentState.value as? DocumentState.Opened)?.opened ?: return
         val at = position ?: opened.position
         // The position is the fraction scrolled into the top page; convert to points.
@@ -256,6 +274,7 @@ class ReaderViewModel @Inject constructor(
     }
 
     fun onOpenSearch() {
+        fullScreen.value = false
         searchState.update { it.copy(isActive = true) }
     }
 
@@ -335,6 +354,14 @@ class ReaderViewModel @Inject constructor(
     }
 
     private fun openedDocument() = (documentState.value as? DocumentState.Opened)?.opened?.document
+
+    /** State of the page view that changes with taps and scrolling. */
+    private data class PageState(
+        val selection: Selection?,
+        val links: LinkTargets,
+        val currentPage: Int,
+        val fullScreen: Boolean,
+    )
 
     /** Where a tapped link leads, until the screen has acted on it. */
     private data class LinkTargets(val jump: PageJump? = null, val externalLink: String? = null)
