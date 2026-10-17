@@ -23,10 +23,15 @@ class Pdfium @Inject constructor(
     @param:ApplicationContext private val context: Context,
     @param:PdfDispatcher private val dispatcher: CoroutineDispatcher,
 ) : PdfEngine {
-    override suspend fun open(uri: Uri, password: String?): PdfiumDocument {
+    override suspend fun open(uri: Uri, password: String?): PdfiumDocument = open(uri, password, hideOwn = true)
+
+    override suspend fun openForEditing(uri: Uri, password: String?): PdfiumEditableDocument =
+        PdfiumEditableDocument(open(uri, password, hideOwn = false))
+
+    private suspend fun open(uri: Uri, password: String?, hideOwn: Boolean): PdfiumDocument {
         // Not cancellable midway: a cancelled withContext would drop a document
         // it had already opened. Cancellation is honoured right after instead.
-        val document = withContext(dispatcher + NonCancellable) { openNow(uri, password) }
+        val document = withContext(dispatcher + NonCancellable) { openNow(uri, password, hideOwn) }
         try {
             currentCoroutineContext().ensureActive()
         } catch (e: CancellationException) {
@@ -36,7 +41,7 @@ class Pdfium @Inject constructor(
         return document
     }
 
-    private fun openNow(uri: Uri, password: String?): PdfiumDocument {
+    private fun openNow(uri: Uri, password: String?, hideOwn: Boolean): PdfiumDocument {
         PdfiumNative.nativeInit()
         val fileDescriptor = context.contentResolver.openFileDescriptor(uri, "r")
             ?: throw FileNotFoundException("Cannot open $uri")
@@ -44,7 +49,7 @@ class Pdfium @Inject constructor(
             val size = fileDescriptor.statSize
             if (size <= 0) throw PdfCorruptException("Empty or unsized file")
             val error = IntArray(1)
-            val handle = openedHandle(PdfiumNative.nativeOpen(fileDescriptor.fd, size, password, true, error), error[0], password)
+            val handle = openedHandle(PdfiumNative.nativeOpen(fileDescriptor.fd, size, password, hideOwn, error), error[0], password)
             val pageSizes = try {
                 List(PdfiumNative.nativePageCount(handle)) { index -> pageSize(handle, index) }
             } catch (e: Exception) {

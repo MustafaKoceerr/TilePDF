@@ -160,6 +160,10 @@ class PdfiumDocument internal constructor(
     @VisibleForTesting
     internal suspend fun loadedPageCount(): Int = withDocument { PdfiumNative.nativeLoadedPageCount(it) }
 
+    @VisibleForTesting
+    internal suspend fun annotationCount(pageIndex: Int): Int =
+        withDocument(pageIndex) { PdfiumNative.nativeAnnotationCount(it, pageIndex) }
+
     /** Runs [block] with the native handle, after checking [pageIndex] if given. */
     internal suspend fun <T> withDocument(pageIndex: Int? = null, block: (Long) -> T): T {
         if (pageIndex != null) {
