@@ -1,5 +1,7 @@
 package com.mustafakoceerr.tilepdf.di
 
+import com.mustafakoceerr.tilepdf.data.annotation.AnnotationRepository
+import com.mustafakoceerr.tilepdf.data.annotation.OfflineAnnotationRepository
 import com.mustafakoceerr.tilepdf.data.document.DocumentRepository
 import com.mustafakoceerr.tilepdf.data.document.SafDocumentRepository
 import com.mustafakoceerr.tilepdf.data.library.LibraryRepository
@@ -19,8 +21,10 @@ import dagger.hilt.components.SingletonComponent
 @InstallIn(SingletonComponent::class)
 interface DataModule {
     @Binds
-    fun bindsBookmarkRepository(impl: OfflineBookmarkRepository): BookmarkRepository
+    fun bindsAnnotationRepository(impl: OfflineAnnotationRepository): AnnotationRepository
 
+    @Binds
+    fun bindsBookmarkRepository(impl: OfflineBookmarkRepository): BookmarkRepository
 
     @Binds
     fun bindsDocumentRepository(impl: SafDocumentRepository): DocumentRepository
