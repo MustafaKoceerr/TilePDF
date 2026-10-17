@@ -96,6 +96,16 @@ class ReaderViewModel @Inject constructor(
      */
     private var documentUri = uri
 
+    /**
+     * A document replaced by a reopen. Closed only once its successor is open,
+     * when its pages have long left the screen: a render still running on it
+     * must not find it closed.
+     */
+    private var retiring: OpenedDocument? = null
+
+    /** Reopens the document when a save wrote a new version; one per controller. */
+    private var fileSavedJob: Job? = null
+
     /** The outcome of "Kopya olarak kaydet", until the screen has acted on it. */
     private val saveCopyResult = MutableStateFlow<SaveCopyResult?>(null)
     private var openJob: Job? = null
@@ -177,7 +187,11 @@ class ReaderViewModel @Inject constructor(
         documentState.value = DocumentState.Loading
         openJob = viewModelScope.launch {
             documentState.value = try {
-                val opened = openDocument(documentUri, password)
+                val opened = try {
+                    openDocument(documentUri, password)
+                } finally {
+                    retireReplacedDocument()
+                }
                 documentUri = opened.uri
                 // Kept in memory so a background save can reopen the file.
                 if (password != null) sessionPasswords.remember(opened.uri, password)
@@ -217,9 +231,17 @@ class ReaderViewModel @Inject constructor(
             // Unreadable annotations leave editing off rather than the document closed.
             runCatchingCancellable { created.prepare(opened.document) }
         }
-        viewModelScope.launch {
+        fileSavedJob?.cancel()
+        fileSavedJob = viewModelScope.launch {
             created.fileSaved.collect { reopenAfterSave(state) }
         }
+    }
+
+    private fun retireReplacedDocument() {
+        val old = retiring ?: return
+        retiring = null
+        old.document.close()
+        applicationScope.launch { documentTextRepository.release(old.document) }
     }
 
     /**
@@ -230,10 +252,10 @@ class ReaderViewModel @Inject constructor(
     private fun reopenAfterSave(old: DocumentState.Opened) {
         if (documentState.value !== old) return
         startPosition.value = position ?: old.opened.position
-        val document = old.opened.document
+        // Pending tile renders of the old version stop here.
+        old.pageImages.requestTiles(emptyList())
+        retiring = old.opened
         open(sessionPasswords.get(old.opened.uri))
-        document.close()
-        applicationScope.launch { documentTextRepository.release(document) }
     }
 
     /** The screen went to the background: save what's unsaved. */
@@ -583,6 +605,7 @@ class ReaderViewModel @Inject constructor(
             it.requestSave()
             it.close()
         }
+        retireReplacedDocument()
         val document = openedDocument() ?: return
         document.close()
         // viewModelScope is already cancelled here.
