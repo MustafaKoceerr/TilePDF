@@ -39,3 +39,16 @@ Tarih: 2026-10-17 · Durum: incelemede · Üst belge: `2026-10-16-tilepdf-v1-des
   testlerinde.
 - **Kapsam dışı:** render sırasındaki bellek baskısı (önbellek bütçeleri zaten
   sınırlı).
+
+## 6c kararları
+
+- **Yan panel:** içindekiler/yer imleri/açıklamalar, genişlik ≥ 840 dp ve
+  yükseklik ≥ 480 dp olduğunda sayfaların solunda 360 dp'lik kalıcı panelde;
+  aksi halde bugünkü alt sayfa. Yatay telefon alt sayfada kalır. Karar ekran
+  türüne değil okuyucuya verilen alana göre (bölünmüş ekran doğru çalışır).
+- **Panel davranışı:** seçim sayfaya atlar, panel açık kalır; vurgulu bölüm
+  okudukça ilerler; tam ekran çubukları gizler, paneli değil; Geri önce
+  paneli kapatır.
+- **Kütüphane:** geniş ekranda sütunlara akan ızgara (en az 360 dp).
+- **Kapsam dışı:** menteşeye göre düzen (masaüstü duruşu); dil ve tema
+  (kullanıcının kendi kütüphaneleri).
