@@ -1,5 +1,6 @@
 package com.mustafakoceerr.tilepdf.feature.reader.components
 
+import androidx.annotation.DrawableRes
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -8,6 +9,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
@@ -30,6 +32,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.mustafakoceerr.tilepdf.core.designsystem.TilePdfIcons
 import com.mustafakoceerr.tilepdf.feature.reader.R
+import com.mustafakoceerr.tilepdf.feature.reader.annotation.AnnotationKind
+import com.mustafakoceerr.tilepdf.feature.reader.annotation.AnnotationListItem
+import com.mustafakoceerr.tilepdf.feature.reader.annotation.AnnotationTarget
+import com.mustafakoceerr.tilepdf.feature.reader.annotation.labelRes
 import com.mustafakoceerr.tilepdf.model.Bookmark
 import com.mustafakoceerr.tilepdf.model.OutlineEntry
 
@@ -48,6 +54,9 @@ internal fun TableOfContentsSheet(
     onSelect: (OutlineEntry) -> Unit,
     onSelectPage: (pageIndex: Int) -> Unit,
     onDismiss: () -> Unit,
+    annotations: List<AnnotationListItem> = emptyList(),
+    onSelectAnnotation: (AnnotationListItem) -> Unit = {},
+    onDeleteAnnotation: (AnnotationTarget) -> Unit = {},
 ) {
     // Documents without an outline open straight on their bookmarks.
     var tab by rememberSaveable { mutableIntStateOf(if (outline.isEmpty()) BOOKMARKS_TAB else CONTENTS_TAB) }
@@ -64,10 +73,16 @@ internal fun TableOfContentsSheet(
                 onClick = { tab = BOOKMARKS_TAB },
                 text = { Text(stringResource(R.string.reader_bookmarks)) },
             )
+            Tab(
+                selected = tab == ANNOTATIONS_TAB,
+                onClick = { tab = ANNOTATIONS_TAB },
+                text = { Text(stringResource(R.string.reader_annotations)) },
+            )
         }
         when (tab) {
             CONTENTS_TAB -> OutlineList(outline, currentIndex, onSelect)
-            else -> BookmarkList(bookmarks, onSelectPage)
+            BOOKMARKS_TAB -> BookmarkList(bookmarks, onSelectPage)
+            else -> AnnotationList(annotations, onSelectAnnotation, onDeleteAnnotation)
         }
     }
 }
@@ -132,5 +147,49 @@ private fun BookmarkList(bookmarks: List<Bookmark>, onSelectPage: (Int) -> Unit)
     }
 }
 
+/** Every annotation in reading order; tap to go there, or delete it. */
+@Composable
+private fun AnnotationList(
+    items: List<AnnotationListItem>,
+    onSelect: (AnnotationListItem) -> Unit,
+    onDelete: (AnnotationTarget) -> Unit,
+) {
+    if (items.isEmpty()) {
+        Text(
+            text = stringResource(R.string.reader_no_annotations),
+            style = MaterialTheme.typography.bodyLarge,
+            modifier = Modifier.padding(24.dp),
+        )
+        return
+    }
+    LazyColumn {
+        items(items) { item ->
+            ListItem(
+                headlineContent = { Text(stringResource(item.kind.labelRes)) },
+                overlineContent = { Text(stringResource(R.string.annotation_page, item.pageIndex + 1)) },
+                supportingContent = if (item.text.isBlank()) null else {
+                    { Text(item.text, maxLines = 2, overflow = TextOverflow.Ellipsis) }
+                },
+                leadingContent = { Icon(painterResource(item.kind.icon), contentDescription = null) },
+                trailingContent = {
+                    IconButton(onClick = { onDelete(item.target) }) {
+                        Icon(painterResource(TilePdfIcons.Delete), contentDescription = stringResource(R.string.annotation_delete))
+                    }
+                },
+                modifier = Modifier.clickable { onSelect(item) },
+            )
+        }
+    }
+}
+
+@get:DrawableRes
+private val AnnotationKind.icon: Int
+    get() = when (this) {
+        AnnotationKind.Note -> TilePdfIcons.StickyNote
+        AnnotationKind.Ink -> TilePdfIcons.Edit
+        else -> TilePdfIcons.TextSelect
+    }
+
 private const val CONTENTS_TAB = 0
 private const val BOOKMARKS_TAB = 1
+private const val ANNOTATIONS_TAB = 2

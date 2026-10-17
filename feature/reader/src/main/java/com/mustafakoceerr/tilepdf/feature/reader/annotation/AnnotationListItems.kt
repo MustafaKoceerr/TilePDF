@@ -34,6 +34,13 @@ fun annotationListItems(own: List<Annotation>, foreign: List<ForeignAnnotation>)
     return rows.sortedWith(compareBy({ it.first.pageIndex }, { it.second })).map { it.first }
 }
 
+/** Where the item starts on its page, for jumping to it. */
+val AnnotationListItem.topPt: Float
+    get() = when (target) {
+        is AnnotationTarget.Own -> target.annotation.top
+        is AnnotationTarget.Foreign -> target.annotation.bounds.top
+    }
+
 /** Where an annotation starts, from the top of its page. */
 val Annotation.top: Float
     get() = when (this) {

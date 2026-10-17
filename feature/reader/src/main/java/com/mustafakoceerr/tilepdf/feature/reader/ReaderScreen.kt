@@ -78,6 +78,8 @@ import com.mustafakoceerr.tilepdf.feature.reader.annotation.AnnotationToolbar
 import com.mustafakoceerr.tilepdf.feature.reader.annotation.Erased
 import com.mustafakoceerr.tilepdf.feature.reader.annotation.PageDrawing
 import com.mustafakoceerr.tilepdf.feature.reader.annotation.ToolbarState
+import com.mustafakoceerr.tilepdf.feature.reader.annotation.annotationListItems
+import com.mustafakoceerr.tilepdf.feature.reader.annotation.topPt
 import com.mustafakoceerr.tilepdf.feature.reader.annotation.AnnotationTarget
 import com.mustafakoceerr.tilepdf.feature.reader.annotation.NoteDialog
 import com.mustafakoceerr.tilepdf.feature.reader.annotation.SelectionMarkupBar
@@ -411,6 +413,12 @@ internal fun ReaderScreen(
                 pageJump = PageJump(page)
             },
             onDismiss = onCloseToc,
+            annotations = remember(ready.annotations) { annotationListItems(ready.annotations.own, ready.annotations.foreign) },
+            onSelectAnnotation = { item ->
+                onCloseToc()
+                pageJump = PageJump(item.pageIndex, item.topPt)
+            },
+            onDeleteAnnotation = annotationActions.onDelete,
         )
     }
 
