@@ -35,7 +35,7 @@
   - Merged release permissions must be a subset of the allowlist: `ACCESS_NETWORK_STATE`, `WAKE_LOCK`, `RECEIVE_BOOT_COMPLETED`, `FOREGROUND_SERVICE` (WorkManager's), and `com.mustafakoceerr.tilepdf.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION` (androidx.core).
   - Anything else fails `checkReleasePermissions`, which `assembleRelease` and `bundleRelease` depend on.
 - **Version:** `versionCode = 1`, `versionName = "1.0.0"`.
-- **Backups:** only DataStore preferences are backed up, through both `backup_rules.xml` and `data_extraction_rules.xml` (cloud backup and device transfer). The Room database, private PDF copies and caches are excluded, because restored URIs have no grants.
+- **Backups:** only preferences are backed up: the DataStore files (`reader_preferences`, and the theme library's `theme_preferences`) and the AppCompat locale record the language library uses below Android 13 (`androidx.appcompat.app.AppCompatDelegate.application_locales_record_file`). This goes through both `backup_rules.xml` and `data_extraction_rules.xml` (cloud backup and device transfer). The Room database, private PDF copies and caches are excluded, because restored URIs have no grants.
 - **Store text limits:** `title.txt` ≤ 30, `short_description.txt` ≤ 80, `full_description.txt` ≤ 4000 and `changelogs/1.txt` ≤ 500 characters, for both `en-US` and `tr-TR`. Screenshots must be no more than twice as long as they are wide.
 - **Outward-facing steps are the user's:** creating the real upload key, hosting the privacy policy and anything in Play Console. This plan produces the files and the instructions, `docs/RELEASING.md`.
 - **Language and theme:** none of this work touches them (the user's own libraries will). The About screen's strings get EN and TR like every other screen.
@@ -127,7 +127,7 @@ Blank counts as missing.
 **Files:**
 - Modify:
   - `app/src/main/AndroidManifest.xml`: `<uses-permission android:name="android.permission.INTERNET" tools:node="remove" />`;
-  - `app/src/main/res/xml/backup_rules.xml` and `data_extraction_rules.xml`: include `domain="file" path="datastore/"` only; replace the template comments.
+  - `app/src/main/res/xml/backup_rules.xml` and `data_extraction_rules.xml`: include `domain="file" path="datastore/"` and `domain="file" path="androidx.appcompat.app.AppCompatDelegate.application_locales_record_file"` only; replace the template comments.
 - Create:
   - `build-logic/convention/src/main/kotlin/com/mustafakoceerr/tilepdf/ReleasePermissions.kt`, holding the pure function `unexpectedPermissions(manifestXml: String, allowed: Set<String>): List<String>`, and its test `ReleasePermissionsTest.kt`;
   - a task `checkReleasePermissions` registered by `AndroidApplicationConventionPlugin`. It reads the merged release manifest through the variant API's `artifacts.get(SingleArtifact.MERGED_MANIFEST)`, and `assembleRelease` and `bundleRelease` depend on it.
@@ -164,8 +164,7 @@ Blank counts as missing.
     - `aboutLibraries { offlineMode = true; export { excludeFields.addAll("developers", "funding") } }`;
     - collect only release dependencies.
   - `settings.gradle.kts`: + `:feature:about`.
-  - App navigation: an `AboutRoute` from the library's ⋮ menu item "About" / "Hakkında".
-  - The library's `LibraryActions` and screen: `onAbout`.
+  - App navigation: an `AboutRoute`, opened from a new last row "About TilePDF" / "TilePDF hakkında" on the Settings screen (`feature:settings`, from PR #13). `settingsScreen(onBack, onOpenAbout)` gets the callback; `SettingsScreen` shows the row below Language.
 - Create: `feature/about`, a feature module with these files:
   - `AboutScreen.kt`: the app name and `versionName` (from `PackageManager`); the line "TilePDF works without an internet connection. Your files and notes stay on this device." / "TilePDF internet bağlantısı olmadan çalışır. Dosyaların ve notların bu cihazda kalır."; a section "PDFium and its components" / "PDFium ve bileşenleri" listing the asset files, where tapping one opens its text in a dialog; and a section "Open source libraries" / "Açık kaynak kütüphaneler" rendered by AboutLibraries' `LibrariesContainer`.
   - `PdfiumLicenses.kt`: `internal fun componentName(fileName: String): String` and `internal fun pdfiumLicenseFiles(names: List<String>): List<String>`, which sorts them, puts `pdfium.txt` first and drops anything that isn't `.txt`, `.md` or `.ijg`.
@@ -223,4 +222,4 @@ Blank counts as missing.
   - Reset size and density afterwards.
   - Check that each image's long side is ≤ 2 × its short side.
 - [ ] **Step 5: Full run.** `./gradlew assembleDebug assembleRelease testDebugUnitTest :core:model:test lintDebug` plus the build-logic tests. Expected: BUILD SUCCESSFUL.
-- [ ] **Step 6:** Update the README with release notes and links to `docs/RELEASING.md` and `docs/play/`. Commit `"Launcher icon, store listing and graphics"`, push, then open the PR stacked on `phase6c-adaptive`.
+- [ ] **Step 6:** Update the README with release notes and links to `docs/RELEASING.md` and `docs/play/`. Commit `"Launcher icon, store listing and graphics"`, push, then open the PR stacked on `language-theme-libraries` (#13).
