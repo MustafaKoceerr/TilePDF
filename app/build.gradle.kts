@@ -34,6 +34,8 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.navigation.compose)
+    implementation(libs.androidx.hilt.work)
+    implementation(libs.androidx.work.runtime.ktx)
 
     androidTestImplementation(projects.core.testing)
 }

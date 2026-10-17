@@ -12,7 +12,11 @@ dependencies {
     implementation(projects.core.datastore)
     implementation(libs.androidx.core.ktx)
     implementation(libs.kotlinx.serialization.json)
+    implementation(libs.androidx.work.runtime.ktx)
+    implementation(libs.androidx.hilt.work)
+    ksp(libs.androidx.hilt.compiler)
 
     androidTestImplementation(projects.core.testing)
     androidTestImplementation(libs.androidx.room.runtime)
+    androidTestImplementation(libs.androidx.work.testing)
 }
