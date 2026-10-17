@@ -17,6 +17,11 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Box
+import com.mustafakoceerr.tilepdf.feature.reader.components.tocPlacement
+import com.mustafakoceerr.tilepdf.feature.reader.components.TocPlacement
+import com.mustafakoceerr.tilepdf.feature.reader.components.TableOfContentsPanel
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -326,7 +331,7 @@ internal fun ReaderScreen(
                                 )
                             }
                         }
-                        IconButton(onClick = onOpenToc) {
+                        IconButton(onClick = if (ready.toc.isOpen) onCloseToc else onOpenToc) {
                             Icon(
                                 painter = painterResource(TilePdfIcons.Toc),
                                 contentDescription = stringResource(R.string.reader_toc),
@@ -353,115 +358,138 @@ internal fun ReaderScreen(
         }
     }
 
-    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                // Edge-to-edge: the keyboard overlaps unless we shrink for it,
-                // and search would scroll matches behind the keyboard.
-                .imePadding(),
-            contentAlignment = Alignment.Center,
-        ) {
-            when (uiState) {
-                ReaderUiState.Loading -> CircularProgressIndicator()
-                is ReaderUiState.Error -> ReaderErrorContent(
-                    error = uiState.reason,
-                    onFileChosen = onOpenDocument,
-                    onRetry = onRetryOpen,
-                    onBack = onBack,
+    BoxWithConstraints(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        // Decided here, from the space the reader has, and used only in here.
+        val placement = tocPlacement(maxWidth.value, maxHeight.value)
+        val tocAsPanel = placement == TocPlacement.Side && ready?.toc?.isOpen == true
+        BackHandler(enabled = tocAsPanel, onBack = onCloseToc)
+        Row(Modifier.fillMaxSize()) {
+            if (tocAsPanel) {
+                // Choosing something jumps there; the panel stays for the next choice.
+                TableOfContentsPanel(
+                    outline = ready.toc.entries,
+                    currentIndex = ready.toc.currentIndex,
+                    bookmarks = ready.toc.bookmarks,
+                    onSelect = { entry -> pageJump = PageJump(entry.pageIndex, entry.topPt) },
+                    onSelectPage = { page -> pageJump = PageJump(page) },
+                    onClose = onCloseToc,
+                    annotations = remember(ready.annotations) { annotationListItems(ready.annotations.own, ready.annotations.foreign) },
+                    onSelectAnnotation = { item -> pageJump = PageJump(item.pageIndex, item.topPt) },
+                    onDeleteAnnotation = annotationActions.onDelete,
                 )
-                is ReaderUiState.PasswordRequired -> PasswordDialog(
-                    wrongPassword = uiState.wrongPassword,
-                    onSubmit = onPasswordEntered,
-                    onCancel = onBack,
-                )
-                is ReaderUiState.Ready -> key(uiState.preferences.readingMode) {
-                    ReaderPages(
-                        ready = uiState,
-                        goToPageOpen = goToPageOpen,
-                        onGoToPageOpenChange = { goToPageOpen = it },
-                        pageJump = pageJump,
-                        onPageJumpHandled = { pageJump = null },
-                        onPositionChanged = onPositionChanged,
-                        onTapPage = onTapPage,
-                        onTapOutsidePage = onTapOutsidePage,
-                        annotationActions = annotationActions,
-                        selectionActions = SelectionActions(
-                            onLongPress = onLongPress,
-                            onDragHandle = onDragSelectionHandle,
-                            onCopy = copySelection,
-                            onSelectAll = onSelectAllOnPage,
-                            onClear = onClearSelection,
-                        ),
-                    )
+            }
+            // The page pane: everything the reader showed before, now beside the panel.
+            Box(Modifier.weight(1f).fillMaxHeight()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        // Edge-to-edge: the keyboard overlaps unless we shrink for it,
+                        // and search would scroll matches behind the keyboard.
+                        .imePadding(),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    when (uiState) {
+                        ReaderUiState.Loading -> CircularProgressIndicator()
+                        is ReaderUiState.Error -> ReaderErrorContent(
+                            error = uiState.reason,
+                            onFileChosen = onOpenDocument,
+                            onRetry = onRetryOpen,
+                            onBack = onBack,
+                        )
+                        is ReaderUiState.PasswordRequired -> PasswordDialog(
+                            wrongPassword = uiState.wrongPassword,
+                            onSubmit = onPasswordEntered,
+                            onCancel = onBack,
+                        )
+                        is ReaderUiState.Ready -> key(uiState.preferences.readingMode) {
+                            ReaderPages(
+                                ready = uiState,
+                                goToPageOpen = goToPageOpen,
+                                onGoToPageOpenChange = { goToPageOpen = it },
+                                pageJump = pageJump,
+                                onPageJumpHandled = { pageJump = null },
+                                onPositionChanged = onPositionChanged,
+                                onTapPage = onTapPage,
+                                onTapOutsidePage = onTapOutsidePage,
+                                annotationActions = annotationActions,
+                                selectionActions = SelectionActions(
+                                    onLongPress = onLongPress,
+                                    onDragHandle = onDragSelectionHandle,
+                                    onCopy = copySelection,
+                                    onSelectAll = onSelectAllOnPage,
+                                    onClear = onClearSelection,
+                                ),
+                            )
+                        }
+                    }
+                }
+                Column(Modifier.align(Alignment.BottomCenter)) {
+                    if (selection != null) {
+                        SelectionMarkupBar(enabled = ready.annotations.ready, onMarkup = annotationActions.onMarkup)
+                    }
+                    if (ready != null && ready.editing.annotating) {
+                        AnnotationToolbar(
+                            state = ToolbarState(
+                                tool = ready.editing.tool,
+                                markupColor = ready.preferences.markupColor,
+                                penColor = ready.preferences.penColor,
+                                penWidthPt = ready.preferences.penWidthPt,
+                                canUndo = ready.annotations.canUndo,
+                                canRedo = ready.annotations.canRedo,
+                            ),
+                            onTool = annotationActions.onTool,
+                            onMarkupColor = annotationActions.onMarkupColor,
+                            onPenColor = annotationActions.onPenColor,
+                            onPenWidth = annotationActions.onPenWidth,
+                            onUndo = annotationActions.onUndo,
+                            onRedo = annotationActions.onRedo,
+                            onDone = annotationActions.onToggleAnnotating,
+                        )
+                    }
+                }
+                // Over the pages, not above them: hiding it doesn't move the pages.
+                // Qualified: inside the panel row, the RowScope overload would be picked.
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = !fullScreen,
+                    enter = fadeIn() + slideInVertically { -it },
+                    exit = fadeOut() + slideOutVertically { -it },
+                ) {
+                    Column {
+                        topBar()
+                        val error = ready?.annotations?.saveError
+                        if (error != null && error != SaveError.NeedsPassword) {
+                            SaveErrorBanner(
+                                error = error,
+                                onSaveCopy = { saveCopy() },
+                                onRetry = annotationActions.onRetrySave,
+                            )
+                        }
+                    }
                 }
             }
         }
-        Column(Modifier.align(Alignment.BottomCenter)) {
-            if (selection != null) {
-                SelectionMarkupBar(enabled = ready.annotations.ready, onMarkup = annotationActions.onMarkup)
-            }
-            if (ready != null && ready.editing.annotating) {
-                AnnotationToolbar(
-                    state = ToolbarState(
-                        tool = ready.editing.tool,
-                        markupColor = ready.preferences.markupColor,
-                        penColor = ready.preferences.penColor,
-                        penWidthPt = ready.preferences.penWidthPt,
-                        canUndo = ready.annotations.canUndo,
-                        canRedo = ready.annotations.canRedo,
-                    ),
-                    onTool = annotationActions.onTool,
-                    onMarkupColor = annotationActions.onMarkupColor,
-                    onPenColor = annotationActions.onPenColor,
-                    onPenWidth = annotationActions.onPenWidth,
-                    onUndo = annotationActions.onUndo,
-                    onRedo = annotationActions.onRedo,
-                    onDone = annotationActions.onToggleAnnotating,
-                )
-            }
+        if (ready != null && ready.toc.isOpen && placement == TocPlacement.Sheet) {
+            TableOfContentsSheet(
+                outline = ready.toc.entries,
+                currentIndex = ready.toc.currentIndex,
+                bookmarks = ready.toc.bookmarks,
+                onSelect = { entry ->
+                    onCloseToc()
+                    pageJump = PageJump(entry.pageIndex, entry.topPt)
+                },
+                onSelectPage = { page ->
+                    onCloseToc()
+                    pageJump = PageJump(page)
+                },
+                onDismiss = onCloseToc,
+                annotations = remember(ready.annotations) { annotationListItems(ready.annotations.own, ready.annotations.foreign) },
+                onSelectAnnotation = { item ->
+                    onCloseToc()
+                    pageJump = PageJump(item.pageIndex, item.topPt)
+                },
+                onDeleteAnnotation = annotationActions.onDelete,
+            )
         }
-        // Over the pages, not above them: hiding it doesn't move the pages.
-        AnimatedVisibility(
-            visible = !fullScreen,
-            enter = fadeIn() + slideInVertically { -it },
-            exit = fadeOut() + slideOutVertically { -it },
-        ) {
-            Column {
-                topBar()
-                val error = ready?.annotations?.saveError
-                if (error != null && error != SaveError.NeedsPassword) {
-                    SaveErrorBanner(
-                        error = error,
-                        onSaveCopy = { saveCopy() },
-                        onRetry = annotationActions.onRetrySave,
-                    )
-                }
-            }
-        }
-    }
-
-    if (ready != null && ready.toc.isOpen) {
-        TableOfContentsSheet(
-            outline = ready.toc.entries,
-            currentIndex = ready.toc.currentIndex,
-            bookmarks = ready.toc.bookmarks,
-            onSelect = { entry ->
-                onCloseToc()
-                pageJump = PageJump(entry.pageIndex, entry.topPt)
-            },
-            onSelectPage = { page ->
-                onCloseToc()
-                pageJump = PageJump(page)
-            },
-            onDismiss = onCloseToc,
-            annotations = remember(ready.annotations) { annotationListItems(ready.annotations.own, ready.annotations.foreign) },
-            onSelectAnnotation = { item ->
-                onCloseToc()
-                pageJump = PageJump(item.pageIndex, item.topPt)
-            },
-            onDeleteAnnotation = annotationActions.onDelete,
-        )
     }
 
     ready?.editing?.menu?.let { target ->
