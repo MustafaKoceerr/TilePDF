@@ -6,6 +6,7 @@ import com.mustafakoceerr.tilepdf.model.Bookmark
 import com.mustafakoceerr.tilepdf.core.geometry.PdfRect
 import com.mustafakoceerr.tilepdf.core.pdf.PageSize
 import com.mustafakoceerr.tilepdf.core.render.PageImageSource
+import com.mustafakoceerr.tilepdf.core.render.ThumbnailSource
 import com.mustafakoceerr.tilepdf.model.OutlineEntry
 import com.mustafakoceerr.tilepdf.model.ReadingPosition
 import com.mustafakoceerr.tilepdf.model.SearchMatch
@@ -22,6 +23,8 @@ sealed interface ReaderUiState {
         val title: String,
         val pageSizes: List<PageSize>,
         val pageImages: PageImageSource,
+        /** Small page images for the page grid. */
+        val thumbnails: ThumbnailSource,
         /** Where to start; read once when the page list is first shown. */
         val initialPosition: ReadingPosition,
         val nightMode: Boolean,
@@ -32,7 +35,9 @@ sealed interface ReaderUiState {
         val jump: PageJump? = null,
         /** A web or mail link to hand to another app. */
         val externalLink: String? = null,
-        /** Whether the page at the top of the screen is bookmarked. */
+        /** The page at the top of the screen. */
+        val currentPage: Int = 0,
+        /** Whether [currentPage] is bookmarked. */
         val isCurrentPageBookmarked: Boolean = false,
     ) : ReaderUiState
 }

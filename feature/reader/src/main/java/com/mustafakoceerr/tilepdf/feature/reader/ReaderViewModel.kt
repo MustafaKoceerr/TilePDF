@@ -8,6 +8,7 @@ import com.mustafakoceerr.tilepdf.core.common.runCatchingCancellable
 import com.mustafakoceerr.tilepdf.core.pdf.PdfDocument
 import com.mustafakoceerr.tilepdf.core.render.PageRenderer
 import com.mustafakoceerr.tilepdf.core.text.TextSelection
+import com.mustafakoceerr.tilepdf.core.render.ThumbnailSource
 import com.mustafakoceerr.tilepdf.core.render.TiledPageImageSource
 import com.mustafakoceerr.tilepdf.data.bookmark.BookmarkRepository
 import com.mustafakoceerr.tilepdf.data.library.LibraryRepository
@@ -92,6 +93,7 @@ class ReaderViewModel @Inject constructor(
                 title = document.opened.displayName,
                 pageSizes = document.opened.document.pageSizes,
                 pageImages = document.pageImages,
+                thumbnails = document.thumbnails,
                 initialPosition = document.opened.position,
                 nightMode = nightMode,
                 search = search,
@@ -99,6 +101,7 @@ class ReaderViewModel @Inject constructor(
                 selection = selection?.toUiState(),
                 jump = links.jump,
                 externalLink = links.externalLink,
+                currentPage = page,
                 isCurrentPageBookmarked = toc.bookmarks.any { it.pageIndex == page },
             )
         }
@@ -125,6 +128,7 @@ class ReaderViewModel @Inject constructor(
                 DocumentState.Opened(
                     opened = opened,
                     pageImages = TiledPageImageSource(opened.document, pageRenderer, viewModelScope),
+                    thumbnails = ThumbnailSource(opened.document, pageRenderer),
                 )
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
@@ -348,6 +352,7 @@ class ReaderViewModel @Inject constructor(
         data class Opened(
             val opened: OpenedDocument,
             val pageImages: TiledPageImageSource,
+            val thumbnails: ThumbnailSource,
         ) : DocumentState
     }
 }

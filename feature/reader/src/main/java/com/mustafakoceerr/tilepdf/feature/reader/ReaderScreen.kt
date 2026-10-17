@@ -25,6 +25,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -34,14 +35,20 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.DialogWindowProvider
+import androidx.core.view.WindowCompat
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -51,6 +58,8 @@ import com.mustafakoceerr.tilepdf.feature.reader.components.PasswordDialog
 import com.mustafakoceerr.tilepdf.feature.reader.components.PdfPageList
 import com.mustafakoceerr.tilepdf.feature.reader.components.SearchTopBar
 import com.mustafakoceerr.tilepdf.feature.reader.components.TableOfContentsSheet
+import com.mustafakoceerr.tilepdf.feature.reader.components.ThumbnailGrid
+import com.mustafakoceerr.tilepdf.feature.reader.components.TrimMemoryEffect
 import com.mustafakoceerr.tilepdf.model.ReadingPosition
 import com.mustafakoceerr.tilepdf.ui.theme.TilePDFTheme
 import kotlinx.coroutines.launch
@@ -135,6 +144,7 @@ internal fun ReaderScreen(
     val copySelection = rememberCopyAction(selection?.text, onCopied = onClearSelection)
     BackHandler(enabled = selection != null, onBack = onClearSelection)
     var goToPageOpen by rememberSaveable { mutableStateOf(false) }
+    var pagesOpen by rememberSaveable { mutableStateOf(false) }
     var menuOpen by remember { mutableStateOf(false) }
     var pageJump by remember { mutableStateOf<PageJump?>(null) }
     LaunchedEffect(ready?.jump) {
@@ -182,6 +192,12 @@ internal fun ReaderScreen(
                     },
                     actions = {
                         if (ready != null) {
+                            IconButton(onClick = { pagesOpen = true }) {
+                                Icon(
+                                    painter = painterResource(TilePdfIcons.Grid),
+                                    contentDescription = stringResource(R.string.reader_pages),
+                                )
+                            }
                             // Always there: it also holds the bookmarks.
                             IconButton(onClick = onOpenToc) {
                                 Icon(
@@ -273,6 +289,66 @@ internal fun ReaderScreen(
             },
             onDismiss = onCloseToc,
         )
+    }
+
+    if (ready != null) {
+        val thumbnails = ready.thumbnails
+        TrimMemoryEffect(thumbnails) { thumbnails.trimMemory() }
+        if (pagesOpen) {
+            PagesDialog(
+                ready = ready,
+                onSelect = { page ->
+                    pagesOpen = false
+                    pageJump = PageJump(page)
+                },
+                onDismiss = { pagesOpen = false },
+            )
+        }
+    }
+}
+
+/** The page grid, full screen over the reader. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun PagesDialog(ready: ReaderUiState.Ready, onSelect: (Int) -> Unit, onDismiss: () -> Unit) {
+    // Edge to edge like the reader; the Scaffold pads for the system bars.
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
+    ) {
+        // The dialog has its own window: give it bar icons that suit the theme.
+        val view = LocalView.current
+        val lightBars = MaterialTheme.colorScheme.surface.luminance() > 0.5f
+        SideEffect {
+            val window = (view.parent as? DialogWindowProvider)?.window ?: return@SideEffect
+            WindowCompat.getInsetsController(window, view).apply {
+                isAppearanceLightStatusBars = lightBars
+                isAppearanceLightNavigationBars = lightBars
+            }
+        }
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { Text(stringResource(R.string.reader_pages)) },
+                    navigationIcon = {
+                        IconButton(onClick = onDismiss) {
+                            Icon(
+                                painter = painterResource(TilePdfIcons.Close),
+                                contentDescription = stringResource(R.string.reader_close),
+                            )
+                        }
+                    },
+                )
+            },
+        ) { innerPadding ->
+            ThumbnailGrid(
+                pageSizes = ready.pageSizes,
+                currentPage = ready.currentPage,
+                thumbnail = ready.thumbnails::thumbnail,
+                onSelect = onSelect,
+                modifier = Modifier.padding(innerPadding).consumeWindowInsets(innerPadding),
+            )
+        }
     }
 }
 

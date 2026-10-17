@@ -23,6 +23,8 @@
     <string name="reader_bookmark_add">Yer imi ekle</string>
     <string name="reader_bookmark_remove">Yer imini kaldır</string>
     <string name="reader_no_bookmarks">Henüz yer imi yok</string>
+    <string name="reader_pages">Sayfalar</string>
+    <string name="reader_close">Kapat</string>
     <string name="reader_copied">Kopyalandı</string>
     <string name="reader_error_not_found">Dosya bulunamadı veya erişim izni yok.</string>
     <string name="reader_password_title">Şifre gerekli</string>
