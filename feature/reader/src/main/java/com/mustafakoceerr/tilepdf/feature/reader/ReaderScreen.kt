@@ -70,6 +70,10 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mustafakoceerr.tilepdf.core.designsystem.TilePdfIcons
+import com.mustafakoceerr.tilepdf.feature.reader.annotation.AnnotationMenuDialog
+import com.mustafakoceerr.tilepdf.feature.reader.annotation.AnnotationTarget
+import com.mustafakoceerr.tilepdf.feature.reader.annotation.NoteDialog
+import com.mustafakoceerr.tilepdf.feature.reader.annotation.SelectionMarkupBar
 import com.mustafakoceerr.tilepdf.feature.reader.components.PageJump
 import com.mustafakoceerr.tilepdf.feature.reader.components.PasswordDialog
 import com.mustafakoceerr.tilepdf.feature.reader.components.PdfPageList
@@ -79,6 +83,8 @@ import com.mustafakoceerr.tilepdf.feature.reader.components.SearchTopBar
 import com.mustafakoceerr.tilepdf.feature.reader.components.TableOfContentsSheet
 import com.mustafakoceerr.tilepdf.feature.reader.components.ThumbnailGrid
 import com.mustafakoceerr.tilepdf.feature.reader.components.TrimMemoryEffect
+import com.mustafakoceerr.tilepdf.model.MarkupKind
+import com.mustafakoceerr.tilepdf.model.Note
 import com.mustafakoceerr.tilepdf.model.PageTheme
 import com.mustafakoceerr.tilepdf.model.ReadingMode
 import com.mustafakoceerr.tilepdf.model.ReadingPosition
@@ -117,6 +123,17 @@ fun ReaderScreen(
         onPageThemeSelected = viewModel::onPageThemeSelected,
         onReadingModeSelected = viewModel::onReadingModeSelected,
         onKeepScreenOnChange = viewModel::onKeepScreenOnChange,
+        annotationActions = AnnotationActions(
+            onMarkup = viewModel::onMarkup,
+            onMenuDismissed = viewModel::onAnnotationMenuDismissed,
+            onDelete = viewModel::onDeleteAnnotation,
+            onEditNote = viewModel::onEditNote,
+            onNoteSubmitted = viewModel::onNoteSubmitted,
+            onNoteDeleted = viewModel::onNoteDeleted,
+            onNoteDismissed = viewModel::onNoteDismissed,
+            onUndo = viewModel::onUndo,
+            onRedo = viewModel::onRedo,
+        ),
     )
 }
 
@@ -128,6 +145,23 @@ internal class SelectionActions(
     val onSelectAll: () -> Unit,
     val onClear: () -> Unit,
 )
+
+/** Annotation events, grouped like [SearchActions]. */
+internal class AnnotationActions(
+    val onMarkup: (MarkupKind) -> Unit,
+    val onMenuDismissed: () -> Unit,
+    val onDelete: (AnnotationTarget) -> Unit,
+    val onEditNote: (Note) -> Unit,
+    val onNoteSubmitted: (String) -> Unit,
+    val onNoteDeleted: () -> Unit,
+    val onNoteDismissed: () -> Unit,
+    val onUndo: () -> Unit,
+    val onRedo: () -> Unit,
+) {
+    companion object {
+        val None = AnnotationActions({}, {}, {}, {}, {}, {}, {}, {}, {})
+    }
+}
 
 /** Search events, grouped to keep the screen's signature readable. */
 internal class SearchActions(
@@ -164,6 +198,7 @@ internal fun ReaderScreen(
     onPageThemeSelected: (PageTheme) -> Unit = {},
     onReadingModeSelected: (ReadingMode) -> Unit = {},
     onKeepScreenOnChange: (Boolean) -> Unit = {},
+    annotationActions: AnnotationActions = AnnotationActions.None,
 ) {
     val ready = uiState as? ReaderUiState.Ready
     val search = ready?.search
@@ -298,6 +333,13 @@ internal fun ReaderScreen(
                 }
             }
         }
+        if (selection != null) {
+            SelectionMarkupBar(
+                enabled = ready.annotations.ready,
+                onMarkup = annotationActions.onMarkup,
+                modifier = Modifier.align(Alignment.BottomCenter),
+            )
+        }
         // Over the pages, not above them: hiding it doesn't move the pages.
         AnimatedVisibility(
             visible = !fullScreen,
@@ -323,6 +365,27 @@ internal fun ReaderScreen(
             },
             onDismiss = onCloseToc,
         )
+    }
+
+    ready?.editing?.menu?.let { target ->
+        AnnotationMenuDialog(
+            target = target,
+            onDelete = { annotationActions.onDelete(target) },
+            onEditNote = annotationActions.onEditNote,
+            onDismiss = annotationActions.onMenuDismissed,
+        )
+    }
+    ready?.editing?.noteEditor?.let { editor ->
+        // A new editor starts from its own text, not the last dialog's.
+        key(editor) {
+            NoteDialog(
+                initial = editor.editing?.text.orEmpty(),
+                editing = editor.editing != null,
+                onSave = annotationActions.onNoteSubmitted,
+                onDelete = annotationActions.onNoteDeleted,
+                onDismiss = annotationActions.onNoteDismissed,
+            )
+        }
     }
 
     if (ready != null) {
@@ -363,6 +426,7 @@ private fun ReaderPages(
     onTapOutsidePage: () -> Unit,
     selectionActions: SelectionActions,
 ) {
+    val annotations = ready.annotations.own.groupBy { it.pageIndex }
     when (ready.preferences.readingMode) {
         ReadingMode.Vertical -> PdfPageList(
             pageSizes = ready.pageSizes,
@@ -381,6 +445,7 @@ private fun ReaderPages(
             chromePadding = chromePadding(),
             selection = ready.selection,
             selectionActions = selectionActions,
+            annotations = annotations,
         )
         ReadingMode.Horizontal -> PdfPagePager(
             pageSizes = ready.pageSizes,
@@ -399,6 +464,7 @@ private fun ReaderPages(
             chromePadding = chromePadding(),
             selection = ready.selection,
             selectionActions = selectionActions,
+            annotations = annotations,
         )
     }
 }

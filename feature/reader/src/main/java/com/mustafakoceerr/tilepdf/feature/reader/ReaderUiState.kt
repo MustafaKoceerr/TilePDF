@@ -1,5 +1,7 @@
 package com.mustafakoceerr.tilepdf.feature.reader
 
+import com.mustafakoceerr.tilepdf.feature.reader.annotation.AnnotationEditing
+import com.mustafakoceerr.tilepdf.feature.reader.annotation.AnnotationsUiState
 import com.mustafakoceerr.tilepdf.feature.reader.components.PageJump
 import com.mustafakoceerr.tilepdf.model.Bookmark
 
@@ -42,6 +44,8 @@ sealed interface ReaderUiState {
         val isCurrentPageBookmarked: Boolean = false,
         /** Bars hidden; a tap on the page brings them back. */
         val isFullScreen: Boolean = false,
+        val annotations: AnnotationsUiState = AnnotationsUiState(),
+        val editing: AnnotationEditing = AnnotationEditing(),
     ) : ReaderUiState
 }
 
