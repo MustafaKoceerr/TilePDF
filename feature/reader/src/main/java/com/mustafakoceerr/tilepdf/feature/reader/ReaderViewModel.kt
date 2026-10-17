@@ -21,6 +21,8 @@ import com.mustafakoceerr.tilepdf.domain.OpenedDocument
 import com.mustafakoceerr.tilepdf.feature.reader.components.PageJump
 import com.mustafakoceerr.tilepdf.feature.reader.navigation.ReaderRoute
 import com.mustafakoceerr.tilepdf.model.PageText
+import com.mustafakoceerr.tilepdf.model.PageTheme
+import com.mustafakoceerr.tilepdf.model.ReadingMode
 import com.mustafakoceerr.tilepdf.model.ReadingPosition
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
@@ -79,11 +81,11 @@ class ReaderViewModel @Inject constructor(
 
     val uiState: StateFlow<ReaderUiState> = combine(
         documentState,
-        preferencesRepository.nightMode,
+        preferencesRepository.preferences,
         searchState,
         toc,
         combine(selection, linkTargets, currentPage, ::Triple),
-    ) { document, nightMode, search, toc, selectionAndLinks ->
+    ) { document, preferences, search, toc, selectionAndLinks ->
         val (selection, links, page) = selectionAndLinks
         when (document) {
             DocumentState.Loading -> ReaderUiState.Loading
@@ -95,7 +97,7 @@ class ReaderViewModel @Inject constructor(
                 pageImages = document.pageImages,
                 thumbnails = document.thumbnails,
                 initialPosition = document.opened.position,
-                nightMode = nightMode,
+                preferences = preferences,
                 search = search,
                 toc = toc,
                 selection = selection?.toUiState(),
@@ -203,8 +205,16 @@ class ReaderViewModel @Inject constructor(
         toc.update { it.copy(isOpen = false) }
     }
 
-    fun onToggleNightMode() {
-        viewModelScope.launch { preferencesRepository.toggleNightMode() }
+    fun onPageThemeSelected(theme: PageTheme) {
+        viewModelScope.launch { preferencesRepository.setPageTheme(theme) }
+    }
+
+    fun onReadingModeSelected(mode: ReadingMode) {
+        viewModelScope.launch { preferencesRepository.setReadingMode(mode) }
+    }
+
+    fun onKeepScreenOnChange(enabled: Boolean) {
+        viewModelScope.launch { preferencesRepository.setKeepScreenOn(enabled) }
     }
 
     /** Selects the word at a point on a page, given in top-left PDF points. */

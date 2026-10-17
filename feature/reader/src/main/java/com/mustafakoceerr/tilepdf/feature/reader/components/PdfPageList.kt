@@ -31,7 +31,6 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.layout.ContentScale
@@ -54,6 +53,7 @@ import com.mustafakoceerr.tilepdf.core.render.RenderedTile
 import com.mustafakoceerr.tilepdf.core.render.Tile
 import com.mustafakoceerr.tilepdf.feature.reader.SelectionActions
 import com.mustafakoceerr.tilepdf.feature.reader.SelectionUiState
+import com.mustafakoceerr.tilepdf.model.PageTheme
 import com.mustafakoceerr.tilepdf.model.ReadingPosition
 import com.mustafakoceerr.tilepdf.model.SearchMatch
 import kotlinx.coroutines.launch
@@ -69,25 +69,13 @@ private val HighlightColor = Color(0x66FFEB3B)
 private val CurrentHighlightColor = Color(0x99FF9800)
 private val SelectionColor = Color(0x553D7BFF)
 
-/** Inverts colours without re-rendering: white paper becomes black. */
-private val NightModeFilter = ColorFilter.colorMatrix(
-    ColorMatrix(
-        floatArrayOf(
-            -1f, 0f, 0f, 0f, 255f,
-            0f, -1f, 0f, 0f, 255f,
-            0f, 0f, -1f, 0f, 255f,
-            0f, 0f, 0f, 1f, 0f,
-        )
-    )
-)
-
 /** Zoomable vertical list of all pages. */
 @Composable
 internal fun PdfPageList(
     pageSizes: List<PageSize>,
     pageImages: PageImageSource,
     initialPosition: ReadingPosition,
-    nightMode: Boolean,
+    pageTheme: PageTheme,
     matches: List<SearchMatch>,
     currentMatch: SearchMatch?,
     onPositionChanged: (ReadingPosition) -> Unit,
@@ -182,7 +170,7 @@ internal fun PdfPageList(
                     pageSize = pageSizes[pageIndex],
                     draftWidthPx = draftWidthPx,
                     pageImages = pageImages,
-                    nightMode = nightMode,
+                    pageTheme = pageTheme,
                     matches = matchesByPage[pageIndex].orEmpty(),
                     currentMatch = currentMatch,
                     selection = selection?.takeIf { it.pageIndex == pageIndex },
@@ -248,7 +236,7 @@ private fun PdfPage(
     pageSize: PageSize,
     draftWidthPx: Int,
     pageImages: PageImageSource,
-    nightMode: Boolean,
+    pageTheme: PageTheme,
     matches: List<SearchMatch>,
     currentMatch: SearchMatch?,
     selection: SelectionUiState?,
@@ -262,7 +250,7 @@ private fun PdfPage(
     LaunchedEffect(pageIndex, draftWidthPx) {
         if (draft == null) draft = pageImages.loadDraft(pageIndex, draftWidthPx)
     }
-    val colorFilter = if (nightMode) NightModeFilter else null
+    val colorFilter = remember(pageTheme) { pageTheme.colorFilter() }
     var pageWidthPx by remember { mutableFloatStateOf(0f) }
     var coordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
 
@@ -277,7 +265,7 @@ private fun PdfPage(
         Box(
             modifier = Modifier
                 .matchParentSize()
-                .background(if (nightMode) Color.Black else Color.White)
+                .background(pageTheme.paperColor)
                 // Tiles are read in the draw phase: a new tile only redraws
                 // this page, it doesn't recompose it.
                 .drawWithContent {

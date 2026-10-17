@@ -1,0 +1,101 @@
+package com.mustafakoceerr.tilepdf.feature.reader.components
+
+import androidx.annotation.StringRes
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.Switch
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.unit.dp
+import com.mustafakoceerr.tilepdf.feature.reader.R
+import com.mustafakoceerr.tilepdf.model.PageTheme
+import com.mustafakoceerr.tilepdf.model.ReaderPreferences
+
+/** Reader settings that apply to every document. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun ReaderSettingsSheet(
+    preferences: ReaderPreferences,
+    onPageThemeSelected: (PageTheme) -> Unit,
+    onKeepScreenOnChange: (Boolean) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier.padding(start = 24.dp, end = 24.dp, bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            ChoiceRow(
+                title = R.string.reader_theme,
+                options = PageTheme.entries,
+                selected = preferences.pageTheme,
+                label = PageTheme::labelRes,
+                onSelect = onPageThemeSelected,
+            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .toggleable(
+                        value = preferences.keepScreenOn,
+                        role = Role.Switch,
+                        onValueChange = onKeepScreenOnChange,
+                    ),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = stringResource(R.string.reader_keep_screen_on),
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.weight(1f),
+                )
+                // The row handles the toggle, so the whole line is one target.
+                Switch(checked = preferences.keepScreenOn, onCheckedChange = null)
+            }
+        }
+    }
+}
+
+/** A titled row of mutually exclusive options. */
+@Composable
+private fun <T> ChoiceRow(
+    @StringRes title: Int,
+    options: List<T>,
+    selected: T,
+    label: (T) -> Int,
+    onSelect: (T) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(stringResource(title), style = MaterialTheme.typography.titleSmall)
+        SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+            options.forEachIndexed { index, option ->
+                SegmentedButton(
+                    selected = option == selected,
+                    onClick = { onSelect(option) },
+                    shape = SegmentedButtonDefaults.itemShape(index, options.size),
+                    label = { Text(stringResource(label(option))) },
+                )
+            }
+        }
+    }
+}
+
+@get:StringRes
+private val PageTheme.labelRes: Int
+    get() = when (this) {
+        PageTheme.Light -> R.string.reader_theme_light
+        PageTheme.Night -> R.string.reader_theme_night
+        PageTheme.Sepia -> R.string.reader_theme_sepia
+    }

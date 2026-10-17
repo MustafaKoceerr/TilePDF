@@ -16,7 +16,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
@@ -24,6 +23,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
@@ -56,10 +56,12 @@ import com.mustafakoceerr.tilepdf.core.designsystem.TilePdfIcons
 import com.mustafakoceerr.tilepdf.feature.reader.components.PageJump
 import com.mustafakoceerr.tilepdf.feature.reader.components.PasswordDialog
 import com.mustafakoceerr.tilepdf.feature.reader.components.PdfPageList
+import com.mustafakoceerr.tilepdf.feature.reader.components.ReaderSettingsSheet
 import com.mustafakoceerr.tilepdf.feature.reader.components.SearchTopBar
 import com.mustafakoceerr.tilepdf.feature.reader.components.TableOfContentsSheet
 import com.mustafakoceerr.tilepdf.feature.reader.components.ThumbnailGrid
 import com.mustafakoceerr.tilepdf.feature.reader.components.TrimMemoryEffect
+import com.mustafakoceerr.tilepdf.model.PageTheme
 import com.mustafakoceerr.tilepdf.model.ReadingPosition
 import com.mustafakoceerr.tilepdf.ui.theme.TilePDFTheme
 import kotlinx.coroutines.launch
@@ -73,7 +75,6 @@ fun ReaderScreen(
     ReaderScreen(
         uiState = uiState,
         onBack = onBack,
-        onToggleNightMode = viewModel::onToggleNightMode,
         onPositionChanged = viewModel::onPositionChanged,
         searchActions = SearchActions(
             onOpen = viewModel::onOpenSearch,
@@ -93,6 +94,8 @@ fun ReaderScreen(
         onJumpHandled = viewModel::onJumpHandled,
         onExternalLinkHandled = viewModel::onExternalLinkHandled,
         onToggleBookmark = viewModel::onToggleBookmark,
+        onPageThemeSelected = viewModel::onPageThemeSelected,
+        onKeepScreenOnChange = viewModel::onKeepScreenOnChange,
     )
 }
 
@@ -123,7 +126,6 @@ internal class SearchActions(
 internal fun ReaderScreen(
     uiState: ReaderUiState,
     onBack: () -> Unit,
-    onToggleNightMode: () -> Unit,
     onPositionChanged: (ReadingPosition) -> Unit,
     searchActions: SearchActions,
     onLongPress: (pageIndex: Int, x: Float, y: Float) -> Unit = { _, _, _ -> },
@@ -137,6 +139,8 @@ internal fun ReaderScreen(
     onJumpHandled: () -> Unit = {},
     onExternalLinkHandled: () -> Unit = {},
     onToggleBookmark: () -> Unit = {},
+    onPageThemeSelected: (PageTheme) -> Unit = {},
+    onKeepScreenOnChange: (Boolean) -> Unit = {},
 ) {
     val ready = uiState as? ReaderUiState.Ready
     val search = ready?.search
@@ -145,6 +149,7 @@ internal fun ReaderScreen(
     BackHandler(enabled = selection != null, onBack = onClearSelection)
     var goToPageOpen by rememberSaveable { mutableStateOf(false) }
     var pagesOpen by rememberSaveable { mutableStateOf(false) }
+    var settingsOpen by rememberSaveable { mutableStateOf(false) }
     var menuOpen by remember { mutableStateOf(false) }
     var pageJump by remember { mutableStateOf<PageJump?>(null) }
     LaunchedEffect(ready?.jump) {
@@ -162,6 +167,7 @@ internal fun ReaderScreen(
         onExternalLinkHandled()
     }
     BackHandler(enabled = search?.isActive == true, onBack = searchActions.onClose)
+    KeepScreenOnEffect(ready?.preferences?.keepScreenOn == true)
 
     Scaffold(
         topBar = {
@@ -214,11 +220,10 @@ internal fun ReaderScreen(
                             OverflowMenu(
                                 expanded = menuOpen,
                                 onExpandedChange = { menuOpen = it },
-                                nightMode = ready.nightMode,
                                 bookmarked = ready.isCurrentPageBookmarked,
                                 onToggleBookmark = onToggleBookmark,
                                 onGoToPage = { goToPageOpen = true },
-                                onToggleNightMode = onToggleNightMode,
+                                onOpenSettings = { settingsOpen = true },
                             )
                         }
                     },
@@ -252,7 +257,7 @@ internal fun ReaderScreen(
                     pageSizes = uiState.pageSizes,
                     pageImages = uiState.pageImages,
                     initialPosition = uiState.initialPosition,
-                    nightMode = uiState.nightMode,
+                    pageTheme = uiState.preferences.pageTheme,
                     matches = uiState.search.matches,
                     currentMatch = uiState.search.currentMatch,
                     onPositionChanged = onPositionChanged,
@@ -294,6 +299,14 @@ internal fun ReaderScreen(
     if (ready != null) {
         val thumbnails = ready.thumbnails
         TrimMemoryEffect(thumbnails) { thumbnails.trimMemory() }
+        if (settingsOpen) {
+            ReaderSettingsSheet(
+                preferences = ready.preferences,
+                onPageThemeSelected = onPageThemeSelected,
+                onKeepScreenOnChange = onKeepScreenOnChange,
+                onDismiss = { settingsOpen = false },
+            )
+        }
         if (pagesOpen) {
             PagesDialog(
                 ready = ready,
@@ -352,6 +365,16 @@ private fun PagesDialog(ready: ReaderUiState.Ready, onSelect: (Int) -> Unit, onD
     }
 }
 
+/** Stops the screen from timing out while [enabled] and the reader is shown. */
+@Composable
+private fun KeepScreenOnEffect(enabled: Boolean) {
+    val view = LocalView.current
+    DisposableEffect(view, enabled) {
+        view.keepScreenOn = enabled
+        onDispose { view.keepScreenOn = false }
+    }
+}
+
 /**
  * Copies [text] to the clipboard. Android 13+ confirms copies itself; older
  * versions get a toast so the user knows it worked.
@@ -383,11 +406,10 @@ private fun rememberCopyAction(text: String?, onCopied: () -> Unit): () -> Unit 
 private fun OverflowMenu(
     expanded: Boolean,
     onExpandedChange: (Boolean) -> Unit,
-    nightMode: Boolean,
     bookmarked: Boolean,
     onToggleBookmark: () -> Unit,
     onGoToPage: () -> Unit,
-    onToggleNightMode: () -> Unit,
+    onOpenSettings: () -> Unit,
 ) {
     Box {
         IconButton(onClick = { onExpandedChange(true) }) {
@@ -421,12 +443,11 @@ private fun OverflowMenu(
                 },
             )
             DropdownMenuItem(
-                text = { Text(stringResource(R.string.reader_night_mode)) },
-                leadingIcon = { Icon(painterResource(TilePdfIcons.DarkMode), contentDescription = null) },
-                trailingIcon = { Checkbox(checked = nightMode, onCheckedChange = null) },
+                text = { Text(stringResource(R.string.reader_settings)) },
+                leadingIcon = { Icon(painterResource(TilePdfIcons.Tune), contentDescription = null) },
                 onClick = {
                     onExpandedChange(false)
-                    onToggleNightMode()
+                    onOpenSettings()
                 },
             )
         }
@@ -444,6 +465,6 @@ private val ReaderError.messageRes: Int
 @Composable
 private fun ReaderScreenErrorPreview() {
     TilePDFTheme {
-        ReaderScreen(ReaderUiState.Error(ReaderError.Corrupt), {}, {}, {}, SearchActions.None)
+        ReaderScreen(ReaderUiState.Error(ReaderError.Corrupt), {}, {}, SearchActions.None)
     }
 }
