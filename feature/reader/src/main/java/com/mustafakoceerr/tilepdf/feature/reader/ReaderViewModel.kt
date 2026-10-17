@@ -182,6 +182,9 @@ class ReaderViewModel @Inject constructor(
     /** Tries the document again with [password]; it is not kept afterwards. */
     fun onPasswordEntered(password: String) = open(password)
 
+    /** After running out of memory: other apps may have freed some since. */
+    fun onRetryOpen() = open(password = null)
+
     private fun open(password: String?) {
         openJob?.cancel()
         documentState.value = DocumentState.Loading
@@ -203,7 +206,8 @@ class ReaderViewModel @Inject constructor(
                     pageImages = TiledPageImageSource(opened.document, pageRenderer, viewModelScope),
                     thumbnails = ThumbnailSource(opened.document, pageRenderer),
                 ).also(::startAnnotations)
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
+                // Throwable, not Exception: running out of memory is an Error.
                 if (e is CancellationException) throw e
                 when (val failure = openFailureFor(e) ?: throw e) {
                     is OpenFailure.NeedsPassword -> DocumentState.NeedsPassword(failure.wrongPassword)

@@ -51,7 +51,15 @@ sealed interface ReaderUiState {
     ) : ReaderUiState
 }
 
-enum class ReaderError { NotFound, Corrupt }
+/** Why a document didn't open; a wrong or missing password is asked for instead. */
+enum class ReaderError {
+    NotFound,
+
+    /** The read grant was revoked; picking the file again restores it. */
+    PermissionLost,
+    Corrupt,
+    OutOfMemory,
+}
 
 sealed interface SaveCopyResult {
     data class Saved(val uri: String) : SaveCopyResult

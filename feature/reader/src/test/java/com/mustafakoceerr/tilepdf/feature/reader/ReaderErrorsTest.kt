@@ -23,8 +23,13 @@ class ReaderErrorsTest {
     }
 
     @Test
-    fun revokedPermissionIsNotFound() {
-        assertEquals(OpenFailure.Failed(ReaderError.NotFound), openFailureFor(SecurityException("grant revoked")))
+    fun revokedPermissionIsPermissionLost() {
+        assertEquals(OpenFailure.Failed(ReaderError.PermissionLost), openFailureFor(SecurityException("grant revoked")))
+    }
+
+    @Test
+    fun outOfMemoryIsOutOfMemory() {
+        assertEquals(OpenFailure.Failed(ReaderError.OutOfMemory), openFailureFor(OutOfMemoryError()))
     }
 
     @Test
@@ -36,5 +41,10 @@ class ReaderErrorsTest {
     @Test
     fun programmingErrorsAreNotMapped() {
         assertNull(openFailureFor(IllegalStateException()))
+    }
+
+    @Test
+    fun otherErrorsAreNotMapped() {
+        assertNull(openFailureFor(StackOverflowError()))
     }
 }

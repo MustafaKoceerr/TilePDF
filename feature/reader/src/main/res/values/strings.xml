@@ -34,12 +34,10 @@
     <string name="reader_pages">Pages</string>
     <string name="reader_close">Close</string>
     <string name="reader_copied">Copied</string>
-    <string name="reader_error_not_found">File not found or no access.</string>
     <string name="reader_password_title">Password required</string>
     <string name="reader_password_hint">Password</string>
     <string name="reader_password_wrong">Wrong password</string>
     <string name="reader_password_open">Open</string>
-    <string name="reader_error_corrupt">Couldn\'t open the PDF; the file may be damaged.</string>
     <string name="reader_annotate">Annotate</string>
     <string name="reader_annotate_done">Done</string>
     <string name="annotation_tool_select">Select</string>
@@ -73,4 +71,15 @@
     <string name="save_error_failed">Couldn\'t save annotations.</string>
     <string name="save_retry">Retry</string>
     <string name="save_copy_done">Copy saved</string>
+    <string name="error_not_found_title">File not found</string>
+    <string name="error_not_found_message">It may have been moved, renamed or deleted.</string>
+    <string name="error_permission_title">Can\'t access this file</string>
+    <string name="error_permission_message">TilePDF no longer has permission to open it. Choose the file again to continue.</string>
+    <string name="error_corrupt_title">Can\'t open this PDF</string>
+    <string name="error_corrupt_message">The file may be damaged or may not be a PDF.</string>
+    <string name="error_memory_title">Not enough memory</string>
+    <string name="error_memory_message">Close other apps and try again.</string>
+    <string name="error_choose_file">Choose file</string>
+    <string name="error_try_again">Try again</string>
+    <string name="error_back_to_library">Back to library</string>
 </resources>

@@ -91,6 +91,7 @@ import com.mustafakoceerr.tilepdf.feature.reader.annotation.topPt
 import com.mustafakoceerr.tilepdf.feature.reader.annotation.AnnotationTarget
 import com.mustafakoceerr.tilepdf.feature.reader.annotation.NoteDialog
 import com.mustafakoceerr.tilepdf.feature.reader.annotation.SelectionMarkupBar
+import com.mustafakoceerr.tilepdf.feature.reader.components.ReaderErrorContent
 import com.mustafakoceerr.tilepdf.feature.reader.components.PageJump
 import com.mustafakoceerr.tilepdf.feature.reader.components.PasswordDialog
 import com.mustafakoceerr.tilepdf.feature.reader.components.PdfPageList
@@ -136,6 +137,7 @@ fun ReaderScreen(
         onOpenToc = viewModel::onOpenToc,
         onCloseToc = viewModel::onCloseToc,
         onPasswordEntered = viewModel::onPasswordEntered,
+        onRetryOpen = viewModel::onRetryOpen,
         onTapPage = viewModel::onTap,
         onTapOutsidePage = viewModel::onTapOutsidePage,
         onJumpHandled = viewModel::onJumpHandled,
@@ -232,6 +234,7 @@ internal fun ReaderScreen(
     onOpenToc: () -> Unit = {},
     onCloseToc: () -> Unit = {},
     onPasswordEntered: (String) -> Unit = {},
+    onRetryOpen: () -> Unit = {},
     onTapPage: (pageIndex: Int, x: Float, y: Float) -> Unit = { _, _, _ -> },
     onTapOutsidePage: () -> Unit = {},
     onJumpHandled: () -> Unit = {},
@@ -359,10 +362,11 @@ internal fun ReaderScreen(
         ) {
             when (uiState) {
                 ReaderUiState.Loading -> CircularProgressIndicator()
-                is ReaderUiState.Error -> Text(
-                    text = stringResource(uiState.reason.messageRes),
-                    style = MaterialTheme.typography.bodyLarge,
-                    modifier = Modifier.padding(24.dp),
+                is ReaderUiState.Error -> ReaderErrorContent(
+                    error = uiState.reason,
+                    onFileChosen = onOpenDocument,
+                    onRetry = onRetryOpen,
+                    onBack = onBack,
                 )
                 is ReaderUiState.PasswordRequired -> PasswordDialog(
                     wrongPassword = uiState.wrongPassword,
@@ -795,13 +799,6 @@ private fun OverflowMenu(
         }
     }
 }
-
-@get:StringRes
-private val ReaderError.messageRes: Int
-    get() = when (this) {
-        ReaderError.NotFound -> R.string.reader_error_not_found
-        ReaderError.Corrupt -> R.string.reader_error_corrupt
-    }
 
 @Preview
 @Composable

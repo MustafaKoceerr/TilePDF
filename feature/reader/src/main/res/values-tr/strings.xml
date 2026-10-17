@@ -31,12 +31,10 @@
     <string name="reader_pages">Sayfalar</string>
     <string name="reader_close">Kapat</string>
     <string name="reader_copied">Kopyalandı</string>
-    <string name="reader_error_not_found">Dosya bulunamadı veya erişim izni yok.</string>
     <string name="reader_password_title">Şifre gerekli</string>
     <string name="reader_password_hint">Şifre</string>
     <string name="reader_password_wrong">Şifre yanlış</string>
     <string name="reader_password_open">Aç</string>
-    <string name="reader_error_corrupt">PDF açılamadı; dosya bozuk olabilir.</string>
     <string name="reader_annotate">Açıklama ekle</string>
     <string name="reader_annotate_done">Bitti</string>
     <string name="annotation_tool_select">Seç</string>
@@ -70,4 +68,15 @@
     <string name="save_error_failed">Açıklamalar kaydedilemedi.</string>
     <string name="save_retry">Tekrar dene</string>
     <string name="save_copy_done">Kopya kaydedildi</string>
+    <string name="error_not_found_title">Dosya bulunamadı</string>
+    <string name="error_not_found_message">Taşınmış, adı değişmiş veya silinmiş olabilir.</string>
+    <string name="error_permission_title">Bu dosyaya erişilemiyor</string>
+    <string name="error_permission_message">TilePDF\'in bu dosyayı açma izni kalmadı. Devam etmek için dosyayı yeniden seç.</string>
+    <string name="error_corrupt_title">Bu PDF açılamıyor</string>
+    <string name="error_corrupt_message">Dosya bozuk olabilir veya PDF olmayabilir.</string>
+    <string name="error_memory_title">Yeterli bellek yok</string>
+    <string name="error_memory_message">Diğer uygulamaları kapatıp tekrar dene.</string>
+    <string name="error_choose_file">Dosya seç</string>
+    <string name="error_try_again">Tekrar dene</string>
+    <string name="error_back_to_library">Kütüphaneye dön</string>
 </resources>
