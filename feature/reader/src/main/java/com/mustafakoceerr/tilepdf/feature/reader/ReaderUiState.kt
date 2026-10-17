@@ -1,6 +1,7 @@
 package com.mustafakoceerr.tilepdf.feature.reader
 
 import com.mustafakoceerr.tilepdf.feature.reader.components.PageJump
+import com.mustafakoceerr.tilepdf.model.Bookmark
 
 import com.mustafakoceerr.tilepdf.core.geometry.PdfRect
 import com.mustafakoceerr.tilepdf.core.pdf.PageSize
@@ -31,6 +32,8 @@ sealed interface ReaderUiState {
         val jump: PageJump? = null,
         /** A web or mail link to hand to another app. */
         val externalLink: String? = null,
+        /** Whether the page at the top of the screen is bookmarked. */
+        val isCurrentPageBookmarked: Boolean = false,
     ) : ReaderUiState
 }
 
@@ -42,6 +45,8 @@ data class TocUiState(
     val isOpen: Boolean = false,
     /** Entry the reader was in when the sheet opened, or -1 before the first. */
     val currentIndex: Int = -1,
+    /** Bookmarked pages, in page order. */
+    val bookmarks: List<Bookmark> = emptyList(),
 )
 
 /** Selected text on one page; positions in top-left PDF points. */

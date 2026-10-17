@@ -83,6 +83,7 @@ fun ReaderScreen(
         onTapPage = viewModel::onTap,
         onJumpHandled = viewModel::onJumpHandled,
         onExternalLinkHandled = viewModel::onExternalLinkHandled,
+        onToggleBookmark = viewModel::onToggleBookmark,
     )
 }
 
@@ -126,6 +127,7 @@ internal fun ReaderScreen(
     onTapPage: (pageIndex: Int, x: Float, y: Float) -> Unit = { _, _, _ -> },
     onJumpHandled: () -> Unit = {},
     onExternalLinkHandled: () -> Unit = {},
+    onToggleBookmark: () -> Unit = {},
 ) {
     val ready = uiState as? ReaderUiState.Ready
     val search = ready?.search
@@ -180,13 +182,12 @@ internal fun ReaderScreen(
                     },
                     actions = {
                         if (ready != null) {
-                            if (ready.toc.entries.isNotEmpty()) {
-                                IconButton(onClick = onOpenToc) {
-                                    Icon(
-                                        painter = painterResource(TilePdfIcons.Toc),
-                                        contentDescription = stringResource(R.string.reader_toc),
-                                    )
-                                }
+                            // Always there: it also holds the bookmarks.
+                            IconButton(onClick = onOpenToc) {
+                                Icon(
+                                    painter = painterResource(TilePdfIcons.Toc),
+                                    contentDescription = stringResource(R.string.reader_toc),
+                                )
                             }
                             IconButton(onClick = searchActions.onOpen) {
                                 Icon(
@@ -198,6 +199,8 @@ internal fun ReaderScreen(
                                 expanded = menuOpen,
                                 onExpandedChange = { menuOpen = it },
                                 nightMode = ready.nightMode,
+                                bookmarked = ready.isCurrentPageBookmarked,
+                                onToggleBookmark = onToggleBookmark,
                                 onGoToPage = { goToPageOpen = true },
                                 onToggleNightMode = onToggleNightMode,
                             )
@@ -259,9 +262,14 @@ internal fun ReaderScreen(
         TableOfContentsSheet(
             outline = ready.toc.entries,
             currentIndex = ready.toc.currentIndex,
+            bookmarks = ready.toc.bookmarks,
             onSelect = { entry ->
                 onCloseToc()
                 pageJump = PageJump(entry.pageIndex, entry.topPt)
+            },
+            onSelectPage = { page ->
+                onCloseToc()
+                pageJump = PageJump(page)
             },
             onDismiss = onCloseToc,
         )
@@ -300,6 +308,8 @@ private fun OverflowMenu(
     expanded: Boolean,
     onExpandedChange: (Boolean) -> Unit,
     nightMode: Boolean,
+    bookmarked: Boolean,
+    onToggleBookmark: () -> Unit,
     onGoToPage: () -> Unit,
     onToggleNightMode: () -> Unit,
 ) {
@@ -311,6 +321,21 @@ private fun OverflowMenu(
             )
         }
         DropdownMenu(expanded = expanded, onDismissRequest = { onExpandedChange(false) }) {
+            DropdownMenuItem(
+                text = {
+                    Text(stringResource(if (bookmarked) R.string.reader_bookmark_remove else R.string.reader_bookmark_add))
+                },
+                leadingIcon = {
+                    Icon(
+                        painterResource(if (bookmarked) TilePdfIcons.Bookmark else TilePdfIcons.BookmarkBorder),
+                        contentDescription = null,
+                    )
+                },
+                onClick = {
+                    onExpandedChange(false)
+                    onToggleBookmark()
+                },
+            )
             DropdownMenuItem(
                 text = { Text(stringResource(R.string.reader_go_to_page)) },
                 leadingIcon = { Icon(painterResource(TilePdfIcons.Tag), contentDescription = null) },

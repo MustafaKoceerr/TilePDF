@@ -6,6 +6,8 @@ import androidx.annotation.DrawableRes
 object TilePdfIcons {
     @DrawableRes val Add = R.drawable.ic_add
     @DrawableRes val ArrowBack = R.drawable.ic_arrow_back
+    @DrawableRes val Bookmark = R.drawable.ic_bookmark
+    @DrawableRes val BookmarkBorder = R.drawable.ic_bookmark_border
     @DrawableRes val Close = R.drawable.ic_close
     @DrawableRes val DarkMode = R.drawable.ic_dark_mode
     @DrawableRes val Delete = R.drawable.ic_delete
