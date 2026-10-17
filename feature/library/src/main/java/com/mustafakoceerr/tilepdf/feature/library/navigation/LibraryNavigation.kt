@@ -8,8 +8,8 @@ import kotlinx.serialization.Serializable
 @Serializable
 data object LibraryRoute
 
-fun NavGraphBuilder.libraryScreen(onOpenDocument: (uri: String) -> Unit) {
+fun NavGraphBuilder.libraryScreen(onOpenDocument: (uri: String) -> Unit, onOpenSettings: () -> Unit) {
     composable<LibraryRoute> {
-        LibraryScreen(onOpenDocument = onOpenDocument)
+        LibraryScreen(onOpenDocument = onOpenDocument, onOpenSettings = onOpenSettings)
     }
 }

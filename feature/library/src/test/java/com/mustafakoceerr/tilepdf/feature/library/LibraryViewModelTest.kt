@@ -3,9 +3,7 @@ package com.mustafakoceerr.tilepdf.feature.library
 import com.mustafakoceerr.tilepdf.core.pdf.PdfDocument
 import com.mustafakoceerr.tilepdf.data.document.DocumentRepository
 import com.mustafakoceerr.tilepdf.data.library.LibraryRepository
-import com.mustafakoceerr.tilepdf.data.preferences.AppLanguageRepository
 import com.mustafakoceerr.tilepdf.data.preferences.LibraryPreferencesRepository
-import com.mustafakoceerr.tilepdf.model.AppLanguage
 import com.mustafakoceerr.tilepdf.model.LibraryDocument
 import com.mustafakoceerr.tilepdf.model.LibrarySort
 import com.mustafakoceerr.tilepdf.model.ReadingPosition
@@ -41,7 +39,6 @@ class LibraryViewModelTest {
         ),
     )
     private val preferences = Preferences()
-    private val languages = Languages(AppLanguage.Turkish)
 
     @Before
     fun setUp() = Dispatchers.setMain(UnconfinedTestDispatcher())
@@ -53,7 +50,7 @@ class LibraryViewModelTest {
         LibraryDocument(if (name.startsWith("file://")) name else "content://$name", name, 10, ReadingPosition(), opened, opened, favorite)
 
     private fun TestScope.viewModel() =
-        LibraryViewModel(library, documents, preferences, languages, CoroutineScope(UnconfinedTestDispatcher(testScheduler)))
+        LibraryViewModel(library, documents, preferences, CoroutineScope(UnconfinedTestDispatcher(testScheduler)))
 
     /** Keeps the state flow collected, as the screen does. */
     private fun TestScope.collected(viewModel: LibraryViewModel) =
@@ -167,15 +164,6 @@ class LibraryViewModelTest {
         assertEquals(listOf("file://copy.pdf"), documents.forgotten)
     }
 
-    @Test
-    fun languageIsShownAndSet() = runTest {
-        val viewModel = viewModel().also { collected(it) }
-        assertEquals(AppLanguage.Turkish, viewModel.success().language)
-        viewModel.onLanguageSelected(AppLanguage.English)
-        assertEquals(listOf(AppLanguage.English), languages.set)
-        assertEquals(AppLanguage.English, viewModel.success().language)
-    }
-
     private class Documents : DocumentRepository {
         val forgotten = mutableListOf<String>()
         override fun persistAccess(uri: String) = Unit
@@ -210,15 +198,6 @@ class LibraryViewModelTest {
         override val sort = MutableStateFlow(LibrarySort.Recent)
         override suspend fun setSort(sort: LibrarySort) {
             this.sort.value = sort
-        }
-    }
-
-    private class Languages(private var current: AppLanguage) : AppLanguageRepository {
-        val set = mutableListOf<AppLanguage>()
-        override fun current() = current
-        override fun set(language: AppLanguage) {
-            set += language
-            current = language
         }
     }
 }

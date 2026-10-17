@@ -2,4 +2,9 @@
 <resources>
 
     <style name="Theme.TilePDF" parent="Theme.AppCompat.DayNight.NoActionBar" />
+
+    <!-- Shown until the stored theme is read, so the first frame has the right theme. -->
+    <style name="Theme.TilePDF.Starting" parent="Theme.SplashScreen">
+        <item name="postSplashScreenTheme">@style/Theme.TilePDF</item>
+    </style>
 </resources>

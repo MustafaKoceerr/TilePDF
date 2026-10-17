@@ -16,11 +16,8 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -39,7 +36,6 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
@@ -57,7 +53,6 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -66,7 +61,6 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mustafakoceerr.tilepdf.core.designsystem.TilePdfIcons
-import com.mustafakoceerr.tilepdf.model.AppLanguage
 import com.mustafakoceerr.tilepdf.model.LibraryDocument
 import com.mustafakoceerr.tilepdf.model.LibrarySort
 import com.mustafakoceerr.tilepdf.model.ReadingPosition
@@ -80,6 +74,7 @@ private val MinRowWidth = 360.dp
 @Composable
 fun LibraryScreen(
     onOpenDocument: (uri: String) -> Unit,
+    onOpenSettings: () -> Unit,
     viewModel: LibraryViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -100,7 +95,7 @@ fun LibraryScreen(
             onQueryChange = viewModel::onQueryChange,
             onFilterSelected = viewModel::onFilterSelected,
             onSortSelected = viewModel::onSortSelected,
-            onLanguageSelected = viewModel::onLanguageSelected,
+            onOpenSettings = onOpenSettings,
         ),
     )
 }
@@ -118,7 +113,7 @@ internal class LibraryActions(
     val onQueryChange: (String) -> Unit = {},
     val onFilterSelected: (LibraryFilter) -> Unit = {},
     val onSortSelected: (LibrarySort) -> Unit = {},
-    val onLanguageSelected: (AppLanguage) -> Unit = {},
+    val onOpenSettings: () -> Unit = {},
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -130,17 +125,6 @@ internal fun LibraryScreen(uiState: LibraryUiState, actions: LibraryActions) {
     val success = uiState as? LibraryUiState.Success
     val snackbars = remember { SnackbarHostState() }
     RemovalSnackbarEffect(success?.pendingRemoval, snackbars, actions)
-    var languageDialog by remember { mutableStateOf(false) }
-    if (languageDialog && success != null) {
-        LanguageDialog(
-            selected = success.language,
-            onSelect = {
-                languageDialog = false
-                actions.onLanguageSelected(it)
-            },
-            onDismiss = { languageDialog = false },
-        )
-    }
 
     Scaffold(
         topBar = {
@@ -156,7 +140,7 @@ internal fun LibraryScreen(uiState: LibraryUiState, actions: LibraryActions) {
                             }
                             SortMenu(success.sort, actions.onSortSelected)
                         }
-                        if (success != null) LibraryMenu(onLanguage = { languageDialog = true })
+                        if (success != null) LibraryMenu(onSettings = actions.onOpenSettings)
                     },
                 )
             }
@@ -261,7 +245,7 @@ private fun SortMenu(sort: LibrarySort, onSelect: (LibrarySort) -> Unit) {
 }
 
 @Composable
-private fun LibraryMenu(onLanguage: () -> Unit) {
+private fun LibraryMenu(onSettings: () -> Unit) {
     var open by remember { mutableStateOf(false) }
     Box {
         IconButton(onClick = { open = true }) {
@@ -269,42 +253,14 @@ private fun LibraryMenu(onLanguage: () -> Unit) {
         }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             DropdownMenuItem(
-                text = { Text(stringResource(R.string.library_language)) },
+                text = { Text(stringResource(R.string.library_settings)) },
                 onClick = {
                     open = false
-                    onLanguage()
+                    onSettings()
                 },
             )
         }
     }
-}
-
-/** Language names are written in their own language, so anyone can find theirs. */
-@Composable
-private fun LanguageDialog(selected: AppLanguage, onSelect: (AppLanguage) -> Unit, onDismiss: () -> Unit) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.library_language)) },
-        text = {
-            Column(Modifier.selectableGroup()) {
-                AppLanguage.entries.forEach { language ->
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .selectable(selected = language == selected, role = Role.RadioButton, onClick = { onSelect(language) })
-                            .padding(vertical = 12.dp),
-                    ) {
-                        RadioButton(selected = language == selected, onClick = null)
-                        Text(stringResource(language.labelRes), modifier = Modifier.padding(start = 16.dp))
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.library_cancel)) }
-        },
-    )
 }
 
 @Composable
@@ -393,14 +349,6 @@ private val LibrarySort.labelRes: Int
         LibrarySort.Recent -> R.string.library_sort_recent
         LibrarySort.Name -> R.string.library_sort_name
         LibrarySort.Added -> R.string.library_sort_added
-    }
-
-@get:StringRes
-private val AppLanguage.labelRes: Int
-    get() = when (this) {
-        AppLanguage.System -> R.string.language_system
-        AppLanguage.English -> R.string.language_english
-        AppLanguage.Turkish -> R.string.language_turkish
     }
 
 @get:StringRes
