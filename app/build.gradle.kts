@@ -10,7 +10,7 @@ android {
     defaultConfig {
         applicationId = "com.mustafakoceerr.tilepdf"
         versionCode = 1
-        versionName = "1.0"
+        versionName = "1.0.0"
     }
 
     androidResources {
@@ -22,7 +22,15 @@ android {
     buildTypes {
         release {
             optimization {
-                enable = false
+                enable = true
+                keepRules {
+                    files.add(file("proguard-rules.pro"))
+                }
+            }
+            // Local checks of the shrunk build only (-Ptilepdf.signReleaseWithDebug=true);
+            // a build for Play is signed with the upload key.
+            if (providers.gradleProperty("tilepdf.signReleaseWithDebug").orNull == "true") {
+                signingConfig = signingConfigs.getByName("debug")
             }
         }
     }
