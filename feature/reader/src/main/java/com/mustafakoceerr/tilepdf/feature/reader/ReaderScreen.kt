@@ -7,6 +7,8 @@ import android.os.Build
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -16,6 +18,8 @@ import androidx.compose.foundation.background
 import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
@@ -35,6 +39,8 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.Surface
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -69,6 +75,8 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.core.net.toUri
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mustafakoceerr.tilepdf.core.designsystem.TilePdfIcons
 import com.mustafakoceerr.tilepdf.core.geometry.PdfPoint
@@ -93,6 +101,7 @@ import com.mustafakoceerr.tilepdf.feature.reader.components.TableOfContentsSheet
 import com.mustafakoceerr.tilepdf.feature.reader.components.ThumbnailGrid
 import com.mustafakoceerr.tilepdf.feature.reader.components.TrimMemoryEffect
 import com.mustafakoceerr.tilepdf.model.MarkupKind
+import com.mustafakoceerr.tilepdf.model.SaveError
 import com.mustafakoceerr.tilepdf.model.Note
 import com.mustafakoceerr.tilepdf.model.PageTheme
 import com.mustafakoceerr.tilepdf.model.ReadingMode
@@ -103,8 +112,11 @@ import kotlinx.coroutines.launch
 @Composable
 fun ReaderScreen(
     onBack: () -> Unit,
+    onOpenDocument: (uri: String) -> Unit,
     viewModel: ReaderViewModel = hiltViewModel(),
 ) {
+    // Leaving the app saves; leaving the reader saves in onCleared.
+    LifecycleEventEffect(Lifecycle.Event.ON_STOP) { viewModel.onStop() }
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     ReaderScreen(
         uiState = uiState,
@@ -149,7 +161,11 @@ fun ReaderScreen(
             onPenWidth = viewModel::onPenWidthSelected,
             onInkStroke = viewModel::onInkStroke,
             onErase = viewModel::onErase,
+            onSaveCopy = viewModel::onSaveCopy,
+            onSaveCopyResultHandled = viewModel::onSaveCopyResultHandled,
+            onRetrySave = viewModel::onRetrySave,
         ),
+        onOpenDocument = onOpenDocument,
     )
 }
 
@@ -180,6 +196,9 @@ internal class AnnotationActions(
     val onPenWidth: (Float) -> Unit = {},
     val onInkStroke: (pageIndex: Int, List<PdfPoint>) -> Unit = { _, _ -> },
     val onErase: (Erased) -> Unit = {},
+    val onSaveCopy: (target: String) -> Unit = {},
+    val onSaveCopyResultHandled: () -> Unit = {},
+    val onRetrySave: () -> Unit = {},
 ) {
     companion object {
         val None = AnnotationActions({}, {}, {}, {}, {}, {}, {}, {}, {})
@@ -222,8 +241,14 @@ internal fun ReaderScreen(
     onReadingModeSelected: (ReadingMode) -> Unit = {},
     onKeepScreenOnChange: (Boolean) -> Unit = {},
     annotationActions: AnnotationActions = AnnotationActions.None,
+    onOpenDocument: (uri: String) -> Unit = {},
 ) {
     val ready = uiState as? ReaderUiState.Ready
+    val saveCopyLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/pdf")) { target ->
+        target?.let { annotationActions.onSaveCopy(it.toString()) }
+    }
+    val saveCopy = { ready?.let { saveCopyLauncher.launch(copyName(it.title)) } }
+    SaveCopyResultEffect(ready?.saveCopyResult, onOpenDocument, annotationActions.onSaveCopyResultHandled)
     val search = ready?.search
     val selection = ready?.selection
     val copySelection = rememberCopyAction(selection?.text, onCopied = onClearSelection)
@@ -315,6 +340,7 @@ internal fun ReaderScreen(
                             onToggleBookmark = onToggleBookmark,
                             onGoToPage = { goToPageOpen = true },
                             onOpenSettings = { settingsOpen = true },
+                            onSaveCopy = { saveCopy() },
                         )
                     }
                 },
@@ -395,7 +421,17 @@ internal fun ReaderScreen(
             enter = fadeIn() + slideInVertically { -it },
             exit = fadeOut() + slideOutVertically { -it },
         ) {
-            topBar()
+            Column {
+                topBar()
+                val error = ready?.annotations?.saveError
+                if (error != null && error != SaveError.NeedsPassword) {
+                    SaveErrorBanner(
+                        error = error,
+                        onSaveCopy = { saveCopy() },
+                        onRetry = annotationActions.onRetrySave,
+                    )
+                }
+            }
         }
     }
 
@@ -588,6 +624,51 @@ private fun PagesDialog(ready: ReaderUiState.Ready, onSelect: (Int) -> Unit, onD
     }
 }
 
+/** Says why annotations aren't in the file, and offers a copy (or another try). */
+@Composable
+private fun SaveErrorBanner(error: SaveError, onSaveCopy: () -> Unit, onRetry: () -> Unit) {
+    Surface(color = MaterialTheme.colorScheme.secondaryContainer, modifier = Modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 16.dp, end = 8.dp)) {
+            Text(
+                text = stringResource(
+                    when (error) {
+                        SaveError.NoWritePermission -> R.string.save_error_no_permission
+                        SaveError.FileChanged -> R.string.save_error_file_changed
+                        else -> R.string.save_error_failed
+                    },
+                ),
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.weight(1f).padding(vertical = 12.dp),
+            )
+            if (error == SaveError.Failed) {
+                TextButton(onClick = onRetry) { Text(stringResource(R.string.save_retry)) }
+            } else {
+                TextButton(onClick = onSaveCopy) { Text(stringResource(R.string.reader_save_copy)) }
+            }
+        }
+    }
+}
+
+/** Opens a saved copy, or says the copy failed; then forgets the result. */
+@Composable
+private fun SaveCopyResultEffect(result: SaveCopyResult?, onOpenDocument: (String) -> Unit, onHandled: () -> Unit) {
+    val context = LocalContext.current
+    LaunchedEffect(result) {
+        when (result) {
+            null -> return@LaunchedEffect
+            is SaveCopyResult.Saved -> {
+                Toast.makeText(context, R.string.save_copy_done, Toast.LENGTH_SHORT).show()
+                onOpenDocument(result.uri)
+            }
+            SaveCopyResult.Failed -> Toast.makeText(context, R.string.save_error_failed, Toast.LENGTH_LONG).show()
+        }
+        onHandled()
+    }
+}
+
+/** "report.pdf" → "report (açıklamalı).pdf", the name offered for a copy. */
+private fun copyName(title: String) = "${title.removeSuffix(".pdf").removeSuffix(".PDF")} (açıklamalı).pdf"
+
 /**
  * Room the bars take at the top and bottom, whether or not they are showing,
  * so the pages keep their place when the bars hide.
@@ -663,6 +744,7 @@ private fun OverflowMenu(
     onToggleBookmark: () -> Unit,
     onGoToPage: () -> Unit,
     onOpenSettings: () -> Unit,
+    onSaveCopy: () -> Unit,
 ) {
     Box {
         IconButton(onClick = { onExpandedChange(true) }) {
@@ -693,6 +775,13 @@ private fun OverflowMenu(
                 onClick = {
                     onExpandedChange(false)
                     onGoToPage()
+                },
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.reader_save_copy)) },
+                onClick = {
+                    onExpandedChange(false)
+                    onSaveCopy()
                 },
             )
             DropdownMenuItem(

@@ -13,6 +13,7 @@ import com.mustafakoceerr.tilepdf.core.render.TiledPageImageSource
 import com.mustafakoceerr.tilepdf.core.geometry.PdfPoint
 import com.mustafakoceerr.tilepdf.data.annotation.AnnotationRepository
 import com.mustafakoceerr.tilepdf.data.annotation.AnnotationSaveScheduler
+import com.mustafakoceerr.tilepdf.data.annotation.SaveResult
 import com.mustafakoceerr.tilepdf.data.annotation.SessionPasswords
 import com.mustafakoceerr.tilepdf.data.bookmark.BookmarkRepository
 import com.mustafakoceerr.tilepdf.data.library.LibraryRepository
@@ -20,6 +21,7 @@ import com.mustafakoceerr.tilepdf.data.preferences.ReaderPreferencesRepository
 import com.mustafakoceerr.tilepdf.data.text.DocumentTextRepository
 import com.mustafakoceerr.tilepdf.di.ApplicationScope
 import com.mustafakoceerr.tilepdf.domain.OpenDocumentUseCase
+import com.mustafakoceerr.tilepdf.domain.SaveAsCopyUseCase
 import com.mustafakoceerr.tilepdf.domain.OutlineLocator
 import com.mustafakoceerr.tilepdf.domain.OpenedDocument
 import com.mustafakoceerr.tilepdf.feature.reader.annotation.AnnotationController
@@ -82,10 +84,20 @@ class ReaderViewModel @Inject constructor(
     private val annotationRepository: AnnotationRepository,
     private val saveScheduler: AnnotationSaveScheduler,
     private val sessionPasswords: SessionPasswords,
+    private val saveAsCopy: SaveAsCopyUseCase,
     @param:ApplicationScope private val applicationScope: CoroutineScope,
 ) : ViewModel() {
 
     private val uri = savedStateHandle.toRoute<ReaderRoute>().uri
+
+    /**
+     * What to open: the route's URI at first, then the URI it was opened as,
+     * possibly a private copy. Reopening a copy must not copy its source again.
+     */
+    private var documentUri = uri
+
+    /** The outcome of "Kopya olarak kaydet", until the screen has acted on it. */
+    private val saveCopyResult = MutableStateFlow<SaveCopyResult?>(null)
     private var openJob: Job? = null
 
     private val documentState = MutableStateFlow<DocumentState>(DocumentState.Loading)
@@ -120,11 +132,11 @@ class ReaderViewModel @Inject constructor(
         preferencesRepository.preferences,
         combine(searchState, toc, ::Pair),
         combine(selection, linkTargets, currentPage, fullScreen, startPosition, ::PageState),
-        combine(annotations, editing, ::Pair),
+        combine(annotations, editing, saveCopyResult, ::Triple),
     ) { document, preferences, searchAndToc, pageState, annotationUi ->
         val (search, toc) = searchAndToc
         val (selection, links, page, fullScreen, start) = pageState
-        val (annotations, editing) = annotationUi
+        val (annotations, editing, copyResult) = annotationUi
         when (document) {
             DocumentState.Loading -> ReaderUiState.Loading
             is DocumentState.Failed -> ReaderUiState.Error(document.reason)
@@ -146,6 +158,7 @@ class ReaderViewModel @Inject constructor(
                 isFullScreen = fullScreen,
                 annotations = annotations,
                 editing = editing,
+                saveCopyResult = copyResult,
             )
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ReaderUiState.Loading)
@@ -164,7 +177,8 @@ class ReaderViewModel @Inject constructor(
         documentState.value = DocumentState.Loading
         openJob = viewModelScope.launch {
             documentState.value = try {
-                val opened = openDocument(uri, password)
+                val opened = openDocument(documentUri, password)
+                documentUri = opened.uri
                 // Kept in memory so a background save can reopen the file.
                 if (password != null) sessionPasswords.remember(opened.uri, password)
                 loadOutline(opened.document)
@@ -203,6 +217,48 @@ class ReaderViewModel @Inject constructor(
             // Unreadable annotations leave editing off rather than the document closed.
             runCatchingCancellable { created.prepare(opened.document) }
         }
+        viewModelScope.launch {
+            created.fileSaved.collect { reopenAfterSave(state) }
+        }
+    }
+
+    /**
+     * A save wrote a new version of the file, so the open document is the old
+     * one: reopen at the same place. Positions of other apps' annotations may
+     * have shifted, and the undo history ends here.
+     */
+    private fun reopenAfterSave(old: DocumentState.Opened) {
+        if (documentState.value !== old) return
+        startPosition.value = position ?: old.opened.position
+        val document = old.opened.document
+        open(sessionPasswords.get(old.opened.uri))
+        document.close()
+        applicationScope.launch { documentTextRepository.release(document) }
+    }
+
+    /** The screen went to the background: save what's unsaved. */
+    fun onStop() {
+        controller.value?.requestSave()
+    }
+
+    /** Writes the annotated document into [target], a file the user picked, and opens it. */
+    fun onSaveCopy(target: String) {
+        val opened = (documentState.value as? DocumentState.Opened)?.opened ?: return
+        val controller = controller.value ?: return
+        viewModelScope.launch {
+            controller.flush()
+            val result = saveAsCopy(opened.uri, target, opened.displayName, opened.document.pageCount)
+            saveCopyResult.value = if (result is SaveResult.Saved) SaveCopyResult.Saved(result.uri) else SaveCopyResult.Failed
+        }
+    }
+
+    fun onSaveCopyResultHandled() {
+        saveCopyResult.value = null
+    }
+
+    /** Tries the background save again after it failed. */
+    fun onRetrySave() {
+        controller.value?.requestSave()
     }
 
     /**

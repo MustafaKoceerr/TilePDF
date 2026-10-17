@@ -118,6 +118,11 @@ class AnnotationController(
         }
     }
 
+    /** Returns once every edit made so far is in the draft, e.g. before saving a copy. */
+    suspend fun flush() {
+        writes.withLock { }
+    }
+
     fun close() {
         watch?.cancel()
     }
