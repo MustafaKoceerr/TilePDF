@@ -21,4 +21,9 @@
     <string name="library_more">More options</string>
     <string name="library_no_favorites">No favorites yet</string>
     <string name="library_no_results">No results</string>
+    <string name="library_language">Language</string>
+    <string name="library_cancel">Cancel</string>
+    <string name="language_system">System default</string>
+    <string name="language_english" translatable="false">English</string>
+    <string name="language_turkish" translatable="false">Türkçe</string>
 </resources>

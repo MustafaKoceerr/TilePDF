@@ -21,4 +21,7 @@
     <string name="library_more">Diğer seçenekler</string>
     <string name="library_no_favorites">Henüz favori yok</string>
     <string name="library_no_results">Sonuç yok</string>
+    <string name="library_language">Dil</string>
+    <string name="library_cancel">İptal</string>
+    <string name="language_system">Sistem varsayılanı</string>
 </resources>

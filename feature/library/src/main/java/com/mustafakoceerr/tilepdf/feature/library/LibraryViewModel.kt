@@ -4,8 +4,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mustafakoceerr.tilepdf.data.document.DocumentRepository
 import com.mustafakoceerr.tilepdf.data.library.LibraryRepository
+import com.mustafakoceerr.tilepdf.data.preferences.AppLanguageRepository
 import com.mustafakoceerr.tilepdf.data.preferences.LibraryPreferencesRepository
 import com.mustafakoceerr.tilepdf.di.ApplicationScope
+import com.mustafakoceerr.tilepdf.model.AppLanguage
 import com.mustafakoceerr.tilepdf.model.LibrarySort
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineScope
@@ -23,6 +25,7 @@ class LibraryViewModel @Inject constructor(
     private val libraryRepository: LibraryRepository,
     private val documentRepository: DocumentRepository,
     private val libraryPreferences: LibraryPreferencesRepository,
+    private val appLanguage: AppLanguageRepository,
     @param:ApplicationScope private val applicationScope: CoroutineScope,
 ) : ViewModel() {
 
@@ -33,12 +36,16 @@ class LibraryViewModel @Inject constructor(
     /** The document removed last, hidden until its undo window ends. */
     private val pendingRemoval = MutableStateFlow<String?>(null)
 
+    /** Read once: choosing another language recreates the screen anyway. */
+    private val language = MutableStateFlow(appLanguage.current())
+
     val uiState: StateFlow<LibraryUiState> = combine(
         libraryRepository.observeDocuments(),
         libraryPreferences.sort,
         combine(query, searching, filter, ::Triple),
         pendingRemoval,
-    ) { documents, sort, (query, searching, filter), pending ->
+        language,
+    ) { documents, sort, (query, searching, filter), pending, language ->
         val accessible = documentRepository.accessibleUris()
         LibraryUiState.Success(
             items = libraryRows(documents, accessible, query, filter, sort, hidden = setOfNotNull(pending)),
@@ -48,6 +55,7 @@ class LibraryViewModel @Inject constructor(
             sort = sort,
             hasDocuments = documents.any { it.uri != pending },
             pendingRemoval = pending,
+            language = language,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -79,6 +87,11 @@ class LibraryViewModel @Inject constructor(
 
     fun onSortSelected(sort: LibrarySort) {
         viewModelScope.launch { libraryPreferences.setSort(sort) }
+    }
+
+    fun onLanguageSelected(selected: AppLanguage) {
+        language.value = selected
+        appLanguage.set(selected)
     }
 
     fun onToggleFavorite(uri: String) {
