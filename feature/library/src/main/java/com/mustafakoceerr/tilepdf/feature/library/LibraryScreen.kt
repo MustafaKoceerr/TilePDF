@@ -12,8 +12,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
@@ -72,6 +73,9 @@ import com.mustafakoceerr.tilepdf.model.ReadingPosition
 import com.mustafakoceerr.tilepdf.ui.theme.TilePDFTheme
 
 private const val PDF_MIME_TYPE = "application/pdf"
+
+/** A library row needs about this much width; wider screens get more columns. */
+private val MinRowWidth = 360.dp
 
 @Composable
 fun LibraryScreen(
@@ -331,7 +335,8 @@ private fun EmptyText(@StringRes text: Int, modifier: Modifier = Modifier) {
 
 @Composable
 private fun DocumentList(items: List<LibraryItem>, actions: LibraryActions) {
-    LazyColumn(Modifier.fillMaxSize()) {
+    // One column on phones; wide screens fit several rows side by side.
+    LazyVerticalGrid(columns = GridCells.Adaptive(MinRowWidth), modifier = Modifier.fillMaxSize()) {
         items(items, key = { it.document.uri }) { item ->
             val document = item.document
             ListItem(

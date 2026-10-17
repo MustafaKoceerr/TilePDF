@@ -2,9 +2,11 @@ package com.mustafakoceerr.tilepdf.feature.reader.components
 
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
@@ -29,7 +31,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -92,16 +93,19 @@ internal fun TableOfContentsPanel(
         TocContent(
             outline, currentIndex, bookmarks, onSelect, onSelectPage, annotations, onSelectAnnotation, onDeleteAnnotation,
             modifier = Modifier.statusBarsPadding().navigationBarsPadding(),
-            trailing = {
-                IconButton(onClick = onClose) {
-                    Icon(painterResource(TilePdfIcons.Close), contentDescription = stringResource(R.string.reader_toc_close))
+            header = {
+                // Its own row: beside the tabs it would squeeze "Annotations" onto two lines.
+                Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
+                    IconButton(onClick = onClose) {
+                        Icon(painterResource(TilePdfIcons.Close), contentDescription = stringResource(R.string.reader_toc_close))
+                    }
                 }
             },
         )
     }
 }
 
-/** Tabs for contents, bookmarks and annotations, with [trailing] beside them. */
+/** Tabs for contents, bookmarks and annotations, with [header] above them. */
 @Composable
 private fun TocContent(
     outline: List<OutlineEntry>,
@@ -113,30 +117,28 @@ private fun TocContent(
     onSelectAnnotation: (AnnotationListItem) -> Unit,
     onDeleteAnnotation: (AnnotationTarget) -> Unit,
     modifier: Modifier = Modifier,
-    trailing: (@Composable () -> Unit)? = null,
+    header: (@Composable () -> Unit)? = null,
 ) {
     // Documents without an outline open straight on their bookmarks.
     var tab by rememberSaveable { mutableIntStateOf(if (outline.isEmpty()) BOOKMARKS_TAB else CONTENTS_TAB) }
     Column(modifier) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            PrimaryTabRow(selectedTabIndex = tab, modifier = Modifier.weight(1f)) {
-                Tab(
-                    selected = tab == CONTENTS_TAB,
-                    onClick = { tab = CONTENTS_TAB },
-                    text = { Text(stringResource(R.string.reader_toc)) },
-                )
-                Tab(
-                    selected = tab == BOOKMARKS_TAB,
-                    onClick = { tab = BOOKMARKS_TAB },
-                    text = { Text(stringResource(R.string.reader_bookmarks)) },
-                )
-                Tab(
-                    selected = tab == ANNOTATIONS_TAB,
-                    onClick = { tab = ANNOTATIONS_TAB },
-                    text = { Text(stringResource(R.string.reader_annotations)) },
-                )
-            }
-            trailing?.invoke()
+        header?.invoke()
+        PrimaryTabRow(selectedTabIndex = tab) {
+            Tab(
+                selected = tab == CONTENTS_TAB,
+                onClick = { tab = CONTENTS_TAB },
+                text = { Text(stringResource(R.string.reader_toc)) },
+            )
+            Tab(
+                selected = tab == BOOKMARKS_TAB,
+                onClick = { tab = BOOKMARKS_TAB },
+                text = { Text(stringResource(R.string.reader_bookmarks)) },
+            )
+            Tab(
+                selected = tab == ANNOTATIONS_TAB,
+                onClick = { tab = ANNOTATIONS_TAB },
+                text = { Text(stringResource(R.string.reader_annotations)) },
+            )
         }
         when (tab) {
             CONTENTS_TAB -> OutlineList(outline, currentIndex, onSelect)

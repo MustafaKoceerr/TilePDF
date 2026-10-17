@@ -54,6 +54,10 @@ minSdk 29
   file that can't be written is offered as an annotated copy
 - Tap a page to hide the top bar and system bars for full-screen reading;
   the pages don't move (with TalkBack on, the bars stay)
+- Large screens: on tablets and unfolded foldables (at least 840 dp wide
+  and 480 dp tall) contents, bookmarks and annotations open in a panel
+  beside the pages that stays open while reading; a phone in landscape
+  keeps the bottom sheet. The library flows into columns on wide screens
 - English and Turkish: follows the device, or pick a language in the
   library's menu (also in Android 13+ app settings)
 - Accessible: every control has its own TalkBack label (colours by name,
