@@ -23,6 +23,7 @@ class FakeLazyListLayoutInfo(
     override val visibleItemsInfo: List<LazyListItemInfo>,
     override val viewportSize: IntSize = IntSize(1000, 2000),
     override val beforeContentPadding: Int = 0,
+    override val afterContentPadding: Int = 0,
     override val mainAxisItemSpacing: Int = 0,
     override val totalItemsCount: Int = 100,
 ) : LazyListLayoutInfo {
@@ -30,5 +31,4 @@ class FakeLazyListLayoutInfo(
     override val viewportEndOffset: Int get() = viewportSize.height - beforeContentPadding
     override val orientation: Orientation get() = Orientation.Vertical
     override val reverseLayout: Boolean get() = false
-    override val afterContentPadding: Int get() = 0
 }
