@@ -1,3 +1,6 @@
+import com.mustafakoceerr.tilepdf.ReleaseSigning
+import com.mustafakoceerr.tilepdf.releaseSigning
+
 plugins {
     alias(libs.plugins.tilepdf.android.application)
     alias(libs.plugins.tilepdf.android.application.compose)
@@ -19,6 +22,19 @@ android {
         localeFilters += listOf("en", "tr")
     }
 
+    // The Play upload key comes only from the environment; see docs/RELEASING.md.
+    val signing = releaseSigning { name -> providers.environmentVariable(name).orNull }
+    when (signing) {
+        is ReleaseSigning.Configured -> signingConfigs.create("release") {
+            storeFile = file(signing.storeFile)
+            storePassword = signing.storePassword
+            keyAlias = signing.keyAlias
+            keyPassword = signing.keyPassword
+        }
+        is ReleaseSigning.Incomplete -> throw GradleException(signing.message)
+        ReleaseSigning.Unsigned -> logger.warn("TilePDF: no upload key in the environment; release builds are unsigned.")
+    }
+
     buildTypes {
         release {
             optimization {
@@ -27,10 +43,12 @@ android {
                     files.add(file("proguard-rules.pro"))
                 }
             }
-            // Local checks of the shrunk build only (-Ptilepdf.signReleaseWithDebug=true);
-            // a build for Play is signed with the upload key.
-            if (providers.gradleProperty("tilepdf.signReleaseWithDebug").orNull == "true") {
-                signingConfig = signingConfigs.getByName("debug")
+            signingConfig = when {
+                signing is ReleaseSigning.Configured -> signingConfigs.getByName("release")
+                // Local checks of the shrunk build only (-Ptilepdf.signReleaseWithDebug=true);
+                // never in place of the upload key.
+                providers.gradleProperty("tilepdf.signReleaseWithDebug").orNull == "true" -> signingConfigs.getByName("debug")
+                else -> null
             }
         }
     }
