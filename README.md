@@ -62,10 +62,13 @@ feature:library      Screen (stateful → stateless) · ViewModel · UiState
 feature:reader         state flows up as StateFlow<UiState>; events go down as calls
    ▼
 core:domain          OpenDocumentUseCase — open + record in library + restore position
+                     AnnotationHistory (undo/redo), SaveAsCopyUseCase, ResumePendingSavesUseCase
    ▼
 core:data            Repositories behind interfaces
                        DocumentRepository     SAF access, persisted grants
                        LibraryRepository      Room
+                       AnnotationRepository   annotation drafts in Room
+                     AnnotationSaver + SaveAnnotationsWorker (WorkManager)
                        ReaderPreferences      DataStore
                        DocumentTextRepository page text cache for search/selection
                      TextSearcher, TextSelection
@@ -127,6 +130,37 @@ instead of 1650 ms. A loaded page also keeps its decoded images (about 29 MB
 for a scanned page), so the cache stays at two pages and is emptied whenever
 the reader trims memory. `PdfDocument` and `PdfEngine` are interfaces, so data and ViewModel code
 is tested with fakes.
+
+## Saving annotations
+
+Every annotation edit goes into a Room draft first: one row per document with
+TilePDF's full annotation list, the other apps' annotations the user deleted,
+a `dirty` flag, and the size and last-modified time of the file the draft is
+based on. A crash loses nothing but the undo history, which lives only in
+memory (`AnnotationHistory`) and is cleared after each save.
+
+When a document closes or the app goes to the background, `SaveAnnotationsWorker`
+runs `AnnotationSaver`, one save at a time per document:
+
+1. If the file's stamp no longer matches the draft, another app changed it:
+   nothing is written (`FileChanged`).
+2. PDFium opens the file for editing, applies the difference to the draft, and
+   saves incrementally into a temp file in the cache.
+3. The temp file is reopened and must hold exactly the draft's annotations;
+   otherwise the original isn't touched (`Failed`).
+4. The temp file overwrites the document through SAF (`"wt"`, or `"w"` for
+   providers that reject it, which is safe because an incremental save never
+   shrinks the file). This step can't be cancelled.
+5. The draft is marked saved, unless the user edited meanwhile. Deletions
+   addressed by position (`#index`) are dropped once saved, because positions
+   shift.
+
+Without write access the draft is kept (`NoWritePermission`) and
+`SaveAsCopyUseCase` can write a copy instead, which then takes over the draft.
+Passwords of encrypted PDFs stay in memory for the life of the process
+(`SessionPasswords`). They are never written anywhere, so a save that finds no
+password waits (`NeedsPassword`) until the document is opened again. Drafts a
+killed process left unsaved are saved at the next start.
 
 ## Rendering pipeline
 
@@ -217,7 +251,8 @@ the one PDF thread.
                                        # mapping, table-of-contents lookup
 ./gradlew connectedDebugAndroidTest    # device: PDFium open/render/text/
                                        # outline/annotations, tiles, pool,
-                                       # Room migration
+                                       # Room migration and drafts, saving,
+                                       # save worker
 ```
 
 Instrumented tests to note:
