@@ -27,11 +27,13 @@ import com.mustafakoceerr.tilepdf.feature.reader.annotation.AnnotationEditing
 import com.mustafakoceerr.tilepdf.feature.reader.annotation.AnnotationTarget
 import com.mustafakoceerr.tilepdf.feature.reader.annotation.AnnotationTool
 import com.mustafakoceerr.tilepdf.feature.reader.annotation.AnnotationsUiState
+import com.mustafakoceerr.tilepdf.feature.reader.annotation.Erased
 import com.mustafakoceerr.tilepdf.feature.reader.annotation.NoteEditor
 import com.mustafakoceerr.tilepdf.feature.reader.annotation.annotationAt
 import com.mustafakoceerr.tilepdf.feature.reader.annotation.markupFor
 import com.mustafakoceerr.tilepdf.feature.reader.components.PageJump
 import com.mustafakoceerr.tilepdf.feature.reader.navigation.ReaderRoute
+import com.mustafakoceerr.tilepdf.model.Ink
 import com.mustafakoceerr.tilepdf.model.MarkupKind
 import com.mustafakoceerr.tilepdf.model.Note
 import com.mustafakoceerr.tilepdf.model.PageText
@@ -362,6 +364,44 @@ class ReaderViewModel @Inject constructor(
 
     fun onUndo() {
         controller.value?.undo()
+    }
+
+    /** Shows or hides the annotation toolbar; hiding it goes back to reading. */
+    fun onToggleAnnotating() = editing.update {
+        if (it.annotating) AnnotationEditing() else it.copy(annotating = true, tool = AnnotationTool.Select)
+    }
+
+    fun onToolSelected(tool: AnnotationTool) {
+        // The pen and eraser need both hands free of a selection.
+        if (tool == AnnotationTool.Pen || tool == AnnotationTool.Eraser) selection.value = null
+        editing.update { it.copy(tool = tool) }
+    }
+
+    fun onMarkupColorSelected(color: Int) {
+        viewModelScope.launch { preferencesRepository.setMarkupColor(color) }
+    }
+
+    fun onPenColorSelected(color: Int) {
+        viewModelScope.launch { preferencesRepository.setPenColor(color) }
+    }
+
+    fun onPenWidthSelected(widthPt: Float) {
+        viewModelScope.launch { preferencesRepository.setPenWidth(widthPt) }
+    }
+
+    /** A finished pen stroke on [pageIndex], in top-left points. */
+    fun onInkStroke(pageIndex: Int, points: List<PdfPoint>) {
+        if (points.isEmpty()) return
+        val controller = controller.value?.takeIf { it.state.value.ready } ?: return
+        viewModelScope.launch {
+            val preferences = preferencesRepository.preferences.first()
+            controller.add(Ink(newAnnotationId(), pageIndex, preferences.penColor, preferences.penWidthPt, listOf(points)))
+        }
+    }
+
+    /** Everything one eraser gesture crossed, removed as one undo step. */
+    fun onErase(erased: Erased) {
+        controller.value?.removeAll(erased.ids, erased.refs)
     }
 
     fun onRedo() {

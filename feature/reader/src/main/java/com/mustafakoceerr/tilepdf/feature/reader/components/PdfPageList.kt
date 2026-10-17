@@ -25,6 +25,7 @@ import com.mustafakoceerr.tilepdf.core.pdf.PageSize
 import com.mustafakoceerr.tilepdf.core.render.PageImageSource
 import com.mustafakoceerr.tilepdf.feature.reader.SelectionActions
 import com.mustafakoceerr.tilepdf.feature.reader.SelectionUiState
+import com.mustafakoceerr.tilepdf.feature.reader.annotation.PageDrawing
 import com.mustafakoceerr.tilepdf.model.Annotation
 import com.mustafakoceerr.tilepdf.model.PageTheme
 import com.mustafakoceerr.tilepdf.model.ReadingPosition
@@ -57,6 +58,8 @@ internal fun PdfPageList(
     modifier: Modifier = Modifier,
     /** TilePDF's annotations by page. */
     annotations: Map<Int, List<Annotation>> = emptyMap(),
+    /** Each page's pen or eraser input; null when neither is active. */
+    drawingFor: ((pageIndex: Int) -> PageDrawing)? = null,
 ) {
     val matchesByPage = remember(matches) { matches.groupBy { it.pageIndex } }
 
@@ -109,6 +112,8 @@ internal fun PdfPageList(
 
         LazyColumn(
             state = listState,
+            // One finger draws: the list only scrolls with two (pinch-pan).
+            userScrollEnabled = drawingFor == null,
             modifier = Modifier
                 .fillMaxSize()
                 .zoomable(
@@ -124,6 +129,7 @@ internal fun PdfPageList(
                         pagePointAt(position, listState, zoomState, pageSizes, density)
                             ?.let { (page, x, y) -> selectionActions.onLongPress(page, x, y) }
                     },
+                    drawing = drawingFor != null,
                 ),
             // Horizontal padding scales with zoom so the whole content grows
             // proportionally; otherwise page heights would grow by a slightly
@@ -148,6 +154,7 @@ internal fun PdfPageList(
                     selection = selection?.takeIf { it.pageIndex == pageIndex },
                     selectionActions = selectionActions,
                     annotations = annotations[pageIndex].orEmpty(),
+                    drawing = drawingFor?.invoke(pageIndex),
                 )
             }
         }

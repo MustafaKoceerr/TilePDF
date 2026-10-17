@@ -15,6 +15,7 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
@@ -70,7 +71,13 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mustafakoceerr.tilepdf.core.designsystem.TilePdfIcons
+import com.mustafakoceerr.tilepdf.core.geometry.PdfPoint
 import com.mustafakoceerr.tilepdf.feature.reader.annotation.AnnotationMenuDialog
+import com.mustafakoceerr.tilepdf.feature.reader.annotation.AnnotationTool
+import com.mustafakoceerr.tilepdf.feature.reader.annotation.AnnotationToolbar
+import com.mustafakoceerr.tilepdf.feature.reader.annotation.Erased
+import com.mustafakoceerr.tilepdf.feature.reader.annotation.PageDrawing
+import com.mustafakoceerr.tilepdf.feature.reader.annotation.ToolbarState
 import com.mustafakoceerr.tilepdf.feature.reader.annotation.AnnotationTarget
 import com.mustafakoceerr.tilepdf.feature.reader.annotation.NoteDialog
 import com.mustafakoceerr.tilepdf.feature.reader.annotation.SelectionMarkupBar
@@ -133,6 +140,13 @@ fun ReaderScreen(
             onNoteDismissed = viewModel::onNoteDismissed,
             onUndo = viewModel::onUndo,
             onRedo = viewModel::onRedo,
+            onToggleAnnotating = viewModel::onToggleAnnotating,
+            onTool = viewModel::onToolSelected,
+            onMarkupColor = viewModel::onMarkupColorSelected,
+            onPenColor = viewModel::onPenColorSelected,
+            onPenWidth = viewModel::onPenWidthSelected,
+            onInkStroke = viewModel::onInkStroke,
+            onErase = viewModel::onErase,
         ),
     )
 }
@@ -157,6 +171,13 @@ internal class AnnotationActions(
     val onNoteDismissed: () -> Unit,
     val onUndo: () -> Unit,
     val onRedo: () -> Unit,
+    val onToggleAnnotating: () -> Unit = {},
+    val onTool: (AnnotationTool) -> Unit = {},
+    val onMarkupColor: (Int) -> Unit = {},
+    val onPenColor: (Int) -> Unit = {},
+    val onPenWidth: (Float) -> Unit = {},
+    val onInkStroke: (pageIndex: Int, List<PdfPoint>) -> Unit = { _, _ -> },
+    val onErase: (Erased) -> Unit = {},
 ) {
     companion object {
         val None = AnnotationActions({}, {}, {}, {}, {}, {}, {}, {}, {})
@@ -265,6 +286,14 @@ internal fun ReaderScreen(
                             )
                         }
                         // Always there: it also holds the bookmarks.
+                        if (ready.annotations.ready) {
+                            IconButton(onClick = annotationActions.onToggleAnnotating) {
+                                Icon(
+                                    painter = painterResource(TilePdfIcons.Edit),
+                                    contentDescription = stringResource(R.string.reader_annotate),
+                                )
+                            }
+                        }
                         IconButton(onClick = onOpenToc) {
                             Icon(
                                 painter = painterResource(TilePdfIcons.Toc),
@@ -322,6 +351,7 @@ internal fun ReaderScreen(
                         onPositionChanged = onPositionChanged,
                         onTapPage = onTapPage,
                         onTapOutsidePage = onTapOutsidePage,
+                        annotationActions = annotationActions,
                         selectionActions = SelectionActions(
                             onLongPress = onLongPress,
                             onDragHandle = onDragSelectionHandle,
@@ -333,12 +363,29 @@ internal fun ReaderScreen(
                 }
             }
         }
-        if (selection != null) {
-            SelectionMarkupBar(
-                enabled = ready.annotations.ready,
-                onMarkup = annotationActions.onMarkup,
-                modifier = Modifier.align(Alignment.BottomCenter),
-            )
+        Column(Modifier.align(Alignment.BottomCenter)) {
+            if (selection != null) {
+                SelectionMarkupBar(enabled = ready.annotations.ready, onMarkup = annotationActions.onMarkup)
+            }
+            if (ready != null && ready.editing.annotating) {
+                AnnotationToolbar(
+                    state = ToolbarState(
+                        tool = ready.editing.tool,
+                        markupColor = ready.preferences.markupColor,
+                        penColor = ready.preferences.penColor,
+                        penWidthPt = ready.preferences.penWidthPt,
+                        canUndo = ready.annotations.canUndo,
+                        canRedo = ready.annotations.canRedo,
+                    ),
+                    onTool = annotationActions.onTool,
+                    onMarkupColor = annotationActions.onMarkupColor,
+                    onPenColor = annotationActions.onPenColor,
+                    onPenWidth = annotationActions.onPenWidth,
+                    onUndo = annotationActions.onUndo,
+                    onRedo = annotationActions.onRedo,
+                    onDone = annotationActions.onToggleAnnotating,
+                )
+            }
         }
         // Over the pages, not above them: hiding it doesn't move the pages.
         AnimatedVisibility(
@@ -424,9 +471,26 @@ private fun ReaderPages(
     onPositionChanged: (ReadingPosition) -> Unit,
     onTapPage: (pageIndex: Int, x: Float, y: Float) -> Unit,
     onTapOutsidePage: () -> Unit,
+    annotationActions: AnnotationActions,
     selectionActions: SelectionActions,
 ) {
     val annotations = ready.annotations.own.groupBy { it.pageIndex }
+    val drawingFor: ((Int) -> PageDrawing)? = if (ready.editing.drawing) {
+        val foreign = ready.annotations.foreign.groupBy { it.pageIndex }
+        val preferences = ready.preferences
+        { page ->
+            PageDrawing(
+                tool = ready.editing.tool,
+                penColor = preferences.penColor,
+                penWidthPt = preferences.penWidthPt,
+                foreign = foreign[page].orEmpty(),
+                onStroke = { annotationActions.onInkStroke(page, it) },
+                onErase = annotationActions.onErase,
+            )
+        }
+    } else {
+        null
+    }
     when (ready.preferences.readingMode) {
         ReadingMode.Vertical -> PdfPageList(
             pageSizes = ready.pageSizes,
@@ -446,6 +510,7 @@ private fun ReaderPages(
             selection = ready.selection,
             selectionActions = selectionActions,
             annotations = annotations,
+            drawingFor = drawingFor,
         )
         ReadingMode.Horizontal -> PdfPagePager(
             pageSizes = ready.pageSizes,
@@ -465,6 +530,7 @@ private fun ReaderPages(
             selection = ready.selection,
             selectionActions = selectionActions,
             annotations = annotations,
+            drawingFor = drawingFor,
         )
     }
 }
