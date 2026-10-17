@@ -44,7 +44,7 @@ class Pdfium @Inject constructor(
             val size = fileDescriptor.statSize
             if (size <= 0) throw PdfCorruptException("Empty or unsized file")
             val error = IntArray(1)
-            val handle = openedHandle(PdfiumNative.nativeOpen(fileDescriptor.fd, size, password, error), error[0], password)
+            val handle = openedHandle(PdfiumNative.nativeOpen(fileDescriptor.fd, size, password, true, error), error[0], password)
             val pageSizes = try {
                 List(PdfiumNative.nativePageCount(handle)) { index -> pageSize(handle, index) }
             } catch (e: Exception) {

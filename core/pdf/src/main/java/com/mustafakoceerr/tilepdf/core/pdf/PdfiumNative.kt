@@ -21,9 +21,11 @@ internal object PdfiumNative {
      * Opens the PDF readable through [fd] (which must stay open until the
      * document is closed). Returns a non-zero handle, or 0 with PDFium's error
      * code in `error[0]`. Handles may be negative: arm64 tags heap pointers.
+     * With [hideOwn], TilePDF's annotations are hidden as pages load; such a
+     * document must never be saved.
      */
     @JvmStatic
-    external fun nativeOpen(fd: Int, size: Long, password: String?, error: IntArray): Long
+    external fun nativeOpen(fd: Int, size: Long, password: String?, hideOwn: Boolean, error: IntArray): Long
 
     @JvmStatic
     external fun nativeCloseDocument(document: Long)
@@ -93,6 +95,17 @@ internal object PdfiumNative {
     /** The URI of the link at top-left ([x], [y]) on page [index], or null. */
     @JvmStatic
     external fun nativeLinkUriAt(document: Long, index: Int, x: Float, y: Float): String?
+
+    /**
+     * Every annotation on page [index] (null elements couldn't be read), or
+     * null if the page can't be loaded.
+     */
+    @JvmStatic
+    external fun nativePageAnnotations(document: Long, index: Int): Array<NativeAnnotation?>?
+
+    /** Hides or shows the foreign annotation with [key] in memory; false if there is none. */
+    @JvmStatic
+    external fun nativeSetForeignHidden(document: Long, index: Int, key: String, hidden: Boolean): Boolean
 
     /** PDFium's `FPDF_ERR_PASSWORD`. */
     const val ERROR_PASSWORD = 4

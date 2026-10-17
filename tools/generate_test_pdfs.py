@@ -269,7 +269,7 @@ def annotated():
         "<< /Type /Annot /Subtype /Popup /Parent 6 0 R /Rect [300 700 500 800] /Open false >>",
         "<< /Type /Annot /Subtype /Square /F 4 /C [0 0 1] /BS << /W 2 >> /Rect [300 300 400 400] "
         "/AP << /N 11 0 R >> >>",
-        "<< /Type /Annot /Subtype /Ink /NM (tilepdf-fixture-ink) /F 4 /C [1 0 0] /BS << /W 2 >> "
+        "<< /Type /Annot /Subtype /Ink /NM (tilepdf-fixture-ink) /F 4 /C [1 0 0] /Border [0 0 2] "
         "/InkList [[100 500 200 500 200 400]] /Rect [99 399 201 501] /AP << /N 12 0 R >> >>",
         form("72 736 260 760", "/GS gs 1 1 0 rg 72 736 188 24 re f",
              " /Resources << /ExtGState << /GS << /BM /Multiply >> >> >>"),

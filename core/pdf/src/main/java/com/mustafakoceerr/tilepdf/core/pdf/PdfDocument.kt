@@ -3,6 +3,7 @@ package com.mustafakoceerr.tilepdf.core.pdf
 import android.graphics.Bitmap
 import android.graphics.Matrix
 import com.mustafakoceerr.tilepdf.model.OutlineEntry
+import com.mustafakoceerr.tilepdf.model.PageAnnotations
 import com.mustafakoceerr.tilepdf.model.PageText
 import java.io.Closeable
 
@@ -29,6 +30,18 @@ interface PdfDocument : Closeable {
 
     /** The table of contents, flattened depth first; empty if there is none. */
     suspend fun outline(): List<OutlineEntry>
+
+    /**
+     * TilePDF's and other apps' annotations on [pageIndex]. TilePDF's are not
+     * drawn by [render]: the reader draws them itself.
+     */
+    suspend fun annotations(pageIndex: Int): PageAnnotations
+
+    /**
+     * Leaves the foreign annotation [key] out of later renders, or brings it
+     * back. Only in memory: the file is not changed.
+     */
+    suspend fun setForeignHidden(pageIndex: Int, key: String, hidden: Boolean)
 
     /** The link at top-left point ([x], [y]) on [pageIndex], if any. */
     suspend fun linkAt(pageIndex: Int, x: Float, y: Float): PdfLink?

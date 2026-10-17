@@ -6,6 +6,7 @@ import com.mustafakoceerr.tilepdf.core.geometry.PdfRect
 import com.mustafakoceerr.tilepdf.core.pdf.PageSize
 import com.mustafakoceerr.tilepdf.core.pdf.PdfDocument
 import com.mustafakoceerr.tilepdf.model.OutlineEntry
+import com.mustafakoceerr.tilepdf.model.PageAnnotations
 import com.mustafakoceerr.tilepdf.model.PageText
 
 /** A document whose pages hold [pages]; char `i` of a page sits at x = i. */
@@ -36,6 +37,8 @@ class FakePdfDocument(private val pages: List<String>) : PdfDocument {
 
     override suspend fun trimMemory() = Unit
     override suspend fun linkAt(pageIndex: Int, x: Float, y: Float): com.mustafakoceerr.tilepdf.core.pdf.PdfLink? = null
+    override suspend fun annotations(pageIndex: Int) = PageAnnotations(emptyList(), emptyList())
+    override suspend fun setForeignHidden(pageIndex: Int, key: String, hidden: Boolean) = Unit
 
     override fun close() {
         closed = true

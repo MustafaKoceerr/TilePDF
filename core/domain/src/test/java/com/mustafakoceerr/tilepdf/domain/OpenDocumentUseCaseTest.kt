@@ -138,6 +138,9 @@ class OpenDocumentUseCaseTest {
         override suspend fun outline(): List<OutlineEntry> = error("unused")
         override suspend fun trimMemory() = Unit
         override suspend fun linkAt(pageIndex: Int, x: Float, y: Float): com.mustafakoceerr.tilepdf.core.pdf.PdfLink? = null
+        override suspend fun annotations(pageIndex: Int) =
+            com.mustafakoceerr.tilepdf.model.PageAnnotations(emptyList(), emptyList())
+        override suspend fun setForeignHidden(pageIndex: Int, key: String, hidden: Boolean) = Unit
         override fun close() {
             closed = true
         }

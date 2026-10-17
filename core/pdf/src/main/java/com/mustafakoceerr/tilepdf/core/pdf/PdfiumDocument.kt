@@ -6,6 +6,7 @@ import android.os.ParcelFileDescriptor
 import androidx.annotation.VisibleForTesting
 import com.mustafakoceerr.tilepdf.core.geometry.PdfRect
 import com.mustafakoceerr.tilepdf.model.OutlineEntry
+import com.mustafakoceerr.tilepdf.model.PageAnnotations
 import com.mustafakoceerr.tilepdf.model.PageText
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -135,6 +136,16 @@ class PdfiumDocument internal constructor(
         } else {
             PdfiumNative.nativeLinkUriAt(handle, pageIndex, x, y)?.let(PdfLink::Uri)
         }
+    }
+
+    override suspend fun annotations(pageIndex: Int): PageAnnotations {
+        val natives = withDocument(pageIndex) { PdfiumNative.nativePageAnnotations(it, pageIndex) }
+            ?: return PageAnnotations(emptyList(), emptyList())
+        return toPageAnnotations(pageIndex, natives.filterNotNull().toTypedArray())
+    }
+
+    override suspend fun setForeignHidden(pageIndex: Int, key: String, hidden: Boolean) {
+        withDocument(pageIndex) { PdfiumNative.nativeSetForeignHidden(it, pageIndex, key, hidden) }
     }
 
     override suspend fun trimMemory() {
