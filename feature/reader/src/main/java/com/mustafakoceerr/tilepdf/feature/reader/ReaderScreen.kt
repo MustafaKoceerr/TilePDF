@@ -92,6 +92,7 @@ import com.mustafakoceerr.tilepdf.feature.reader.annotation.AnnotationTarget
 import com.mustafakoceerr.tilepdf.feature.reader.annotation.NoteDialog
 import com.mustafakoceerr.tilepdf.feature.reader.annotation.SelectionMarkupBar
 import com.mustafakoceerr.tilepdf.feature.reader.components.ReaderErrorContent
+import com.mustafakoceerr.tilepdf.feature.reader.components.rememberTouchExplorationEnabled
 import com.mustafakoceerr.tilepdf.feature.reader.components.PageJump
 import com.mustafakoceerr.tilepdf.feature.reader.components.PasswordDialog
 import com.mustafakoceerr.tilepdf.feature.reader.components.PdfPageList
@@ -278,7 +279,8 @@ internal fun ReaderScreen(
     BackHandler(enabled = search?.isActive == true, onBack = searchActions.onClose)
     KeepScreenOnEffect(ready?.preferences?.keepScreenOn == true)
 
-    val fullScreen = ready?.isFullScreen == true
+    // A TalkBack user can't find bars hidden by a tap, so they stay.
+    val fullScreen = ready?.isFullScreen == true && !rememberTouchExplorationEnabled()
     SystemBarsEffect(hidden = fullScreen)
 
     val topBar: @Composable () -> Unit = {

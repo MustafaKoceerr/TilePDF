@@ -18,7 +18,8 @@ internal fun openFailureFor(error: Throwable): OpenFailure? = when (error) {
     // Before IOException: the password error is one.
     is PdfPasswordException -> OpenFailure.NeedsPassword(error.wrongPassword)
     is FileNotFoundException -> OpenFailure.Failed(ReaderError.NotFound)
-    // A revoked SAF grant: the file is likely still there.
+    // A revoked SAF grant. Deleting a document revokes its grants too, so the
+    // file may also be gone; the copy says both.
     is SecurityException -> OpenFailure.Failed(ReaderError.PermissionLost)
     is IOException -> OpenFailure.Failed(ReaderError.Corrupt)
     // A huge page or document; trying again after other apps close may work.

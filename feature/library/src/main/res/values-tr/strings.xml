@@ -24,4 +24,5 @@
     <string name="library_language">Dil</string>
     <string name="library_cancel">İptal</string>
     <string name="language_system">Sistem varsayılanı</string>
+    <string name="library_row_options">%1$s seçenekleri</string>
 </resources>

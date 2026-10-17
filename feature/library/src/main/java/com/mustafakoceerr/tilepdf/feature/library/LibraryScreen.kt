@@ -353,7 +353,7 @@ private fun DocumentList(items: List<LibraryItem>, actions: LibraryActions) {
                                 ),
                             )
                         }
-                        RowMenu(onRemove = { actions.onRemove(document.uri) })
+                        RowMenu(document.displayName, onRemove = { actions.onRemove(document.uri) })
                     }
                 },
                 modifier = Modifier.clickable { actions.onOpenDocument(document.uri) },
@@ -363,11 +363,11 @@ private fun DocumentList(items: List<LibraryItem>, actions: LibraryActions) {
 }
 
 @Composable
-private fun RowMenu(onRemove: () -> Unit) {
+private fun RowMenu(documentName: String, onRemove: () -> Unit) {
     var open by remember { mutableStateOf(false) }
     Box {
         IconButton(onClick = { open = true }) {
-            Icon(painterResource(TilePdfIcons.MoreVert), contentDescription = stringResource(R.string.library_more))
+            Icon(painterResource(TilePdfIcons.MoreVert), contentDescription = stringResource(R.string.library_row_options, documentName))
         }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             DropdownMenuItem(
