@@ -50,6 +50,7 @@ import com.mustafakoceerr.tilepdf.feature.reader.annotation.drawAnnotations
 import com.mustafakoceerr.tilepdf.feature.reader.annotation.drawLiveStroke
 import com.mustafakoceerr.tilepdf.feature.reader.annotation.drawingInput
 import com.mustafakoceerr.tilepdf.model.Annotation
+import com.mustafakoceerr.tilepdf.model.FormField
 import com.mustafakoceerr.tilepdf.model.PageTheme
 import com.mustafakoceerr.tilepdf.model.SearchMatch
 import kotlin.math.roundToInt
@@ -59,6 +60,7 @@ internal const val DRAFT_SCALE = 0.5f
 private val HighlightColor = Color(0x66FFEB3B)
 private val CurrentHighlightColor = Color(0x99FF9800)
 private val SelectionColor = Color(0x553D7BFF)
+private val FormFieldColor = Color(0x262196F3)
 
 /** One page: its draft, sharp tiles, search highlights and selection. */
 @Composable
@@ -78,6 +80,8 @@ internal fun PdfPage(
     annotations: List<Annotation> = emptyList(),
     /** Set while the pen or eraser is active: one-finger drags draw or erase. */
     drawing: PageDrawing? = null,
+    /** Fillable form widgets on this page, tinted so they can be found. */
+    formFields: List<FormField> = emptyList(),
 ) {
     // The stroke being drawn and the strokes being erased stay here until the
     // finger lifts, so drawing redraws this page only, never the screen.
@@ -136,6 +140,7 @@ internal fun PdfPage(
                 .drawWithContent {
                     drawContent()
                     pageImages.renderedTiles(pageIndex).forEach { drawTile(it, colorFilter) }
+                    formFields.forEach { if (!it.readOnly) drawHighlight(it.rect, transform, FormFieldColor) }
                     matches.forEach { match ->
                         val color = if (match == currentMatch) CurrentHighlightColor else HighlightColor
                         match.rects.forEach { drawHighlight(it, transform, color) }
