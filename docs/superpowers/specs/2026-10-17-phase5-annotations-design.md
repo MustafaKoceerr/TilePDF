@@ -70,6 +70,11 @@ SAF `"wt"` ile orijinalin üzerine yazma. Artımlı kayıt dosyayı yalnızca
 uzattığı için `"wt"` desteklenmezse `"w"` kullanılır. Son yazma iptal
 edilemez.
 
+**Şifreli PDF.** Şifre diske, Room'a ya da loglara hiç yazılmaz. Okuyucu
+doğru şifreyi süreç ömrü boyunca bellekte tutar ve kayıt worker'ı onu
+kullanır. Süreç öldüyse kayıt "şifre gerekli" hatasıyla bekler ve belge bir
+dahaki sefere şifreyle açılıp kapandığında yapılır.
+
 **İzin.** Kütüphane açarken okuma izninin yanında yazma iznini de kalıcı
 almaya çalışır. Yazma izni yoksa ya da dosya dışarıdan değiştiyse taslak
 korunur; belge bir sonraki açılışta "Kopya olarak kaydet" önerir. Kopya

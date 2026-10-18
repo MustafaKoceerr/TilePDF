@@ -71,4 +71,39 @@ class TilePdfDatabaseMigrationTest {
         assertEquals(0.25f, document.panFraction)
         assertEquals(listOf(7), bookmarks.map { it.pageIndex })
     }
+
+    @Test
+    fun migrate3To4KeepsLibraryAndAddsDrafts() {
+        helper.createDatabase(DB_NAME, 3).use { db ->
+            db.execSQL(
+                "INSERT INTO documents (uri, displayName, pageCount, lastPage, " +
+                    "pageOffsetFraction, zoom, panFraction, addedAt, lastOpenedAt) " +
+                    "VALUES ('content://book', 'Book.pdf', 300, 41, 0.5, 2.0, 0.25, 1, 2)"
+            )
+            db.execSQL("INSERT INTO bookmarks (uri, pageIndex, createdAt) VALUES ('content://book', 7, 3)")
+        }
+
+        // Validates the migrated schema against the exported 4.json.
+        helper.runMigrationsAndValidate(DB_NAME, 4, true).close()
+
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val database = Room.databaseBuilder(context, TilePdfDatabase::class.java, DB_NAME).build()
+        val draft = AnnotationDraftEntity(
+            uri = "content://book", annotations = "[]", removedForeign = "[]", dirty = true,
+            baseSize = 10, baseModified = null, saveError = null, updatedAt = 4,
+        )
+        val (document, bookmarks, stored) = runBlocking {
+            database.annotationDraftDao().upsert(draft)
+            Triple(
+                database.documentDao().get("content://book"),
+                database.bookmarkDao().observe("content://book").first(),
+                database.annotationDraftDao().get("content://book"),
+            )
+        }
+        database.close()
+
+        assertEquals(41, document!!.lastPage)
+        assertEquals(listOf(7), bookmarks.map { it.pageIndex })
+        assertEquals(draft, stored)
+    }
 }

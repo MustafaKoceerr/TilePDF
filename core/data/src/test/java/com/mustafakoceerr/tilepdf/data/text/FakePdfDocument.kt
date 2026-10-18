@@ -37,7 +37,16 @@ class FakePdfDocument(private val pages: List<String>) : PdfDocument {
 
     override suspend fun trimMemory() = Unit
     override suspend fun linkAt(pageIndex: Int, x: Float, y: Float): com.mustafakoceerr.tilepdf.core.pdf.PdfLink? = null
-    override suspend fun annotations(pageIndex: Int) = PageAnnotations(emptyList(), emptyList())
+    /** What [annotations] returns per page; pages not listed have none. */
+    var annotationsByPage: Map<Int, PageAnnotations> = emptyMap()
+
+    var annotationCalls = 0
+        private set
+
+    override suspend fun annotations(pageIndex: Int): PageAnnotations {
+        annotationCalls++
+        return annotationsByPage[pageIndex] ?: PageAnnotations(emptyList(), emptyList())
+    }
     override suspend fun setForeignHidden(pageIndex: Int, key: String, hidden: Boolean) = Unit
 
     override fun close() {

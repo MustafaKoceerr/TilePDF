@@ -2,6 +2,7 @@ package com.mustafakoceerr.tilepdf.di
 
 import android.content.Context
 import androidx.room.Room
+import com.mustafakoceerr.tilepdf.data.local.AnnotationDraftDao
 import com.mustafakoceerr.tilepdf.data.local.BookmarkDao
 import com.mustafakoceerr.tilepdf.data.local.DocumentDao
 import com.mustafakoceerr.tilepdf.data.local.TilePdfDatabase
@@ -26,4 +27,7 @@ object DatabaseModule {
 
     @Provides
     fun providesBookmarkDao(database: TilePdfDatabase): BookmarkDao = database.bookmarkDao()
+
+    @Provides
+    fun providesAnnotationDraftDao(database: TilePdfDatabase): AnnotationDraftDao = database.annotationDraftDao()
 }

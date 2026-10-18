@@ -97,11 +97,19 @@ class SafDocumentRepository @Inject constructor(
         contentResolver.persistedUriPermissions.any { it.uri == uri && it.isReadPermission } ||
             takePersistableGrant(uri)
 
+    /** Keeps write access too when the provider granted it, so annotations can be saved into the file. */
     private fun takePersistableGrant(uri: Uri): Boolean = try {
-        contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        contentResolver.takePersistableUriPermission(
+            uri, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+        )
         true
     } catch (_: SecurityException) {
-        false
+        try {
+            contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            true
+        } catch (_: SecurityException) {
+            false
+        }
     }
 
     /**
