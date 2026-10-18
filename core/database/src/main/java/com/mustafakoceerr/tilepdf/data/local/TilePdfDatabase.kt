@@ -6,7 +6,7 @@ import androidx.room.RoomDatabase
 
 @Database(
     entities = [DocumentEntity::class, BookmarkEntity::class, AnnotationDraftEntity::class],
-    version = 5,
+    version = 6,
     autoMigrations = [
         // 1 -> 2: DocumentEntity.panFraction
         AutoMigration(from = 1, to = 2),
@@ -16,6 +16,8 @@ import androidx.room.RoomDatabase
         AutoMigration(from = 3, to = 4),
         // 4 -> 5: DocumentEntity.favorite
         AutoMigration(from = 4, to = 5),
+        // 5 -> 6: DocumentEntity.rotation and cropMargins
+        AutoMigration(from = 5, to = 6),
     ],
 )
 abstract class TilePdfDatabase : RoomDatabase() {

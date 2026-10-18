@@ -9,6 +9,7 @@ object TilePdfIcons {
     @DrawableRes val Bookmark = R.drawable.ic_bookmark
     @DrawableRes val BookmarkBorder = R.drawable.ic_bookmark_border
     @DrawableRes val Close = R.drawable.ic_close
+    @DrawableRes val Crop = R.drawable.ic_crop
     @DrawableRes val DarkMode = R.drawable.ic_dark_mode
     @DrawableRes val Delete = R.drawable.ic_delete
     @DrawableRes val Document = R.drawable.ic_document
@@ -21,6 +22,7 @@ object TilePdfIcons {
     @DrawableRes val MoreVert = R.drawable.ic_more_vert
     @DrawableRes val Print = R.drawable.ic_print
     @DrawableRes val Redo = R.drawable.ic_redo
+    @DrawableRes val RotateRight = R.drawable.ic_rotate_right
     @DrawableRes val Search = R.drawable.ic_search
     @DrawableRes val Share = R.drawable.ic_share
     @DrawableRes val Sort = R.drawable.ic_sort

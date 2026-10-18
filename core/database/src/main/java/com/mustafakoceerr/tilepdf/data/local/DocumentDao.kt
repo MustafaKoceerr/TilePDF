@@ -40,6 +40,12 @@ abstract class DocumentDao {
     @Query("UPDATE documents SET favorite = :favorite WHERE uri = :uri")
     abstract suspend fun setFavorite(uri: String, favorite: Boolean)
 
+    @Query("UPDATE documents SET rotation = :rotation WHERE uri = :uri")
+    abstract suspend fun setRotation(uri: String, rotation: Int)
+
+    @Query("UPDATE documents SET cropMargins = :cropMargins WHERE uri = :uri")
+    abstract suspend fun setCropMargins(uri: String, cropMargins: Boolean)
+
     @Query("DELETE FROM documents WHERE uri = :uri")
     abstract suspend fun delete(uri: String)
 

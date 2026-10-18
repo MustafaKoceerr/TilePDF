@@ -20,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
+import com.mustafakoceerr.tilepdf.core.geometry.PageViewTransform
 import com.mustafakoceerr.tilepdf.core.pdf.PageSize
 import com.mustafakoceerr.tilepdf.core.render.PageImageSource
 import com.mustafakoceerr.tilepdf.feature.reader.SelectionActions
@@ -37,6 +38,8 @@ internal val PAGE_GAP = 8.dp
 @Composable
 internal fun PdfPageList(
     pageSizes: List<PageSize>,
+    /** How each page is shown; [pageSizes] are their laid-out sizes. */
+    pageTransforms: List<PageViewTransform>,
     pageImages: PageImageSource,
     initialPosition: ReadingPosition,
     pageTheme: PageTheme,
@@ -101,13 +104,13 @@ internal fun PdfPageList(
         LaunchedEffect(pageJump) {
             val jump = pageJump ?: return@LaunchedEffect
             val pageIndex = jump.pageIndex.coerceIn(0, pageSizes.lastIndex)
-            scrollToPage(listState, zoomState, pageIndex, jump.topPt, pageSizes[pageIndex], density)
+            scrollToPage(listState, zoomState, jump.copy(pageIndex = pageIndex), pageTransforms[pageIndex], density)
             onPageJumpHandled()
         }
 
         LaunchedEffect(currentMatch) {
             val match = currentMatch ?: return@LaunchedEffect
-            scrollToMatch(listState, zoomState, match, pageSizes[match.pageIndex], density)
+            scrollToMatch(listState, zoomState, match, pageTransforms[match.pageIndex], density)
         }
 
         LazyColumn(
@@ -121,12 +124,12 @@ internal fun PdfPageList(
                     listState = listState,
                     onTap = { position ->
                         // The reader clears a selection, follows a link or toggles full screen.
-                        pagePointAt(position, listState, zoomState, pageSizes, density)
+                        pagePointAt(position, listState, zoomState, pageTransforms, density)
                             ?.let { (page, x, y) -> onTapPage(page, x, y) }
                             ?: onTapOutsidePage()
                     },
                     onLongPress = { position ->
-                        pagePointAt(position, listState, zoomState, pageSizes, density)
+                        pagePointAt(position, listState, zoomState, pageTransforms, density)
                             ?.let { (page, x, y) -> selectionActions.onLongPress(page, x, y) }
                     },
                     drawing = drawingFor != null,
@@ -145,7 +148,7 @@ internal fun PdfPageList(
             items(count = pageSizes.size, key = { it }) { pageIndex ->
                 PdfPage(
                     pageIndex = pageIndex,
-                    pageSize = pageSizes[pageIndex],
+                    transform = pageTransforms[pageIndex],
                     draftWidthPx = draftWidthPx,
                     pageImages = pageImages,
                     pageTheme = pageTheme,

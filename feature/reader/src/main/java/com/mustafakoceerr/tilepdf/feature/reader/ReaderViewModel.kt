@@ -10,7 +10,10 @@ import com.mustafakoceerr.tilepdf.core.render.PageRenderer
 import com.mustafakoceerr.tilepdf.core.text.TextSelection
 import com.mustafakoceerr.tilepdf.core.render.ThumbnailSource
 import com.mustafakoceerr.tilepdf.core.render.TiledPageImageSource
+import com.mustafakoceerr.tilepdf.core.geometry.PageViewTransform
 import com.mustafakoceerr.tilepdf.core.geometry.PdfPoint
+import com.mustafakoceerr.tilepdf.core.geometry.PdfRect
+import com.mustafakoceerr.tilepdf.model.DocumentView
 import com.mustafakoceerr.tilepdf.data.document.SharedDocuments
 import com.mustafakoceerr.tilepdf.data.thumbnail.ThumbnailStore
 import com.mustafakoceerr.tilepdf.data.annotation.AnnotationRepository
@@ -111,6 +114,13 @@ class ReaderViewModel @Inject constructor(
      */
     private var retiring: OpenedDocument? = null
 
+    /**
+     * Each page's content box for cropping margins, found once per document;
+     * the pages don't change when a save reopens it.
+     */
+    private var margins: List<PdfRect?>? = null
+    private var marginsJob: Job? = null
+
     /** Reopens the document when a save wrote a new version; one per controller. */
     private var fileSavedJob: Job? = null
 
@@ -170,7 +180,9 @@ class ReaderViewModel @Inject constructor(
             is DocumentState.NeedsPassword -> ReaderUiState.PasswordRequired(document.wrongPassword)
             is DocumentState.Opened -> ReaderUiState.Ready(
                 title = document.opened.displayName,
-                pageSizes = document.opened.document.pageSizes,
+                pageSizes = document.transforms.map { it.size },
+                pageTransforms = document.transforms,
+                documentView = document.view,
                 pageImages = document.pageImages,
                 thumbnails = document.thumbnails,
                 initialPosition = start ?: document.opened.position,
@@ -222,11 +234,10 @@ class ReaderViewModel @Inject constructor(
                 observeBookmarks(opened)
                 // A password-protected document's first page isn't kept unencrypted.
                 if (password == null) saveThumbnail(opened)
-                DocumentState.Opened(
-                    opened = opened,
-                    pageImages = TiledPageImageSource(opened.document, pageRenderer, viewModelScope),
-                    thumbnails = ThumbnailSource(opened.document, pageRenderer),
-                ).also(::startAnnotations)
+                val view = libraryRepository.documentView(opened.uri)
+                if (margins?.size != opened.document.pageCount) margins = null
+                if (view.cropMargins) findMargins(opened)
+                shown(opened, view).also(::startAnnotations)
             } catch (e: Throwable) {
                 // Throwable, not Exception: running out of memory is an Error.
                 if (e is CancellationException) throw e
@@ -246,6 +257,63 @@ class ReaderViewModel @Inject constructor(
         }
     }
 
+    /** [opened] as [view] shows it, with image sources that draw it so. */
+    private fun shown(opened: OpenedDocument, view: DocumentView): DocumentState.Opened {
+        val transforms = pageTransforms(opened.document.pageSizes, view, margins)
+        return DocumentState.Opened(
+            opened = opened,
+            pageImages = TiledPageImageSource(opened.document, pageRenderer, viewModelScope, transforms = transforms),
+            thumbnails = ThumbnailSource(opened.document, pageRenderer, transforms = transforms),
+            view = view,
+            transforms = transforms,
+        )
+    }
+
+    /** The open document's state, if it's still [opened]: views and reopens replace the state, not the document. */
+    private fun stateOf(opened: OpenedDocument) =
+        (documentState.value as? DocumentState.Opened)?.takeIf { it.opened === opened }
+
+    /** Shows the open document as [view]; new transforms need new image sources. */
+    private fun show(view: DocumentView) {
+        val current = documentState.value as? DocumentState.Opened ?: return
+        val next = shown(current.opened, view)
+        if (next.transforms == current.transforms && next.view == current.view) return
+        // Pending renders of the old view stop here.
+        current.pageImages.requestTiles(emptyList())
+        documentState.value = next
+    }
+
+    /** Finds every page's content box in the background, then shows the cropped pages. */
+    private fun findMargins(opened: OpenedDocument) {
+        if (margins != null || marginsJob?.isActive == true) return
+        marginsJob = viewModelScope.launch {
+            val found = (0 until opened.document.pageCount).map { page ->
+                runCatchingCancellable { pageRenderer.marginCrop(opened.document, page) }.getOrNull()
+            }
+            // A reopen closed this document meanwhile: its boxes may be missing pages.
+            val state = stateOf(opened) ?: return@launch
+            // Read last: by now the draft has long loaded. Later notes go where the cropped page shows.
+            margins = cropsWithAnnotations(found, controller.value?.state?.value?.own.orEmpty())
+            show(state.view)
+        }
+    }
+
+    /** Turns every page a quarter turn clockwise; kept for this document. */
+    fun onRotate() {
+        val state = documentState.value as? DocumentState.Opened ?: return
+        val view = state.view.copy(rotation = nextRotation(state.view.rotation))
+        show(view)
+        viewModelScope.launch { libraryRepository.setRotation(state.opened.uri, view.rotation) }
+    }
+
+    /** Shows pages without their empty margins, once they're found; kept for this document. */
+    fun onCropMarginsChange(enabled: Boolean) {
+        val state = documentState.value as? DocumentState.Opened ?: return
+        if (enabled) findMargins(state.opened)
+        show(state.view.copy(cropMargins = enabled))
+        viewModelScope.launch { libraryRepository.setCropMargins(state.opened.uri, enabled) }
+    }
+
     private fun startAnnotations(state: DocumentState.Opened) {
         controller.value?.close()
         val opened = state.opened
@@ -254,8 +322,11 @@ class ReaderViewModel @Inject constructor(
             runCatchingCancellable {
                 opened.document.setForeignHidden(ref.pageIndex, ref.key, hidden)
                 withContext(Dispatchers.Main) {
-                    state.pageImages.invalidate(ref.pageIndex)
-                    state.thumbnails.invalidate(ref.pageIndex)
+                    // The sources of the view shown now, which may not be the first.
+                    stateOf(opened)?.let {
+                        it.pageImages.invalidate(ref.pageIndex)
+                        it.thumbnails.invalidate(ref.pageIndex)
+                    }
                 }
             }
         }
@@ -266,7 +337,7 @@ class ReaderViewModel @Inject constructor(
         }
         fileSavedJob?.cancel()
         fileSavedJob = viewModelScope.launch {
-            created.fileSaved.collect { reopenAfterSave(state) }
+            created.fileSaved.collect { stateOf(opened)?.let(::reopenAfterSave) }
         }
     }
 
@@ -408,10 +479,11 @@ class ReaderViewModel @Inject constructor(
     /** Back to where the last jump started. */
     fun onJumpBack() {
         val origin = jumpHistory.value.origin ?: return
-        val sizes = openedDocument()?.pageSizes ?: return
-        val page = origin.pageIndex.coerceIn(0, sizes.lastIndex)
+        val pageCount = openedDocument()?.pageCount ?: return
+        val page = origin.pageIndex.coerceIn(0, pageCount - 1)
         jumpHistory.value = JumpHistory()
-        linkTargets.update { it.copy(jump = PageJump(page, origin.pageOffsetFraction * sizes[page].heightPt)) }
+        // A fraction of the page as laid out: right however the pages are turned or cropped.
+        linkTargets.update { it.copy(jump = PageJump(page, offsetFraction = origin.pageOffsetFraction)) }
     }
 
     fun onJumpHandled() = linkTargets.update { it.copy(jump = null) }
@@ -464,6 +536,10 @@ class ReaderViewModel @Inject constructor(
 
     fun onVolumeKeysChange(enabled: Boolean) {
         viewModelScope.launch { preferencesRepository.setVolumeKeysTurnPages(enabled) }
+    }
+
+    fun onTwoPageSpreadsChange(enabled: Boolean) {
+        viewModelScope.launch { preferencesRepository.setTwoPageSpreads(enabled) }
     }
 
     /** Marks up the selected text and clears the selection. */
@@ -731,6 +807,9 @@ class ReaderViewModel @Inject constructor(
             val opened: OpenedDocument,
             val pageImages: TiledPageImageSource,
             val thumbnails: ThumbnailSource,
+            val view: DocumentView,
+            /** Pages as [view] shows them; the image sources draw through these. */
+            val transforms: List<PageViewTransform>,
         ) : DocumentState
     }
 }

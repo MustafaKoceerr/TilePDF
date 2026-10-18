@@ -11,6 +11,7 @@ interface ReaderPreferencesRepository {
     suspend fun setReadingMode(mode: ReadingMode)
     suspend fun setKeepScreenOn(enabled: Boolean)
     suspend fun setVolumeKeysTurnPages(enabled: Boolean)
+    suspend fun setTwoPageSpreads(enabled: Boolean)
     suspend fun setMarkupColor(color: Int)
     suspend fun setPenColor(color: Int)
     suspend fun setPenWidth(widthPt: Float)

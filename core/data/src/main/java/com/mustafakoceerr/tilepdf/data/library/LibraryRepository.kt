@@ -1,5 +1,6 @@
 package com.mustafakoceerr.tilepdf.data.library
 
+import com.mustafakoceerr.tilepdf.model.DocumentView
 import com.mustafakoceerr.tilepdf.model.LibraryDocument
 import com.mustafakoceerr.tilepdf.model.ReadingPosition
 import kotlinx.coroutines.flow.Flow
@@ -20,6 +21,13 @@ interface LibraryRepository {
     suspend fun saveReadingPosition(uri: String, position: ReadingPosition)
 
     suspend fun setFavorite(uri: String, favorite: Boolean)
+
+    /** How [uri]'s pages are shown; the default when it isn't in the library. */
+    suspend fun documentView(uri: String): DocumentView
+
+    suspend fun setRotation(uri: String, rotation: Int)
+
+    suspend fun setCropMargins(uri: String, cropMargins: Boolean)
 
     suspend fun remove(uri: String)
 }

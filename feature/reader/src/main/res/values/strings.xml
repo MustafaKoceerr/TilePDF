@@ -13,6 +13,7 @@
     <string name="reader_theme_sepia">Sepia</string>
     <string name="reader_keep_screen_on">Keep screen on</string>
     <string name="reader_volume_keys">Turn pages with volume keys</string>
+    <string name="reader_two_page_spreads">Two pages side by side on wide screens</string>
     <string name="reader_search">Search</string>
     <string name="reader_search_hint">Search document</string>
     <string name="reader_search_close">Close search</string>
@@ -69,6 +70,8 @@
     <string name="annotation_page">Page %1$d</string>
     <string name="reader_save_copy">Save as copy</string>
     <string name="reader_share">Share</string>
+    <string name="reader_rotate">Rotate pages</string>
+    <string name="reader_crop_margins">Crop margins</string>
     <string name="reader_print">Print</string>
     <string name="reader_hand_off_failed">Couldn\'t prepare the document.</string>
     <string name="reader_no_app_for_share">No app can receive this document</string>

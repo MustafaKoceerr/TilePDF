@@ -39,6 +39,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -67,6 +68,10 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.mustafakoceerr.tilepdf.feature.reader.components.showsSpreads
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
@@ -74,6 +79,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.state.ToggleableState
+import androidx.compose.ui.semantics.toggleableState
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -161,6 +169,9 @@ fun ReaderScreen(
         onReadingModeSelected = viewModel::onReadingModeSelected,
         onKeepScreenOnChange = viewModel::onKeepScreenOnChange,
         onVolumeKeysChange = viewModel::onVolumeKeysChange,
+        onTwoPageSpreadsChange = viewModel::onTwoPageSpreadsChange,
+        onRotate = viewModel::onRotate,
+        onCropMarginsChange = viewModel::onCropMarginsChange,
         annotationActions = AnnotationActions(
             onMarkup = viewModel::onMarkup,
             onMenuDismissed = viewModel::onAnnotationMenuDismissed,
@@ -267,6 +278,9 @@ internal fun ReaderScreen(
     onReadingModeSelected: (ReadingMode) -> Unit = {},
     onKeepScreenOnChange: (Boolean) -> Unit = {},
     onVolumeKeysChange: (Boolean) -> Unit = {},
+    onTwoPageSpreadsChange: (Boolean) -> Unit = {},
+    onRotate: () -> Unit = {},
+    onCropMarginsChange: (Boolean) -> Unit = {},
     annotationActions: AnnotationActions = AnnotationActions.None,
     onOpenDocument: (uri: String) -> Unit = {},
 ) {
@@ -305,13 +319,6 @@ internal fun ReaderScreen(
     }
     BackHandler(enabled = search?.isActive == true, onBack = searchActions.onClose)
     KeepScreenOnEffect(ready?.preferences?.keepScreenOn == true)
-    // Page turns aren't jumps: no way back is offered for them.
-    VolumeKeyPagingEffect(
-        enabled = ready?.preferences?.volumeKeysTurnPages == true,
-        currentPage = ready?.currentPage ?: 0,
-        pageCount = ready?.pageSizes?.size ?: 0,
-        onTurn = { pageJump = PageJump(it) },
-    )
 
     // A TalkBack user can't find bars hidden by a tap, so they stay.
     val fullScreen = ready?.isFullScreen == true && !rememberTouchExplorationEnabled()
@@ -382,6 +389,9 @@ internal fun ReaderScreen(
                             onSaveCopy = { saveCopy() },
                             onShare = annotationActions.onShare,
                             onPrint = annotationActions.onPrint,
+                            cropMargins = ready.documentView.cropMargins,
+                            onRotate = onRotate,
+                            onCropMarginsChange = onCropMarginsChange,
                         )
                     }
                 },
@@ -440,6 +450,8 @@ internal fun ReaderScreen(
                                 onGoToPage = { onJump(PageJump(it)) },
                                 pageJump = pageJump,
                                 onPageJumpHandled = { pageJump = null },
+                                // Page turns aren't jumps: no way back is offered for them.
+                                onTurnPage = { pageJump = PageJump(it) },
                                 onPositionChanged = onPositionChanged,
                                 onTapPage = onTapPage,
                                 onTapOutsidePage = onTapOutsidePage,
@@ -563,6 +575,7 @@ internal fun ReaderScreen(
                 onReadingModeSelected = onReadingModeSelected,
                 onKeepScreenOnChange = onKeepScreenOnChange,
                 onVolumeKeysChange = onVolumeKeysChange,
+                onTwoPageSpreadsChange = onTwoPageSpreadsChange,
                 onDismiss = { settingsOpen = false },
             )
         }
@@ -588,6 +601,7 @@ private fun ReaderPages(
     onGoToPage: (pageIndex: Int) -> Unit,
     pageJump: PageJump?,
     onPageJumpHandled: () -> Unit,
+    onTurnPage: (pageIndex: Int) -> Unit,
     onPositionChanged: (ReadingPosition) -> Unit,
     onTapPage: (pageIndex: Int, x: Float, y: Float) -> Unit,
     onTapOutsidePage: () -> Unit,
@@ -611,9 +625,24 @@ private fun ReaderPages(
     } else {
         null
     }
+    // From the space the pages have, not the device: a side panel or split screen counts.
+    var spreadSpace by remember { mutableStateOf(IntSize.Zero) }
+    val density = LocalDensity.current
+    val twoPageSpreads = with(density) {
+        showsSpreads(ready.preferences.twoPageSpreads, spreadSpace.width.toDp().value, spreadSpace.height.toDp().value)
+    }
+    Box(Modifier.fillMaxSize().onSizeChanged { spreadSpace = it })
+    VolumeKeyPagingEffect(
+        enabled = ready.preferences.volumeKeysTurnPages,
+        currentPage = ready.currentPage,
+        pageCount = ready.pageSizes.size,
+        spreads = twoPageSpreads && ready.preferences.readingMode == ReadingMode.Horizontal,
+        onTurn = onTurnPage,
+    )
     when (ready.preferences.readingMode) {
         ReadingMode.Vertical -> PdfPageList(
             pageSizes = ready.pageSizes,
+            pageTransforms = ready.pageTransforms,
             pageImages = ready.pageImages,
             initialPosition = ready.initialPosition,
             pageTheme = ready.preferences.pageTheme,
@@ -635,6 +664,8 @@ private fun ReaderPages(
         )
         ReadingMode.Horizontal -> PdfPagePager(
             pageSizes = ready.pageSizes,
+            pageTransforms = ready.pageTransforms,
+            twoPageSpreads = twoPageSpreads,
             pageImages = ready.pageImages,
             initialPage = ready.initialPosition.pageIndex,
             pageTheme = ready.preferences.pageTheme,
@@ -818,14 +849,14 @@ private fun SystemBarsEffect(hidden: Boolean) {
 /** Stops the screen from timing out while [enabled] and the reader is shown. */
 /** While [enabled], volume keys turn pages instead of changing the volume. */
 @Composable
-private fun VolumeKeyPagingEffect(enabled: Boolean, currentPage: Int, pageCount: Int, onTurn: (Int) -> Unit) {
+private fun VolumeKeyPagingEffect(enabled: Boolean, currentPage: Int, pageCount: Int, spreads: Boolean, onTurn: (Int) -> Unit) {
     val host = LocalActivity.current as? KeyEventHost ?: return
     val page by rememberUpdatedState(currentPage)
     val turn by rememberUpdatedState(onTurn)
-    DisposableEffect(host, enabled, pageCount) {
+    DisposableEffect(host, enabled, pageCount, spreads) {
         if (enabled && pageCount > 0) {
             host.setKeyHandler { event ->
-                val target = pageForVolumeKey(event.keyCode, page, pageCount) ?: return@setKeyHandler false
+                val target = pageForVolumeKey(event.keyCode, page, pageCount, spreads) ?: return@setKeyHandler false
                 // Both down and up are taken; held down, it keeps turning.
                 if (event.action == KeyEvent.ACTION_DOWN && target != page) turn(target)
                 true
@@ -893,6 +924,9 @@ private fun OverflowMenu(
     onSaveCopy: () -> Unit,
     onShare: () -> Unit,
     onPrint: () -> Unit,
+    cropMargins: Boolean,
+    onRotate: () -> Unit,
+    onCropMarginsChange: (Boolean) -> Unit,
 ) {
     Box {
         IconButton(onClick = { onExpandedChange(true) }) {
@@ -924,6 +958,24 @@ private fun OverflowMenu(
                     onExpandedChange(false)
                     onGoToPage()
                 },
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.reader_rotate)) },
+                leadingIcon = { Icon(painterResource(TilePdfIcons.RotateRight), contentDescription = null) },
+                onClick = {
+                    // Stays open: turning again is one more tap.
+                    onRotate()
+                },
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.reader_crop_margins)) },
+                leadingIcon = { Icon(painterResource(TilePdfIcons.Crop), contentDescription = null) },
+                trailingIcon = { Checkbox(checked = cropMargins, onCheckedChange = null) },
+                onClick = {
+                    onExpandedChange(false)
+                    onCropMarginsChange(!cropMargins)
+                },
+                modifier = Modifier.semantics { toggleableState = ToggleableState(cropMargins) },
             )
             DropdownMenuItem(
                 text = { Text(stringResource(R.string.reader_share)) },

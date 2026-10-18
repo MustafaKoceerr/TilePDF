@@ -66,6 +66,19 @@ class DataStoreReaderPreferencesRepositoryTest {
     }
 
     @Test
+    fun twoPageSpreadsAreOnByDefault() = runTest {
+        val repository = DataStoreReaderPreferencesRepository(dataStore())
+        assertEquals(true, repository.preferences.first().twoPageSpreads)
+    }
+
+    @Test
+    fun setTwoPageSpreadsIsRead() = runTest {
+        val repository = DataStoreReaderPreferencesRepository(dataStore())
+        repository.setTwoPageSpreads(false)
+        assertEquals(false, repository.preferences.first().twoPageSpreads)
+    }
+
+    @Test
     fun legacyNightModeReadsAsNight() = runTest {
         // Written by versions that only had a night mode switch.
         val dataStore = dataStore()

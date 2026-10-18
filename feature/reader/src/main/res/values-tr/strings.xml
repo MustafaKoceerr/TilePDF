@@ -12,6 +12,7 @@
     <string name="reader_theme_sepia">Sepya</string>
     <string name="reader_keep_screen_on">Ekranı açık tut</string>
     <string name="reader_volume_keys">Ses tuşlarıyla sayfa çevir</string>
+    <string name="reader_two_page_spreads">Geniş ekranda iki sayfa yan yana</string>
     <string name="reader_search">Ara</string>
     <string name="reader_search_hint">Belgede ara</string>
     <string name="reader_search_close">Aramayı kapat</string>
@@ -66,6 +67,8 @@
     <string name="annotation_page">Sayfa %1$d</string>
     <string name="reader_save_copy">Kopya olarak kaydet</string>
     <string name="reader_share">Paylaş</string>
+    <string name="reader_rotate">Sayfaları döndür</string>
+    <string name="reader_crop_margins">Kenar boşluklarını kırp</string>
     <string name="reader_print">Yazdır</string>
     <string name="reader_hand_off_failed">Belge hazırlanamadı.</string>
     <string name="reader_no_app_for_share">Bu belgeyi alabilecek uygulama yok</string>

@@ -11,6 +11,11 @@ import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -41,6 +46,7 @@ import androidx.compose.ui.util.fastAny
 import androidx.compose.ui.util.fastForEach
 import com.mustafakoceerr.tilepdf.core.geometry.CoordinateMapper
 import com.mustafakoceerr.tilepdf.core.geometry.Viewport
+import com.mustafakoceerr.tilepdf.core.geometry.PageViewTransform
 import com.mustafakoceerr.tilepdf.core.pdf.PageSize
 import com.mustafakoceerr.tilepdf.core.render.PageImageSource
 import com.mustafakoceerr.tilepdf.core.render.TileGrid
@@ -67,6 +73,8 @@ private const val TILE_REQUEST_DEBOUNCE_MS = 80L
 @Composable
 internal fun PdfPagePager(
     pageSizes: List<PageSize>,
+    /** How each page is shown; [pageSizes] are their laid-out sizes. */
+    pageTransforms: List<PageViewTransform>,
     pageImages: PageImageSource,
     initialPage: Int,
     pageTheme: PageTheme,
@@ -90,28 +98,37 @@ internal fun PdfPagePager(
     annotations: Map<Int, List<Annotation>> = emptyMap(),
     /** Each page's pen or eraser input; null when neither is active. */
     drawingFor: ((pageIndex: Int) -> PageDrawing)? = null,
+    /** Two pages side by side, as [spreads] pairs them. */
+    twoPageSpreads: Boolean = false,
 ) {
     val matchesByPage = remember(matches) { matches.groupBy { it.pageIndex } }
 
     BoxWithConstraints(modifier.fillMaxSize()) {
         val viewport = IntSize(constraints.maxWidth, constraints.maxHeight)
         val draftWidthPx = (constraints.maxWidth * DRAFT_SCALE).toInt()
-        val pagerState = rememberPagerState(initialPage = initialPage.coerceIn(0, pageSizes.lastIndex)) {
-            pageSizes.size
+        // Each pager page: one PDF page, or a book spread of two.
+        val groups = remember(pageSizes.size, twoPageSpreads) {
+            if (twoPageSpreads) spreads(pageSizes.size) else List(pageSizes.size) { listOf(it) }
         }
-        val zoomedPage = pagerState.settledPage
+        val pagerState = rememberPagerState(initialPage = spreadOf(initialPage, groups)) { groups.size }
+        val settled = pagerState.settledPage.coerceIn(0, groups.lastIndex)
         // A new page, or a new screen size, starts unzoomed and fitted.
-        val zoom = remember(zoomedPage, viewport) { PageZoom(fitPage(pageSizes[zoomedPage], viewport), viewport) }
+        val zooms = remember(settled, viewport, groups) { slotZooms(groups[settled], pageSizes, viewport) }
 
-        LaunchedEffect(pagerState) {
-            snapshotFlow { pagerState.currentPage }.collect(onPageChanged)
+        LaunchedEffect(pagerState, groups) {
+            // The reading position is the spread's left page.
+            snapshotFlow { groups[pagerState.currentPage.coerceIn(0, groups.lastIndex)].first() }.collect(onPageChanged)
         }
 
-        LaunchedEffect(zoom, pageImages) {
-            val screen = Viewport(viewport.width, viewport.height)
+        LaunchedEffect(zooms, pageImages) {
+            val pages = groups[settled]
             snapshotFlow {
-                val visible = screen.visiblePage(zoomedPage, zoom.pageBounds()) ?: return@snapshotFlow emptyList()
-                TileGrid.forZoom(zoomedPage, pageSizes[zoomedPage], zoom.fitted.width, zoom.scale).tilesFor(visible)
+                // One request for the whole spread: a request replaces the one before.
+                pages.zip(zooms).flatMap { (page, zoom) ->
+                    val screen = Viewport(zoom.viewport.width, zoom.viewport.height)
+                    val visible = screen.visiblePage(page, zoom.pageBounds()) ?: return@flatMap emptyList()
+                    TileGrid.forZoom(page, pageSizes[page], zoom.fitted.width, zoom.scale).tilesFor(visible)
+                }
             }
                 .distinctUntilChanged()
                 .debounce(TILE_REQUEST_DEBOUNCE_MS)
@@ -122,65 +139,74 @@ internal fun PdfPagePager(
 
         LaunchedEffect(pageJump) {
             val jump = pageJump ?: return@LaunchedEffect
-            pagerState.scrollToPage(jump.pageIndex.coerceIn(0, pageSizes.lastIndex))
+            pagerState.scrollToPage(spreadOf(jump.pageIndex, groups))
             onPageJumpHandled()
         }
 
         LaunchedEffect(currentMatch) {
             val match = currentMatch ?: return@LaunchedEffect
-            if (match.pageIndex != pagerState.currentPage) pagerState.scrollToPage(match.pageIndex)
+            val target = spreadOf(match.pageIndex, groups)
+            if (target != pagerState.currentPage) pagerState.scrollToPage(target)
         }
 
         HorizontalPager(
             state = pagerState,
-            key = { it },
+            key = { groups[it].first() },
             beyondViewportPageCount = 0,
-            userScrollEnabled = zoom.scale == 1f && drawingFor == null,
+            userScrollEnabled = zooms.all { it.scale == 1f } && drawingFor == null,
             modifier = Modifier.fillMaxSize(),
-        ) { pageIndex ->
-            val pageSize = pageSizes[pageIndex]
-            // Pages sliding in or out stay fitted.
-            val restingZoom = remember(pageIndex, viewport) { PageZoom(fitPage(pageSize, viewport), viewport) }
-            val pageZoom = if (pageIndex == zoomedPage) zoom else restingZoom
-            val fitted = pageZoom.fitted
+        ) { groupIndex ->
+            val pages = groups[groupIndex]
+            // Spreads sliding in or out stay fitted.
+            val resting = remember(pages, viewport) { slotZooms(pages, pageSizes, viewport) }
+            val slotZooms = if (groupIndex == settled) zooms else resting
 
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .pageGestures(pageZoom, pageIndex, pageSize, onTapPage, onTapOutsidePage, selectionActions, drawingFor != null),
-            ) {
-                PdfPage(
-                    pageIndex = pageIndex,
-                    pageSize = pageSize,
-                    draftWidthPx = draftWidthPx,
-                    pageImages = pageImages,
-                    pageTheme = pageTheme,
-                    matches = matchesByPage[pageIndex].orEmpty(),
-                    currentMatch = currentMatch,
-                    selection = selection?.takeIf { it.pageIndex == pageIndex },
-                    selectionActions = selectionActions,
-                    annotations = annotations[pageIndex].orEmpty(),
-                    drawing = drawingFor?.invoke(pageIndex),
-                    modifier = Modifier
-                        .offset { IntOffset(fitted.left, fitted.top) }
-                        .graphicsLayer {
-                            transformOrigin = TransformOrigin(0f, 0f)
-                            translationX = pageZoom.offset.x
-                            translationY = pageZoom.offset.y
-                            scaleX = pageZoom.scale
-                            scaleY = pageZoom.scale
-                        }
-                        // Exactly the fitted size, as the tile maths assume.
-                        .layout { measurable, _ ->
-                            val placeable = measurable.measure(Constraints.fixed(fitted.width, fitted.height))
-                            layout(placeable.width, placeable.height) { placeable.place(0, 0) }
-                        },
-                )
+            Row(Modifier.fillMaxSize()) {
+                pages.zip(slotZooms).forEach { (pageIndex, pageZoom) ->
+                    val transform = pageTransforms[pageIndex]
+                    val fitted = pageZoom.fitted
+                    Box(
+                        Modifier
+                            .width(with(LocalDensity.current) { pageZoom.viewport.width.toDp() })
+                            .fillMaxHeight()
+                            // A zoomed half stays in its half.
+                            .clipToBounds()
+                            .pageGestures(pageZoom, pageIndex, transform, onTapPage, onTapOutsidePage, selectionActions, drawingFor != null),
+                    ) {
+                        PdfPage(
+                            pageIndex = pageIndex,
+                            transform = transform,
+                            draftWidthPx = draftWidthPx,
+                            pageImages = pageImages,
+                            pageTheme = pageTheme,
+                            matches = matchesByPage[pageIndex].orEmpty(),
+                            currentMatch = currentMatch,
+                            selection = selection?.takeIf { it.pageIndex == pageIndex },
+                            selectionActions = selectionActions,
+                            annotations = annotations[pageIndex].orEmpty(),
+                            drawing = drawingFor?.invoke(pageIndex),
+                            modifier = Modifier
+                                .offset { IntOffset(fitted.left, fitted.top) }
+                                .graphicsLayer {
+                                    transformOrigin = TransformOrigin(0f, 0f)
+                                    translationX = pageZoom.offset.x
+                                    translationY = pageZoom.offset.y
+                                    scaleX = pageZoom.scale
+                                    scaleY = pageZoom.scale
+                                }
+                                // Exactly the fitted size, as the tile maths assume.
+                                .layout { measurable, _ ->
+                                    val placeable = measurable.measure(Constraints.fixed(fitted.width, fitted.height))
+                                    layout(placeable.width, placeable.height) { placeable.place(0, 0) }
+                                },
+                        )
+                    }
+                }
             }
         }
 
         PagerPageIndicator(
-            currentPage = pagerState.currentPage,
+            currentPage = groups.getOrNull(pagerState.currentPage)?.first() ?: 0,
             pageCount = pageSizes.size,
             scrolling = pagerState.isScrollInProgress,
             onClick = { onGoToPageOpenChange(true) },
@@ -193,7 +219,7 @@ internal fun PdfPagePager(
         if (goToPageOpen) {
             GoToPageDialog(
                 pageCount = pageSizes.size,
-                currentPage = pagerState.currentPage,
+                currentPage = groups.getOrNull(pagerState.currentPage)?.first() ?: 0,
                 onGoToPage = { pageIndex ->
                     onGoToPageOpenChange(false)
                     onGoToPage(pageIndex)
@@ -205,6 +231,23 @@ internal fun PdfPagePager(
 }
 
 /**
+ * A zoom per page of a pager page, each fitted into its share of the
+ * [viewport]. A spread's pages meet in the middle, like a book's.
+ */
+private fun slotZooms(pages: List<Int>, pageSizes: List<PageSize>, viewport: IntSize): List<PageZoom> {
+    val slot = IntSize(viewport.width / pages.size, viewport.height)
+    return pages.mapIndexed { index, page ->
+        val fitted = fitPage(pageSizes[page], slot)
+        val atSpine = when {
+            pages.size == 1 -> fitted
+            index == 0 -> fitted.translate(slot.width - fitted.right, 0)
+            else -> fitted.translate(-fitted.left, 0)
+        }
+        PageZoom(atSpine, slot)
+    }
+}
+
+/**
  * Pinch, double tap and pan for [zoom], and taps reported in PDF points of
  * the page. Positions arrive in the page slot's coordinates, which are the
  * viewport's, so [PageZoom] maps them directly.
@@ -212,7 +255,7 @@ internal fun PdfPagePager(
 private fun Modifier.pageGestures(
     zoom: PageZoom,
     pageIndex: Int,
-    pageSize: PageSize,
+    transform: PageViewTransform,
     onTapPage: (pageIndex: Int, x: Float, y: Float) -> Unit,
     onTapOutsidePage: () -> Unit,
     selectionActions: SelectionActions,
@@ -220,7 +263,7 @@ private fun Modifier.pageGestures(
     drawing: Boolean,
 ): Modifier {
     fun pdfPoint(position: Offset) = zoom.toPagePixels(position)?.let { (x, y) ->
-        CoordinateMapper.toPdfPoints(x, y, pageSize, zoom.fitted.width.toFloat())
+        CoordinateMapper.toPdfPoints(x, y, transform, zoom.fitted.width.toFloat())
     }
     return this
         .pointerInput(zoom) {

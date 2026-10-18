@@ -128,6 +128,9 @@ class OpenDocumentUseCaseTest {
         override suspend fun readingPosition(uri: String): ReadingPosition? = position
         override suspend fun saveReadingPosition(uri: String, position: ReadingPosition) = Unit
         override suspend fun setFavorite(uri: String, favorite: Boolean) = Unit
+        override suspend fun documentView(uri: String) = com.mustafakoceerr.tilepdf.model.DocumentView()
+        override suspend fun setRotation(uri: String, rotation: Int) = Unit
+        override suspend fun setCropMargins(uri: String, cropMargins: Boolean) = Unit
         override suspend fun remove(uri: String) = Unit
     }
 

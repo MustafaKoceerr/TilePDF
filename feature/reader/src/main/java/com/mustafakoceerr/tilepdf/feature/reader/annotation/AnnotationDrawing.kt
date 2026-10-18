@@ -11,7 +11,6 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.lerp
 import com.mustafakoceerr.tilepdf.core.geometry.PdfPoint
-import com.mustafakoceerr.tilepdf.core.pdf.PageSize
 import com.mustafakoceerr.tilepdf.feature.reader.components.recolor
 import com.mustafakoceerr.tilepdf.model.Annotation
 import com.mustafakoceerr.tilepdf.model.Ink
@@ -24,13 +23,12 @@ private const val HIGHLIGHT_ALPHA = 0.4f
 private const val LINE_WIDTH_PT = 1.5f
 
 /*
- * TilePDF's annotations as the reader draws them, over a page laid out
- * size.width pixels wide. Positions are top-left points scaled like search
- * highlights.
+ * TilePDF's annotations as the reader draws them, in top-left page points
+ * multiplied by scale; a turned or cropped page draws them under its
+ * canvas transform.
  */
 
-internal fun DrawScope.drawAnnotations(annotations: List<Annotation>, pageSize: PageSize, theme: PageTheme) {
-    val scale = size.width / pageSize.widthPt
+internal fun DrawScope.drawAnnotations(annotations: List<Annotation>, scale: Float, theme: PageTheme) {
     annotations.forEach { annotation ->
         val color = Color(theme.recolor(annotation.color))
         when (annotation) {
@@ -42,8 +40,7 @@ internal fun DrawScope.drawAnnotations(annotations: List<Annotation>, pageSize: 
 }
 
 /** A stroke still being drawn, in the pen's colour. */
-internal fun DrawScope.drawLiveStroke(points: List<PdfPoint>, color: Int, widthPt: Float, pageSize: PageSize, theme: PageTheme) {
-    val scale = size.width / pageSize.widthPt
+internal fun DrawScope.drawLiveStroke(points: List<PdfPoint>, color: Int, widthPt: Float, scale: Float, theme: PageTheme) {
     drawStrokePoints(points, Color(theme.recolor(color)), widthPt * scale, scale)
 }
 

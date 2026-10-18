@@ -18,7 +18,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.mustafakoceerr.tilepdf.core.geometry.CoordinateMapper
-import com.mustafakoceerr.tilepdf.core.pdf.PageSize
+import com.mustafakoceerr.tilepdf.core.geometry.PageViewTransform
 import com.mustafakoceerr.tilepdf.feature.reader.SelectionHandle
 import com.mustafakoceerr.tilepdf.feature.reader.SelectionUiState
 import kotlin.math.roundToInt
@@ -34,20 +34,20 @@ private val HandleRadius = 10.dp
 @Composable
 internal fun SelectionHandles(
     selection: SelectionUiState,
-    pageSize: PageSize,
+    transform: PageViewTransform,
     pageWidthPx: Float,
     onDrag: (SelectionHandle, x: Float, y: Float) -> Unit,
 ) {
     for (handle in SelectionHandle.entries) {
         val box = if (handle == SelectionHandle.Start) selection.startBox else selection.endBox
-        val px = CoordinateMapper.toPagePixels(box, pageSize, pageWidthPx)
+        val px = CoordinateMapper.toPagePixels(box, transform, pageWidthPx)
         Handle(
             handle = handle,
             // Handles hang from the bottom corner of the first / last character.
             anchor = Offset(if (handle == SelectionHandle.Start) px.left else px.right, px.bottom),
             lineCenter = Offset(if (handle == SelectionHandle.Start) px.left else px.right, (px.top + px.bottom) / 2),
             onDragTo = { point ->
-                val (x, y) = CoordinateMapper.toPdfPoints(point.x, point.y, pageSize, pageWidthPx)
+                val (x, y) = CoordinateMapper.toPdfPoints(point.x, point.y, transform, pageWidthPx)
                 onDrag(handle, x, y)
             },
         )

@@ -213,6 +213,9 @@ class LibraryViewModelTest {
         override suspend fun setFavorite(uri: String, favorite: Boolean) {
             documents.update { all -> all.map { if (it.uri == uri) it.copy(favorite = favorite) else it } }
         }
+        override suspend fun documentView(uri: String) = com.mustafakoceerr.tilepdf.model.DocumentView()
+        override suspend fun setRotation(uri: String, rotation: Int) = Unit
+        override suspend fun setCropMargins(uri: String, cropMargins: Boolean) = Unit
         override suspend fun remove(uri: String) {
             removed += uri
             documents.update { all -> all.filterNot { it.uri == uri } }
