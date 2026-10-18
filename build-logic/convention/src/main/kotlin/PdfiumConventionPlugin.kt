@@ -1,4 +1,6 @@
 import com.android.build.api.dsl.LibraryExtension
+import com.android.build.api.variant.LibraryAndroidComponentsExtension
+import com.mustafakoceerr.tilepdf.CopyPdfiumLicensesTask
 import com.mustafakoceerr.tilepdf.DownloadPdfiumTask
 import org.gradle.api.Plugin
 import org.gradle.api.Project
@@ -46,6 +48,18 @@ class PdfiumConventionPlugin : Plugin<Project> {
 
             tasks.matching { it.name.startsWith("configureCMake") }.configureEach {
                 dependsOn(downloads)
+            }
+
+            // The app shows these texts; they come from the archive, so a new
+            // RELEASE brings its own licenses along.
+            val licenses = tasks.register<CopyPdfiumLicensesTask>("copyPdfiumLicenses") {
+                archiveDir.set(downloads.first().flatMap { it.outputDir })
+                outputDir.set(layout.buildDirectory.dir("generated/pdfiumLicenses"))
+            }
+            extensions.configure<LibraryAndroidComponentsExtension> {
+                onVariants { variant ->
+                    variant.sources.assets?.addGeneratedSourceDirectory(licenses, CopyPdfiumLicensesTask::outputDir)
+                }
             }
         }
     }

@@ -1,0 +1,35 @@
+TilePDF is a fast PDF reader that keeps everything on your phone. It has no internet permission, no ads and no account, so your documents never leave your device.
+
+READ COMFORTABLY
+• Smooth scrolling and sharp zoom, even on large documents
+• Vertical scrolling or one page at a time
+• Light, night and sepia page colors
+• Search the whole document and jump between results
+• Table of contents, bookmarks and a page grid
+• Tap a page for full-screen reading
+• Reopens every document exactly where you left it
+• Opens password-protected PDFs
+
+MARK UP YOUR PDFS
+• Highlight, underline or strike out text
+• Draw with a pen in several colors and widths, and erase strokes
+• Add sticky notes
+• Undo and redo
+• Annotations are saved into the PDF itself, so other PDF apps show them too
+• Files that can't be changed are saved as an annotated copy
+
+YOUR LIBRARY
+• Every document you opened, ready to continue
+• Favorites, sorting and search
+• Open PDFs from any app with "Open with" or "Share"
+
+MADE FOR EVERY SCREEN
+• Tablets and foldables keep the contents in a side panel next to the pages
+• Light, dark or system theme, with optional Material You colors
+• English and Turkish
+• TalkBack labels and large touch targets
+
+PRIVATE BY DESIGN
+TilePDF works completely offline. It collects no data and shares nothing. Your files, notes and settings stay on your device.
+
+TilePDF uses the PDFium engine, the same engine that renders PDFs in Chrome.

@@ -4,6 +4,13 @@ plugins {
     alias(libs.plugins.tilepdf.pdfium)
 }
 
+android {
+    defaultConfig {
+        // Apps shrinking with R8 keep what the C++ code reaches through JNI.
+        consumerProguardFiles("consumer-rules.pro")
+    }
+}
+
 dependencies {
     api(projects.core.model)
     implementation(projects.core.common)

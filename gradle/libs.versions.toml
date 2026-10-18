@@ -3,6 +3,7 @@ appcompat = "1.8.0"
 themeManager = "2.0.0"
 languageManager = "2.1.0"
 coreSplashscreen = "1.2.0"
+aboutLibraries = "15.2.0"
 agp = "9.4.1"
 coreKtx = "1.19.1"
 junit = "4.13.2"
@@ -32,6 +33,7 @@ language-manager = { group = "com.github.MustafaKoceerr.compose-language-manager
 language-manager-hilt = { group = "com.github.MustafaKoceerr.compose-language-manager", name = "language-manager-hilt", version.ref = "languageManager" }
 language-manager-testing = { group = "com.github.MustafaKoceerr.compose-language-manager", name = "language-manager-testing", version.ref = "languageManager" }
 androidx-core-splashscreen = { group = "androidx.core", name = "core-splashscreen", version.ref = "coreSplashscreen" }
+aboutlibraries-compose-m3 = { group = "com.mikepenz", name = "aboutlibraries-compose-m3", version.ref = "aboutLibraries" }
 androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
@@ -86,6 +88,7 @@ kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", versi
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 hilt = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
 room = { id = "androidx.room", version.ref = "room" }
+aboutlibraries-android = { id = "com.mikepenz.aboutlibraries.plugin.android", version.ref = "aboutLibraries" }
 
 # Plugins defined by this project (build-logic)
 tilepdf-android-application = { id = "tilepdf.android.application" }
