@@ -13,9 +13,13 @@ internal object PdfiumNative {
         System.loadLibrary("tilepdf_pdfium")
     }
 
-    /** Initializes PDFium once per process; later calls do nothing. */
+    /**
+     * Initializes PDFium once per process; later calls do nothing. Form fields
+     * draw letters their own font lacks with [formFallbackFont], a TrueType
+     * font's bytes, when given.
+     */
     @JvmStatic
-    external fun nativeInit()
+    external fun nativeInit(formFallbackFont: ByteArray?)
 
     /**
      * Opens the PDF readable through [fd] (which must stay open until the

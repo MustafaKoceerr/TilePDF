@@ -114,4 +114,33 @@ class PdfiumFormTest {
             assertTrue("checked box is dark", centre() < 0x60)
         }
     }
+
+    @Test
+    fun turkishLettersInHelveticaFieldAreDrawnAndEmbedded() = runBlocking {
+        saved.delete()
+        val latin = pdfium.open(TestAssets.uri("forms.pdf")).use { document ->
+            document.fill(mapOf("name" to "ISGisg"))
+            darkPixelsOfName(document)
+        }
+        pdfium.openForEditing(TestAssets.uri("forms.pdf")).use { document ->
+            document.fill(mapOf("name" to "İŞĞışğ"))
+            // Helvetica has none of these; without the fallback font the field stays blank.
+            val drawn = darkPixelsOfName(document.document)
+            assertTrue("drawn: $drawn of $latin", drawn >= latin * 0.8)
+            document.saveIncremental(saved)
+        }
+
+        pdfium.open(Uri.fromFile(saved)).use { document ->
+            assertEquals("İŞĞışğ", document.formFields(0).single { it.name == "name" }.value)
+            // Drawn from the saved appearance, so the font went into the file.
+            assertTrue(darkPixelsOfName(document) >= latin * 0.8)
+        }
+    }
+
+    /** Dark pixels inside the "name" field (top-left 72, 118 to 300, 142) at 1 pt = 1 px. */
+    private suspend fun darkPixelsOfName(document: PdfDocument): Int {
+        val bitmap = createBitmap(595, 842).apply { eraseColor(Color.WHITE) }
+        document.render(0, bitmap, Matrix())
+        return (72 until 300).sumOf { x -> (118 until 142).count { y -> Color.red(bitmap.getPixel(x, y)) < 0x80 } }
+    }
 }
