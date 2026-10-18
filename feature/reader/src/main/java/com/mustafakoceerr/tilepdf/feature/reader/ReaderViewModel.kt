@@ -5,11 +5,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.toRoute
 import com.mustafakoceerr.tilepdf.core.common.runCatchingCancellable
+import com.mustafakoceerr.tilepdf.core.pdf.PdfDocument
 import com.mustafakoceerr.tilepdf.core.render.PageRenderer
 import com.mustafakoceerr.tilepdf.core.text.TextSelection
 import com.mustafakoceerr.tilepdf.core.render.TiledPageImageSource
 import com.mustafakoceerr.tilepdf.data.library.LibraryRepository
-import com.mustafakoceerr.tilepdf.data.outline.DocumentOutlineRepository
 import com.mustafakoceerr.tilepdf.data.preferences.ReaderPreferencesRepository
 import com.mustafakoceerr.tilepdf.data.text.DocumentTextRepository
 import com.mustafakoceerr.tilepdf.di.ApplicationScope
@@ -20,6 +20,7 @@ import com.mustafakoceerr.tilepdf.feature.reader.navigation.ReaderRoute
 import com.mustafakoceerr.tilepdf.model.PageText
 import com.mustafakoceerr.tilepdf.model.ReadingPosition
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
@@ -37,8 +38,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import java.io.FileNotFoundException
-import java.io.IOException
 import javax.inject.Inject
 
 private const val SAVE_POSITION_DEBOUNCE_MS = 500L
@@ -52,7 +51,6 @@ class ReaderViewModel @Inject constructor(
     private val libraryRepository: LibraryRepository,
     private val preferencesRepository: ReaderPreferencesRepository,
     private val documentTextRepository: DocumentTextRepository,
-    private val outlineRepository: DocumentOutlineRepository,
     @param:ApplicationScope private val applicationScope: CoroutineScope,
 ) : ViewModel() {
 
@@ -99,18 +97,14 @@ class ReaderViewModel @Inject constructor(
         viewModelScope.launch {
             documentState.value = try {
                 val opened = openDocument(uri)
-                prepareSearch()
-                loadOutline()
+                loadOutline(opened.document)
                 DocumentState.Opened(
                     opened = opened,
                     pageImages = TiledPageImageSource(opened.document, pageRenderer, viewModelScope),
                 )
-            } catch (_: FileNotFoundException) {
-                DocumentState.Failed(ReaderError.NotFound)
-            } catch (_: SecurityException) {
-                DocumentState.Failed(ReaderError.PasswordProtected)
-            } catch (_: IOException) {
-                DocumentState.Failed(ReaderError.Corrupt)
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                DocumentState.Failed(readerErrorFor(e) ?: throw e)
             }
         }
         savePositionWhileReading()
@@ -150,9 +144,10 @@ class ReaderViewModel @Inject constructor(
     /** Selects the word at a point on a page, given in top-left PDF points. */
     fun onLongPress(pageIndex: Int, x: Float, y: Float) {
         selectionJob?.cancel()
+        val document = openedDocument() ?: return
         selectionJob = viewModelScope.launch {
             // Unreadable text: nothing to select.
-            val page = runCatchingCancellable { documentTextRepository.pageText(uri, pageIndex) }
+            val page = runCatchingCancellable { documentTextRepository.pageText(document, pageIndex) }
                 .getOrNull() ?: return@launch
             selection.value = TextSelection.wordAt(page, x, y)?.let { Selection(page, it) }
         }
@@ -219,10 +214,10 @@ class ReaderViewModel @Inject constructor(
                     it.copy(matches = emptyList(), currentIndex = -1, isSearching = query.isNotBlank())
                 }
                 if (query.isBlank()) return@collectLatest
-                val pageCount = documentState.filterIsInstance<DocumentState.Opened>()
-                    .first().opened.document.pageCount
-                documentTextRepository.search(uri, pageCount, query)
-                    // An unreadable document simply has no matches.
+                val document = documentState.filterIsInstance<DocumentState.Opened>()
+                    .first().opened.document
+                documentTextRepository.search(document, query)
+                    // An unreadable or closed document simply has no more matches.
                     .catch { }
                     .collect { pageMatches ->
                         searchState.update { state ->
@@ -237,15 +232,10 @@ class ReaderViewModel @Inject constructor(
             }
     }
 
-    private fun loadOutline() = viewModelScope.launch {
-        // Optional extra: a PDF PdfBox can't parse simply shows no contents.
-        runCatchingCancellable { outlineRepository.outline(uri) }
+    private fun loadOutline(document: PdfDocument) = viewModelScope.launch {
+        // Optional extra: a damaged outline simply shows no contents.
+        runCatchingCancellable { document.outline() }
             .onSuccess { entries -> toc.update { it.copy(entries = entries) } }
-    }
-
-    private fun prepareSearch() = viewModelScope.launch {
-        // Best effort: if text can't be read, searching just finds nothing.
-        runCatchingCancellable { documentTextRepository.prepare(uri) }
     }
 
     @OptIn(FlowPreview::class)
@@ -258,10 +248,13 @@ class ReaderViewModel @Inject constructor(
     }
 
     override fun onCleared() {
-        (documentState.value as? DocumentState.Opened)?.opened?.document?.close()
+        val document = openedDocument() ?: return
+        document.close()
         // viewModelScope is already cancelled here.
-        applicationScope.launch { documentTextRepository.release(uri) }
+        applicationScope.launch { documentTextRepository.release(document) }
     }
+
+    private fun openedDocument() = (documentState.value as? DocumentState.Opened)?.opened?.document
 
     /** The page's text is kept so dragging handles needs no reload. */
     private data class Selection(val page: PageText, val range: IntRange) {

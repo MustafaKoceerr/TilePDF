@@ -22,15 +22,25 @@ class OpenDocumentUseCase @Inject constructor(
     private val libraryRepository: LibraryRepository,
 ) {
 
-    /** @throws Exception as documented on [DocumentRepository.open]. */
+    /**
+     * The caller owns the returned document. If anything fails or the caller is
+     * cancelled after the file was opened, the document is closed here.
+     *
+     * @throws Exception as documented on [DocumentRepository.open].
+     */
     suspend operator fun invoke(uri: String): OpenedDocument {
         val document = documentRepository.open(uri)
-        val displayName = documentRepository.displayName(uri) ?: uri.substringAfterLast('/')
-        libraryRepository.recordOpened(uri, displayName, document.pageCount)
-        return OpenedDocument(
-            document = document,
-            displayName = displayName,
-            position = libraryRepository.readingPosition(uri) ?: ReadingPosition(),
-        )
+        try {
+            val displayName = documentRepository.displayName(uri) ?: uri.substringAfterLast('/')
+            libraryRepository.recordOpened(uri, displayName, document.pageCount)
+            return OpenedDocument(
+                document = document,
+                displayName = displayName,
+                position = libraryRepository.readingPosition(uri) ?: ReadingPosition(),
+            )
+        } catch (e: Throwable) {
+            document.close()
+            throw e
+        }
     }
 }

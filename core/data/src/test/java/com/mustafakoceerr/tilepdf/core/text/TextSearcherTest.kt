@@ -10,7 +10,7 @@ class TextSearcherTest {
 
     /**
      * Lays [lines] out as 10 pt wide, 12 pt tall chars, 20 pt per line, with
-     * box-less separators between words and lines like PdfBox inserts.
+     * box-less separators between words and lines like PDFium generates.
      */
     private fun page(vararg lines: String): PageText {
         val builder = PageText.Builder(expectedLength = 4)

@@ -8,7 +8,9 @@
 #include <cerrno>
 #include <cmath>
 #include <cstdint>
+#include <list>
 #include <unistd.h>
+#include <utility>
 #include <vector>
 
 #include "fpdf_doc.h"
@@ -19,11 +21,57 @@ namespace {
 
 bool g_initialized = false;
 
+// NativePageText(String, float[]), resolved once in JNI_OnLoad.
+jclass g_pageTextClass = nullptr;
+jmethodID g_pageTextConstructor = nullptr;
+
+// Pages kept loaded per document. Loading parses the page's content, so a
+// page drawn as a dozen tiles is parsed once instead of once per tile: on a
+// Galaxy A52 a 1080 px page of a 300 dpi scan draws in about 300 ms instead
+// of 1450 ms. A loaded page also keeps its decoded images (~29 MB per
+// scanned page), and Android 14+ sends no trim callbacks while the app is
+// visible, so the cap stays small. Tiles are requested page by page, so two
+// pages cover the pages on screen.
+constexpr size_t kLoadedPages = 2;
+
 // PDFium reads the file lazily for as long as the document is open, so the
 // read callback and the descriptor it uses live as long as the document.
 struct NativeDocument {
     FPDF_FILEACCESS access{};
     FPDF_DOCUMENT document = nullptr;
+    // Most recently used first.
+    std::list<std::pair<int, FPDF_PAGE>> pages;
+
+    // The loaded page [index], from the cache when possible; null if it
+    // can't be loaded. Owned by this document: callers must not close it.
+    FPDF_PAGE Page(int index) {
+        for (auto it = pages.begin(); it != pages.end(); ++it) {
+            if (it->first == index) {
+                pages.splice(pages.begin(), pages, it);
+                return it->second;
+            }
+        }
+        FPDF_PAGE page = FPDF_LoadPage(document, index);
+        if (!page) return nullptr;
+        pages.emplace_front(index, page);
+        if (pages.size() > kLoadedPages) {
+            FPDF_ClosePage(pages.back().second);
+            pages.pop_back();
+        }
+        return page;
+    }
+
+    // Closes every loaded page; later calls load them again.
+    void Trim() {
+        for (auto& entry : pages) FPDF_ClosePage(entry.second);
+        pages.clear();
+    }
+
+    // Pages first: PDFium requires them closed before their document.
+    void Close() {
+        Trim();
+        FPDF_CloseDocument(document);
+    }
 };
 
 int ReadBlock(void* param, unsigned long position, unsigned char* buffer, unsigned long size) {
@@ -57,17 +105,16 @@ void PageToTopLeft(FPDF_PAGE page, double x, double y, float* outX, float* outY)
     *outY = static_cast<float>(deviceY) / kDeviceScale;
 }
 
-// Owns a loaded page and its text page for the duration of one call.
+// A cached page and its text page; the text page lives for one call.
 struct TextPage {
     FPDF_PAGE page;
     FPDF_TEXTPAGE text;
 
-    TextPage(FPDF_DOCUMENT document, int index)
-        : page(FPDF_LoadPage(document, index)), text(page ? FPDFText_LoadPage(page) : nullptr) {}
+    TextPage(NativeDocument* document, int index)
+        : page(document->Page(index)), text(page ? FPDFText_LoadPage(page) : nullptr) {}
 
     ~TextPage() {
         if (text) FPDFText_ClosePage(text);
-        if (page) FPDF_ClosePage(page);
     }
 
     TextPage(const TextPage&) = delete;
@@ -77,6 +124,17 @@ struct TextPage {
 }  // namespace
 
 extern "C" {
+
+JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void*) {
+    JNIEnv* env = nullptr;
+    if (vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6) != JNI_OK) return JNI_ERR;
+    jclass local = env->FindClass("com/mustafakoceerr/tilepdf/core/pdf/NativePageText");
+    if (!local) return JNI_ERR;
+    g_pageTextClass = static_cast<jclass>(env->NewGlobalRef(local));
+    env->DeleteLocalRef(local);
+    g_pageTextConstructor = env->GetMethodID(g_pageTextClass, "<init>", "(Ljava/lang/String;[F)V");
+    return g_pageTextConstructor ? JNI_VERSION_1_6 : JNI_ERR;
+}
 
 JNIEXPORT void JNICALL
 Java_com_mustafakoceerr_tilepdf_core_pdf_PdfiumNative_nativeInit(JNIEnv*, jclass) {
@@ -118,8 +176,18 @@ Java_com_mustafakoceerr_tilepdf_core_pdf_PdfiumNative_nativeOpen(
 JNIEXPORT void JNICALL
 Java_com_mustafakoceerr_tilepdf_core_pdf_PdfiumNative_nativeCloseDocument(JNIEnv*, jclass, jlong handle) {
     NativeDocument* native = FromHandle(handle);
-    FPDF_CloseDocument(native->document);
+    native->Close();
     delete native;
+}
+
+JNIEXPORT void JNICALL
+Java_com_mustafakoceerr_tilepdf_core_pdf_PdfiumNative_nativeTrim(JNIEnv*, jclass, jlong handle) {
+    FromHandle(handle)->Trim();
+}
+
+JNIEXPORT jint JNICALL
+Java_com_mustafakoceerr_tilepdf_core_pdf_PdfiumNative_nativeLoadedPageCount(JNIEnv*, jclass, jlong handle) {
+    return static_cast<jint>(FromHandle(handle)->pages.size());
 }
 
 JNIEXPORT jint JNICALL
@@ -153,12 +221,11 @@ Java_com_mustafakoceerr_tilepdf_core_pdf_PdfiumNative_nativeRender(
         info.format != ANDROID_BITMAP_FORMAT_RGBA_8888 || env->GetArrayLength(matrix) != 6) {
         return JNI_FALSE;
     }
-    FPDF_PAGE page = FPDF_LoadPage(FromHandle(handle)->document, index);
+    FPDF_PAGE page = FromHandle(handle)->Page(index);
     if (!page) return JNI_FALSE;
 
     void* pixels = nullptr;
     if (AndroidBitmap_lockPixels(env, bitmap, &pixels) != ANDROID_BITMAP_RESULT_SUCCESS) {
-        FPDF_ClosePage(page);
         return JNI_FALSE;
     }
     jfloat m[6];
@@ -175,39 +242,25 @@ Java_com_mustafakoceerr_tilepdf_core_pdf_PdfiumNative_nativeRender(
         FPDFBitmap_Destroy(target);
     }
     AndroidBitmap_unlockPixels(env, bitmap);
-    FPDF_ClosePage(page);
     return target ? JNI_TRUE : JNI_FALSE;
 }
 
-// The page's text, one Java char per PDFium character index, or null if the
-// page has no text layer. Characters outside the BMP become U+FFFD so the
-// indices stay aligned with nativeCharBoxes.
-JNIEXPORT jstring JNICALL
+// The page's text and boxes as a NativePageText, loading the text page once;
+// null if the page has no text layer. One Java char per PDFium character
+// index (outside the BMP becomes U+FFFD) and four floats per char: left,
+// top, right, bottom in top-left points, NaN for generated characters and
+// those without a box.
+JNIEXPORT jobject JNICALL
 Java_com_mustafakoceerr_tilepdf_core_pdf_PdfiumNative_nativePageText(
         JNIEnv* env, jclass, jlong handle, jint index) {
-    TextPage page(FromHandle(handle)->document, index);
+    TextPage page(FromHandle(handle), index);
     if (!page.text) return nullptr;
-    const int count = FPDFText_CountChars(page.text);
-    if (count <= 0) return env->NewString(nullptr, 0);
+    const int count = std::max(FPDFText_CountChars(page.text), 0);
     std::vector<jchar> chars(static_cast<size_t>(count));
+    std::vector<jfloat> boxes(static_cast<size_t>(count) * 4, NAN);
     for (int i = 0; i < count; ++i) {
         const unsigned int unicode = FPDFText_GetUnicode(page.text, i);
         chars[static_cast<size_t>(i)] = unicode > 0xFFFF ? 0xFFFD : static_cast<jchar>(unicode);
-    }
-    return env->NewString(chars.data(), count);
-}
-
-// Four floats per character in nativePageText's order: left, top, right,
-// bottom in top-left points. NaN for generated characters and those without
-// a box. Null if the page has no text layer.
-JNIEXPORT jfloatArray JNICALL
-Java_com_mustafakoceerr_tilepdf_core_pdf_PdfiumNative_nativeCharBoxes(
-        JNIEnv* env, jclass, jlong handle, jint index) {
-    TextPage page(FromHandle(handle)->document, index);
-    if (!page.text) return nullptr;
-    const int count = FPDFText_CountChars(page.text);
-    std::vector<jfloat> boxes(static_cast<size_t>(count > 0 ? count : 0) * 4, NAN);
-    for (int i = 0; i < count; ++i) {
         double left = 0, right = 0, bottom = 0, top = 0;
         if (FPDFText_IsGenerated(page.text, i) != 0 ||
             !FPDFText_GetCharBox(page.text, i, &left, &right, &bottom, &top)) {
@@ -222,10 +275,12 @@ Java_com_mustafakoceerr_tilepdf_core_pdf_PdfiumNative_nativeCharBoxes(
         box[2] = std::max(x1, x2);
         box[3] = std::max(y1, y2);
     }
-    jfloatArray result = env->NewFloatArray(static_cast<jsize>(boxes.size()));
-    if (!result) return nullptr;  // OutOfMemoryError is pending.
-    env->SetFloatArrayRegion(result, 0, static_cast<jsize>(boxes.size()), boxes.data());
-    return result;
+    jstring text = env->NewString(chars.data(), count);
+    if (!text) return nullptr;  // OutOfMemoryError is pending.
+    jfloatArray boxArray = env->NewFloatArray(count * 4);
+    if (!boxArray) return nullptr;  // OutOfMemoryError is pending.
+    env->SetFloatArrayRegion(boxArray, 0, count * 4, boxes.data());
+    return env->NewObject(g_pageTextClass, g_pageTextConstructor, text, boxArray);
 }
 
 // First child of [parent], or of the outline root when [parent] is 0; 0 if none.
@@ -291,13 +346,12 @@ Java_com_mustafakoceerr_tilepdf_core_pdf_PdfiumNative_nativePageToTopLeft(
     const jsize count = env->GetArrayLength(points);
     std::vector<jfloat> values(static_cast<size_t>(count));
     env->GetFloatArrayRegion(points, 0, count, values.data());
-    FPDF_PAGE page = FPDF_LoadPage(FromHandle(handle)->document, index);
+    FPDF_PAGE page = FromHandle(handle)->Page(index);
     if (!page) return nullptr;
     for (jsize i = 0; i + 1 < count; i += 2) {
         PageToTopLeft(page, values[static_cast<size_t>(i)], values[static_cast<size_t>(i) + 1],
                       &values[static_cast<size_t>(i)], &values[static_cast<size_t>(i) + 1]);
     }
-    FPDF_ClosePage(page);
     jfloatArray result = env->NewFloatArray(count);
     if (!result) return nullptr;  // OutOfMemoryError is pending.
     env->SetFloatArrayRegion(result, 0, count, values.data());

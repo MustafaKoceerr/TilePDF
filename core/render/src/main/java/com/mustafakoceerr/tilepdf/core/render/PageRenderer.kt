@@ -27,7 +27,7 @@ class PageRenderer @Inject constructor(
     /**
      * Only the part of the page covered by [tile]. The page is scaled to the
      * tile's render width, then shifted so the tile's top-left corner lands
-     * at the bitmap origin; PdfRenderer clips everything else.
+     * at the bitmap origin; the engine clips everything else.
      *
      * @param reuse a pooled bitmap to render into instead of allocating; it is
      *   reconfigured to the tile size, so it must be large enough.

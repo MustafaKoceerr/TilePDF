@@ -3,6 +3,7 @@ package com.mustafakoceerr.tilepdf.core.pdf
 import android.graphics.Bitmap
 import android.graphics.Matrix
 import android.os.ParcelFileDescriptor
+import androidx.annotation.VisibleForTesting
 import com.mustafakoceerr.tilepdf.core.geometry.PdfRect
 import com.mustafakoceerr.tilepdf.model.OutlineEntry
 import com.mustafakoceerr.tilepdf.model.PageText
@@ -13,7 +14,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import java.io.Closeable
 
 /**
  * An open PDF backed by PDFium. Every call runs on the shared PDF dispatcher
@@ -23,21 +23,18 @@ import java.io.Closeable
 class PdfiumDocument internal constructor(
     private val fileDescriptor: ParcelFileDescriptor,
     private val handle: Long,
-    /** Size of every page, read once when the document is opened. */
-    val pageSizes: List<PageSize>,
+    override val pageSizes: List<PageSize>,
     private val dispatcher: CoroutineDispatcher,
-) : Closeable {
+) : PdfDocument {
 
     private val mutex = Mutex()
     private var closed = false
-
-    val pageCount: Int get() = pageSizes.size
 
     /**
      * Renders [pageIndex] into [bitmap]. [transform] maps top-left page points
      * to bitmap pixels; the caller is responsible for clearing the bitmap.
      */
-    suspend fun render(pageIndex: Int, bitmap: Bitmap, transform: Matrix) {
+    override suspend fun render(pageIndex: Int, bitmap: Bitmap, transform: Matrix) {
         require(bitmap.config == Bitmap.Config.ARGB_8888) { "Bitmap must be ARGB_8888, was ${bitmap.config}" }
         val values = FloatArray(9).also(transform::getValues)
         // Android's Matrix is row-major 3x3; PDFium's is {a, b, c, d, e, f}
@@ -56,11 +53,11 @@ class PdfiumDocument internal constructor(
      * Line breaks are plain `'\n'`; characters PDFium generates (spaces and
      * line breaks it inferred) have no box.
      */
-    suspend fun pageText(pageIndex: Int): PageText {
-        val (text, boxes) = withDocument(pageIndex) {
-            PdfiumNative.nativePageText(it, pageIndex) to PdfiumNative.nativeCharBoxes(it, pageIndex)
-        }
-        if (text == null || boxes == null) return PageText.withoutBoxes(pageIndex, "")
+    override suspend fun pageText(pageIndex: Int): PageText {
+        val native = withDocument(pageIndex) { PdfiumNative.nativePageText(it, pageIndex) }
+            ?: return PageText.withoutBoxes(pageIndex, "")
+        val text = native.text
+        val boxes = native.boxes
         val builder = PageText.Builder(text.length)
         text.forEachIndexed { i, char ->
             if (char == '\r') return@forEachIndexed
@@ -82,7 +79,7 @@ class PdfiumDocument internal constructor(
      * top-left needs the page loaded, so that happens one page per call, and
      * renders waiting on the PDF dispatcher run in between.
      */
-    suspend fun outline(): List<OutlineEntry> {
+    override suspend fun outline(): List<OutlineEntry> {
         val raw = withDocument { handle -> readBookmarks(handle) }
         val tops = HashMap<Int, FloatArray?>()
         for ((pageIndex, entries) in raw.filter { !it.y.isNaN() }.groupBy { it.pageIndex }) {
@@ -125,6 +122,18 @@ class PdfiumDocument internal constructor(
         addChildren(parent = 0L, depth = 0)
         return entries
     }
+
+    override suspend fun trimMemory() {
+        try {
+            withDocument { PdfiumNative.nativeTrim(it) }
+        } catch (_: IllegalStateException) {
+            // Already closed: nothing left to free.
+        }
+    }
+
+    /** Pages PDFium currently keeps loaded for this document. */
+    @VisibleForTesting
+    internal suspend fun loadedPageCount(): Int = withDocument { PdfiumNative.nativeLoadedPageCount(it) }
 
     /** Runs [block] with the native handle, after checking [pageIndex] if given. */
     internal suspend fun <T> withDocument(pageIndex: Int? = null, block: (Long) -> T): T {

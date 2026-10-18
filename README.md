@@ -3,13 +3,14 @@
 An ad-free PDF reader for Android with its own tile-based rendering engine.
 
 TilePDF doesn't wrap a ready-made viewer (`androidx.pdf`, `PdfViewerFragment`).
-It builds the viewer on top of the platform's low-level `PdfRenderer`:
-viewport math, 512 px tiles, a memory-bounded cache, PDF-point to screen-pixel
-mapping for search highlights, and two interchangeable text-extraction
-strategies chosen at runtime.
+It embeds PDFium, the engine behind Chrome and Android's own `PdfRenderer`,
+through a small JNI layer, so every Android version from 10 up renders and
+reads text identically. On top of it: viewport math, 512 px tiles, a
+memory-bounded cache, and PDF-point to screen-pixel mapping for search
+highlights and text selection.
 
 **Stack:** Kotlin · Jetpack Compose · Material 3 · Coroutines/Flow · Hilt ·
-Room · DataStore · Navigation Compose (type-safe) · PdfBox-Android ·
+Room · DataStore · Navigation Compose (type-safe) · PDFium (C++, via JNI) ·
 minSdk 29
 
 ## Features
@@ -51,13 +52,13 @@ core:data            Repositories behind interfaces
                        DocumentRepository     SAF access, persisted grants
                        LibraryRepository      Room
                        ReaderPreferences      DataStore
-                       TextSearchRepository   PdfTextProvider strategy + text cache
+                       DocumentTextRepository page text cache for search/selection
                      TextSearcher, TextSelection
    ▼
 core:database        Room (schema history in core/database/schemas)
 core:datastore       Preferences DataStore
 core:render          TileGrid, PageRenderer, TiledPageImageSource, BitmapCache, BitmapPool
-core:pdf             PdfDocument: PdfRenderer serialized on one thread
+core:pdf             PdfDocument / PdfEngine, implemented with PDFium (JNI)
    ▼
 core:model           Pure Kotlin: geometry (Viewport, PageLayout, CoordinateMapper) and data
 core:common          Dispatcher qualifiers, application scope
@@ -92,8 +93,14 @@ SHA-256 differs from the pinned one; no binaries are committed. To update
 PDFium, change `RELEASE` and the four hashes in
 `build-logic/convention/src/main/kotlin/PdfiumConventionPlugin.kt`.
 
-The reader still renders with `PdfRenderer` and extracts text with PdfBox; it
-moves to PDFium next, and both go away.
+Each document keeps its two most recently used pages loaded natively, so a
+page drawn as many tiles is parsed once, and text extraction reuses the same
+page. On a Galaxy A52 that draws a 1080 px page of a 300 dpi scan in about
+300 ms instead of 1450 ms, and a page of 20 000 vector lines in about 260 ms
+instead of 1650 ms. A loaded page also keeps its decoded images (about 29 MB
+for a scanned page), so the cache stays at two pages and is emptied whenever
+the reader trims memory. `PdfDocument` and `PdfEngine` are interfaces, so data and ViewModel code
+is tested with fakes.
 
 ## Rendering pipeline
 
@@ -125,8 +132,9 @@ moves to PDFium next, and both go away.
 - **Tile draws happen in the draw phase.** A tile arriving redraws one page
   without recomposition. Tile edges are rounded independently so neighbours
   share edges exactly (no hairline seams).
-- **One PDF thread.** `PdfRenderer` isn't thread-safe and allows one open page,
-  so all access goes through a single-threaded dispatcher plus a mutex.
+- **One PDF thread.** PDFium isn't thread-safe and its state is global, so
+  every document goes through one single-threaded dispatcher, plus a mutex per
+  document so closing waits for in-flight work.
 
 ## Memory strategy
 
@@ -151,36 +159,28 @@ Search highlights must land on the rendered glyphs at any zoom. Everything
 meets in one convention: **PDF points, top-left origin, relative to the crop
 box, page rotation applied.**
 
-- Text providers produce boxes in that space. PdfBox's `*DirAdj` coordinates
-  already are; PDFium's `searchText` bounds already are.
+- PDFium's character boxes are mapped into that space with
+  `FPDF_PageToDevice`, which applies the crop box and `/Rotate`.
 - `CoordinateMapper` converts points to page pixels with the same
   points-to-pixels factor the renderer uses (`PageSize.scaleForWidth`), so
   highlights and tiles can't drift apart.
 - Screen placement reuses the list's own rounding (`Dp.roundToPx`,
   `round(width × zoom)`) rather than approximating it.
 
-## Text extraction: strategies behind one interface
+## Text: search and selection
 
-`PdfTextProvider` has three implementations; `TextModule` picks one by API
-level:
+The reader's open `PdfDocument` also supplies its text: PDFium extracts a page
+with one box per character, and `CachingDocumentTextRepository` keeps every
+page it has extracted. The first search extracts pages as it reaches them and
+streams each page's matches; later searches only scan memory. Selecting text
+reuses the same cache.
 
-- **`PdfBoxTextProvider`** (all API levels) extracts every character with
-  its box once and caches it. It searches with `TextSearcher`, which is
-  case-insensitive, folds Turkish İ/ı/I/i together, and matches a line break
-  as a space.
-- **`NativePdfTextProvider`** (API 35+) calls `PdfRenderer.Page.searchText`
-  (PDFium). It needs no extraction but caches nothing.
-- **`HybridTextProvider`** (API 35+, **the default there**) answers with
-  native search immediately while PdfBox extracts the document in the
-  background. Each page switches to the PdfBox cache once it has been
-  extracted.
-
-Below API 35, PdfBox handles everything.
-
-The text provider opens together with the document, so warm-up starts before
-the first search. Extracted text is stored compactly as a String plus four
-floats per character (about 18 bytes per character), so keeping a whole book
-in memory stays affordable.
+Search runs in Kotlin with `TextSearcher`, which is case-insensitive, folds
+Turkish İ/ı/I/i together, and matches a line break as a space. Extracted text
+is stored compactly as a String plus four floats per character (about 18
+bytes per character), so keeping a whole book in memory stays affordable.
+Nothing is extracted in the background: that would compete with rendering for
+the one PDF thread.
 
 ## Testing
 
@@ -188,9 +188,8 @@ in memory stays affordable.
 ./gradlew testDebugUnitTest            # JVM: zoom math, viewport, tile grid,
                                        # text search and selection, coordinate
                                        # mapping, table-of-contents lookup
-./gradlew connectedDebugAndroidTest    # device: PdfRenderer, tiles, pool,
-                                       # PdfBox extraction, outline, Room
-                                       # migration
+./gradlew connectedDebugAndroidTest    # device: PDFium open/render/text/
+                                       # outline, tiles, pool, Room migration
 ```
 
 Instrumented tests to note:
@@ -200,7 +199,15 @@ Instrumented tests to note:
 - **The tile source's fallback, cache and pool behaviour** is tested on a real
   PDF, including a regression test for render jobs that finish without
   suspending.
-- **PdfBox boxes land at known positions** in the generated sample PDF.
+- **PDFium matches the platform renderer**: the same page sizes, and pixels
+  within anti-aliasing tolerance of `PdfRenderer` (kept only as a test-time
+  reference).
+- **Character boxes land at known positions** in the generated sample PDF,
+  and encrypted, truncated and invalid files fail with typed errors.
+
+Run instrumented tests one device at a time (`ANDROID_SERIAL=<serial>`): with
+several devices in parallel, AGP 9.4 sometimes reports passing tests as
+failed.
 
 Test PDFs in `core/testing/src/main/assets` are small hand-built files with
 known content and positions, generated by `tools/generate_test_pdfs.py`;

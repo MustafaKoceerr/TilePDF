@@ -8,7 +8,7 @@ import org.junit.Test
 
 class TextSelectionTest {
 
-    /** 10 pt wide, 12 pt tall chars, 20 pt per line; box-less separators like PdfBox. */
+    /** 10 pt wide, 12 pt tall chars, 20 pt per line; box-less separators like PDFium generates. */
     private fun page(vararg lines: String): PageText {
         val builder = PageText.Builder()
         lines.forEachIndexed { row, line ->

@@ -142,6 +142,9 @@ class TiledPageImageSource(
         }
         bitmapPool.clear(recycle = uiHidden)
         draftCache.trimToSize(DRAFT_CACHE_BYTES / 2)
+        // Pages the engine keeps parsed reload in milliseconds; native memory is
+        // invisible to the caches above, so free it too.
+        scope.launch { document.trimMemory() }
     }
 
     @VisibleForTesting

@@ -10,7 +10,6 @@ dependencies {
     implementation(projects.core.database)
     implementation(projects.core.datastore)
     implementation(libs.androidx.core.ktx)
-    implementation(libs.pdfbox.android)
 
     androidTestImplementation(projects.core.testing)
 }

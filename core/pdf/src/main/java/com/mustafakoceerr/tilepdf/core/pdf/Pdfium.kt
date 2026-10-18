@@ -5,6 +5,10 @@ import android.net.Uri
 import com.mustafakoceerr.tilepdf.di.PdfDispatcher
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import java.io.FileNotFoundException
 import javax.inject.Inject
@@ -18,13 +22,21 @@ import javax.inject.Singleton
 class Pdfium @Inject constructor(
     @param:ApplicationContext private val context: Context,
     @param:PdfDispatcher private val dispatcher: CoroutineDispatcher,
-) {
-    /**
-     * @throws FileNotFoundException if [uri] can't be opened.
-     * @throws PdfPasswordException if the document needs a (different) password.
-     * @throws PdfCorruptException if the file isn't a readable PDF.
-     */
-    suspend fun open(uri: Uri, password: String? = null): PdfiumDocument = withContext(dispatcher) {
+) : PdfEngine {
+    override suspend fun open(uri: Uri, password: String?): PdfiumDocument {
+        // Not cancellable midway: a cancelled withContext would drop a document
+        // it had already opened. Cancellation is honoured right after instead.
+        val document = withContext(dispatcher + NonCancellable) { openNow(uri, password) }
+        try {
+            currentCoroutineContext().ensureActive()
+        } catch (e: CancellationException) {
+            document.close()
+            throw e
+        }
+        return document
+    }
+
+    private fun openNow(uri: Uri, password: String?): PdfiumDocument {
         PdfiumNative.nativeInit()
         val fileDescriptor = context.contentResolver.openFileDescriptor(uri, "r")
             ?: throw FileNotFoundException("Cannot open $uri")
@@ -39,7 +51,7 @@ class Pdfium @Inject constructor(
                 PdfiumNative.nativeCloseDocument(handle)
                 throw e
             }
-            PdfiumDocument(fileDescriptor, handle, pageSizes, dispatcher)
+            return PdfiumDocument(fileDescriptor, handle, pageSizes, dispatcher)
         } catch (e: Exception) {
             fileDescriptor.close()
             throw e
@@ -49,7 +61,8 @@ class Pdfium @Inject constructor(
     private fun pageSize(handle: Long, index: Int): PageSize {
         val size = PdfiumNative.nativePageSize(handle, index)
         if (size.size != 2) throw PdfCorruptException("Page $index has no size")
-        // Truncated like PdfRenderer, so both engines lay pages out identically.
+        // Truncated to whole points, as PdfRenderer did, so saved layouts and
+        // reading positions stay the same after the switch.
         return PageSize(size[0].toInt(), size[1].toInt())
     }
 }

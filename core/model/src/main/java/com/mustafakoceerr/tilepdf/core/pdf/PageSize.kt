@@ -2,7 +2,7 @@ package com.mustafakoceerr.tilepdf.core.pdf
 
 import kotlin.math.roundToInt
 
-/** Page dimensions in PDF points (1/72 inch), as reported by PdfRenderer. */
+/** Page dimensions in whole PDF points (1/72 inch), rotation applied. */
 data class PageSize(val widthPt: Int, val heightPt: Int) {
     val aspectRatio: Float get() = widthPt.toFloat() / heightPt
 
