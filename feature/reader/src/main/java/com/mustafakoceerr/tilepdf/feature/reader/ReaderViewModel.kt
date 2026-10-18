@@ -18,7 +18,11 @@ import com.mustafakoceerr.tilepdf.model.DocumentView
 import com.mustafakoceerr.tilepdf.model.FormField
 import com.mustafakoceerr.tilepdf.model.FormFieldKind
 import com.mustafakoceerr.tilepdf.data.document.SharedDocuments
+import com.mustafakoceerr.tilepdf.data.signature.SignatureStore
 import com.mustafakoceerr.tilepdf.data.thumbnail.ThumbnailStore
+import com.mustafakoceerr.tilepdf.model.Signature
+import com.mustafakoceerr.tilepdf.model.normalizeSignature
+import com.mustafakoceerr.tilepdf.model.placedAround
 import com.mustafakoceerr.tilepdf.data.annotation.AnnotationRepository
 import com.mustafakoceerr.tilepdf.data.annotation.AnnotationSaveScheduler
 import com.mustafakoceerr.tilepdf.data.annotation.SaveResult
@@ -81,6 +85,11 @@ import javax.inject.Inject
 private const val SAVE_POSITION_DEBOUNCE_MS = 500L
 private const val SEARCH_DEBOUNCE_MS = 300L
 
+/** A signature as wide as one written by hand on a form line. */
+private const val SIGNATURE_WIDTH_PT = 160f
+private const val SIGNATURE_PEN_PT = 1.5f
+private const val SIGNATURE_COLOR = 0xFF000000.toInt()
+
 /** Twice the library's 40 dp row picture at most densities, still small as a PNG. */
 private const val THUMBNAIL_WIDTH_PX = 240
 
@@ -99,6 +108,7 @@ class ReaderViewModel @Inject constructor(
     private val saveAsCopy: SaveAsCopyUseCase,
     private val sharedDocuments: SharedDocuments,
     private val thumbnailStore: ThumbnailStore,
+    private val signatureStore: SignatureStore,
     @param:ApplicationScope private val applicationScope: CoroutineScope,
 ) : ViewModel() {
 
@@ -132,6 +142,8 @@ class ReaderViewModel @Inject constructor(
 
     /** A text or choice field being filled in through a dialog. */
     private val formEditor = MutableStateFlow<FormField?>(null)
+
+    private val signatureStep = MutableStateFlow<SignatureStep?>(null)
 
     /** Reopens the document when a save wrote a new version; one per controller. */
     private var fileSavedJob: Job? = null
@@ -180,7 +192,7 @@ class ReaderViewModel @Inject constructor(
         preferencesRepository.preferences,
         combine(searchState, toc, ::Pair),
         combine(selection, linkTargets, currentPage, fullScreen, startPosition, ::PageState),
-        combine(annotations, editing, combine(saveCopyResult, handOff, ::Pair), jumpHistory, combine(formFields, formEditor, ::Pair), ::Outputs),
+        combine(annotations, editing, combine(saveCopyResult, handOff, ::Pair), jumpHistory, combine(formFields, formEditor, signatureStep, ::Triple), ::Outputs),
     ) { document, preferences, searchAndToc, pageState, annotationUi ->
         val (search, toc) = searchAndToc
         val (selection, links, page, fullScreen, start) = pageState
@@ -214,6 +226,7 @@ class ReaderViewModel @Inject constructor(
                 handOff = handOff,
                 formFields = forms.first,
                 formEditor = forms.second,
+                signatureStep = forms.third,
             )
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ReaderUiState.Loading)
@@ -493,6 +506,10 @@ class ReaderViewModel @Inject constructor(
      * toggles full screen, in that order. Pen and eraser handle their own taps.
      */
     fun onTap(pageIndex: Int, x: Float, y: Float) {
+        (signatureStep.value as? SignatureStep.Place)?.let { step ->
+            placeSignature(step.signature, pageIndex, PdfPoint(x, y))
+            return
+        }
         if (selection.value != null) {
             selection.value = null
             return
@@ -716,6 +733,36 @@ class ReaderViewModel @Inject constructor(
         }
     }
 
+    /** Opens the signature pad, with the saved signature when there is one. */
+    fun onAddSignature() {
+        if (controller.value?.state?.value?.ready != true) return
+        viewModelScope.launch { signatureStep.value = SignatureStep.Pad(signatureStore.load()) }
+    }
+
+    /** The pad's strokes, in any units: kept for next time, then placed with a tap. */
+    fun onSignatureDrawn(strokes: List<List<PdfPoint>>) {
+        val signature = normalizeSignature(strokes)
+        if (signature == null) {
+            signatureStep.value = null
+            return
+        }
+        signatureStep.value = SignatureStep.Place(signature)
+        viewModelScope.launch { signatureStore.save(signature) }
+    }
+
+    fun onSignatureCancelled() {
+        signatureStep.value = null
+    }
+
+    /** An ink drawing like the pen's, so it undoes, erases and saves the same way. */
+    private fun placeSignature(signature: Signature, pageIndex: Int, centre: PdfPoint) {
+        signatureStep.value = null
+        val controller = controller.value?.takeIf { it.state.value.ready } ?: return
+        controller.add(
+            Ink(newAnnotationId(), pageIndex, SIGNATURE_COLOR, SIGNATURE_PEN_PT, signature.placedAround(centre, SIGNATURE_WIDTH_PT)),
+        )
+    }
+
     /** Everything one eraser gesture crossed, removed as one undo step. */
     fun onErase(erased: Erased) {
         controller.value?.removeAll(erased.ids, erased.refs)
@@ -867,7 +914,7 @@ class ReaderViewModel @Inject constructor(
         val editing: AnnotationEditing,
         val results: Pair<SaveCopyResult?, HandOff?>,
         val jumpHistory: JumpHistory,
-        val forms: Pair<Map<Int, List<FormField>>, FormField?>,
+        val forms: Triple<Map<Int, List<FormField>>, FormField?, SignatureStep?>,
     )
 
     /** Where a tapped link leads, until the screen has acted on it. */
