@@ -65,7 +65,7 @@ class StoreGraphicsExport {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Center,
-            modifier = Modifier.background(Color(0xFF3F51B5)).padding(horizontal = pxToDp(56)),
+            modifier = Modifier.fillMaxSize().background(Color(0xFF3F51B5)).padding(horizontal = pxToDp(56)),
         ) {
             Image(painterResource(R.drawable.ic_launcher_foreground), null, Modifier.size(pxToDp(420)))
             Column {

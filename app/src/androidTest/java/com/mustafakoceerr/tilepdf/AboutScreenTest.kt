@@ -1,6 +1,9 @@
 package com.mustafakoceerr.tilepdf
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasScrollAction
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -34,7 +37,10 @@ class AboutScreenTest {
     @Test
     fun opensTheLibraryList() {
         compose.setContent { TilePDFTheme { AboutScreen(onBack = {}, librariesRes = R.raw.aboutlibraries) } }
-        compose.onNodeWithText(context.getString(AboutR.string.about_libraries_summary)).performClick()
+        val summary = context.getString(AboutR.string.about_libraries_summary)
+        // Below PDFium's components: scroll the list to it first.
+        compose.onNode(hasScrollAction()).performScrollToNode(hasText(summary))
+        compose.onNodeWithText(summary).performClick()
         compose.waitUntil(5_000) {
             compose.onAllNodesWithTextCount("Material")
         }
