@@ -19,6 +19,9 @@ object TilePdfIcons {
     @DrawableRes val MoreVert = R.drawable.ic_more_vert
     @DrawableRes val Redo = R.drawable.ic_redo
     @DrawableRes val Search = R.drawable.ic_search
+    @DrawableRes val Sort = R.drawable.ic_sort
+    @DrawableRes val Star = R.drawable.ic_star
+    @DrawableRes val StarBorder = R.drawable.ic_star_border
     @DrawableRes val StickyNote = R.drawable.ic_sticky_note
     @DrawableRes val Tag = R.drawable.ic_tag
     @DrawableRes val TextSelect = R.drawable.ic_text_select

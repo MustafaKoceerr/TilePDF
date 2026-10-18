@@ -106,4 +106,46 @@ class TilePdfDatabaseMigrationTest {
         assertEquals(listOf(7), bookmarks.map { it.pageIndex })
         assertEquals(draft, stored)
     }
+
+    @Test
+    fun migrate4To5KeepsLibrary() {
+        helper.createDatabase(DB_NAME, 4).use { db ->
+            db.execSQL(
+                "INSERT INTO documents (uri, displayName, pageCount, lastPage, " +
+                    "pageOffsetFraction, zoom, panFraction, addedAt, lastOpenedAt) " +
+                    "VALUES ('content://book', 'Book.pdf', 300, 41, 0.5, 2.0, 0.25, 1, 2)"
+            )
+            db.execSQL(
+                "INSERT INTO annotation_drafts (uri, annotations, removedForeign, dirty, baseSize, " +
+                    "baseModified, saveError, updatedAt) VALUES ('content://book', '[]', '[]', 1, 10, NULL, NULL, 3)"
+            )
+        }
+
+        // Validates the migrated schema against the exported 5.json.
+        helper.runMigrationsAndValidate(DB_NAME, 5, true).close()
+
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val database = Room.databaseBuilder(context, TilePdfDatabase::class.java, DB_NAME).build()
+        val (document, draft) = runBlocking {
+            database.documentDao().get("content://book") to database.annotationDraftDao().get("content://book")
+        }
+        database.close()
+
+        assertEquals(41, document!!.lastPage)
+        assertEquals(false, document.favorite)
+        assertEquals(true, draft!!.dirty)
+    }
+
+    @Test
+    fun setFavoriteIsStored() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val database = Room.inMemoryDatabaseBuilder(context, TilePdfDatabase::class.java).build()
+        val document = runBlocking {
+            database.documentDao().recordOpened("content://book", "Book.pdf", pageCount = 3, now = 1)
+            database.documentDao().setFavorite("content://book", true)
+            database.documentDao().get("content://book")
+        }
+        database.close()
+        assertEquals(true, document!!.favorite)
+    }
 }

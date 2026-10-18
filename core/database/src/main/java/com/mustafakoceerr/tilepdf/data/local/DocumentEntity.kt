@@ -18,6 +18,8 @@ data class DocumentEntity(
     @ColumnInfo(defaultValue = "0") val panFraction: Float = 0f,
     val addedAt: Long,
     val lastOpenedAt: Long,
+    /** Added in schema 5. */
+    @ColumnInfo(defaultValue = "0") val favorite: Boolean = false,
 )
 
 fun DocumentEntity.asExternalModel() = LibraryDocument(
@@ -26,4 +28,6 @@ fun DocumentEntity.asExternalModel() = LibraryDocument(
     pageCount = pageCount,
     position = ReadingPosition(lastPage, pageOffsetFraction, zoom, panFraction),
     lastOpenedAt = lastOpenedAt,
+    addedAt = addedAt,
+    favorite = favorite,
 )

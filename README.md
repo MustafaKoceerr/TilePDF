@@ -42,6 +42,10 @@ minSdk 29
 - Light, night (colour inversion) and sepia pages, recoloured without
   re-rendering
 - Keep screen on while reading
+- Library of opened documents: favorites, sorting by last opened, name or
+  date added (remembered), and search that ignores case and Turkish accents
+  ("sozlesme" finds "Sözleşme.pdf"). Removing a document can be undone for a
+  few seconds, since it also deletes its private copy and unsaved annotations
 - Annotations, saved into the PDF itself so other apps show them:
   highlight, underline or strike out selected text; draw with a pen
   (colours, three widths) and erase whole strokes; sticky notes; undo and
