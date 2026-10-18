@@ -24,6 +24,7 @@ import com.mustafakoceerr.tilepdf.model.DocumentView
 import com.mustafakoceerr.tilepdf.model.FormField
 import com.mustafakoceerr.tilepdf.model.FormFieldKind
 import com.mustafakoceerr.tilepdf.data.document.SharedDocuments
+import com.mustafakoceerr.tilepdf.data.signature.DocumentSignatures
 import com.mustafakoceerr.tilepdf.data.signature.SignatureStore
 import com.mustafakoceerr.tilepdf.data.thumbnail.ThumbnailStore
 import com.mustafakoceerr.tilepdf.model.Signature
@@ -122,6 +123,7 @@ class ReaderViewModel @Inject constructor(
     private val thumbnailStore: ThumbnailStore,
     private val signatureStore: SignatureStore,
     private val textRecognizer: TextRecognizer,
+    private val documentSignatures: DocumentSignatures,
     @param:ApplicationScope private val applicationScope: CoroutineScope,
 ) : ViewModel() {
 
@@ -173,6 +175,9 @@ class ReaderViewModel @Inject constructor(
     @OptIn(ExperimentalCoroutinesApi::class)
     private val scriptDialog = scriptHost.flatMapLatest { it?.dialog ?: flowOf(null) }
 
+    private val signatures = MutableStateFlow(SignaturesUiState())
+    private var signaturesJob: Job? = null
+
     private val recognition = MutableStateFlow(RecognitionUiState())
     private var recognitionJob: Job? = null
 
@@ -221,11 +226,11 @@ class ReaderViewModel @Inject constructor(
     val uiState: StateFlow<ReaderUiState> = combine(
         documentState,
         preferencesRepository.preferences,
-        combine(searchState, toc, recognition, ::Triple),
+        combine(searchState, toc, recognition, signatures, ::Panels),
         combine(selection, linkTargets, currentPage, fullScreen, startPosition, ::PageState),
         combine(annotations, editing, combine(saveCopyResult, handOff, ::Pair), jumpHistory, combine(formFields, formEditor, signatureStep, scriptDialog, ::FormState), ::Outputs),
     ) { document, preferences, searchAndToc, pageState, annotationUi ->
-        val (search, toc, textRecognition) = searchAndToc
+        val (search, toc, textRecognition, signatureState) = searchAndToc
         val (selection, links, page, fullScreen, start) = pageState
         val (annotations, editing, results, history, forms) = annotationUi
         val (copyResult, handOff) = results
@@ -261,6 +266,7 @@ class ReaderViewModel @Inject constructor(
                 signatureStep = forms.signatureStep,
                 scriptDialog = forms.scriptDialog,
                 recognition = textRecognition,
+                signatures = signatureState,
             )
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ReaderUiState.Loading)
@@ -331,7 +337,10 @@ class ReaderViewModel @Inject constructor(
                 }
             }
             loadFormFields(currentPage.value)
-            (documentState.value as? DocumentState.Opened)?.let { attachScripts(it.opened) }
+            (documentState.value as? DocumentState.Opened)?.let {
+                attachScripts(it.opened)
+                checkSignatures(it.opened)
+            }
         }
     }
 
@@ -354,6 +363,24 @@ class ReaderViewModel @Inject constructor(
         scriptHost.value = dialogs
         runCatchingCancellable { opened.document.setScriptHost(dialogs, openAction = !openActionRun) }
         openActionRun = true
+    }
+
+    /** Checks [opened]'s signatures in the background; the file may be large. */
+    private fun checkSignatures(opened: OpenedDocument) {
+        signaturesJob?.cancel()
+        signaturesJob = viewModelScope.launch {
+            val found = runCatchingCancellable { opened.document.signatures() }.getOrDefault(emptyList())
+            val checks = runCatchingCancellable { documentSignatures.check(opened.uri, found) }.getOrDefault(emptyList())
+            signatures.update { it.copy(checks = checks, open = it.open && checks.isNotEmpty()) }
+        }
+    }
+
+    fun onOpenSignatures() {
+        if (signatures.value.checks.isNotEmpty()) signatures.update { it.copy(open = true) }
+    }
+
+    fun onCloseSignatures() {
+        signatures.update { it.copy(open = false) }
     }
 
     fun onScriptAnswer(answer: ScriptAnswer) {
@@ -1145,6 +1172,13 @@ class ReaderViewModel @Inject constructor(
         val results: Pair<SaveCopyResult?, HandOff?>,
         val jumpHistory: JumpHistory,
         val forms: FormState,
+    )
+
+    private data class Panels(
+        val search: SearchUiState,
+        val toc: TocUiState,
+        val recognition: RecognitionUiState,
+        val signatures: SignaturesUiState,
     )
 
     private data class FormState(

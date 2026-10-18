@@ -74,6 +74,8 @@ import com.mustafakoceerr.tilepdf.feature.reader.components.RecognitionProgressB
 import com.mustafakoceerr.tilepdf.feature.reader.components.RecognizeTextDialog
 import com.mustafakoceerr.tilepdf.feature.reader.components.ScriptDialogView
 import com.mustafakoceerr.tilepdf.feature.reader.components.SignatureHint
+import com.mustafakoceerr.tilepdf.feature.reader.components.SignaturesChip
+import com.mustafakoceerr.tilepdf.feature.reader.components.SignaturesSheet
 import com.mustafakoceerr.tilepdf.feature.reader.components.SignaturePadDialog
 import com.mustafakoceerr.tilepdf.feature.reader.components.showsSpreads
 import androidx.compose.ui.unit.IntSize
@@ -182,6 +184,8 @@ fun ReaderScreen(
         onFormValueSubmitted = viewModel::onFormValueSubmitted,
         onAddSignature = viewModel::onAddSignature,
         onScriptAnswer = viewModel::onScriptAnswer,
+        onOpenSignatures = viewModel::onOpenSignatures,
+        onCloseSignatures = viewModel::onCloseSignatures,
         recognitionActions = RecognitionActions(
             onRequest = viewModel::onRecognizeTextRequested,
             onRecognize = viewModel::onRecognizeText,
@@ -304,6 +308,8 @@ internal fun ReaderScreen(
     onFormValueSubmitted: (String) -> Unit = {},
     onAddSignature: () -> Unit = {},
     onScriptAnswer: (ScriptAnswer) -> Unit = {},
+    onOpenSignatures: () -> Unit = {},
+    onCloseSignatures: () -> Unit = {},
     recognitionActions: RecognitionActions = RecognitionActions.None,
     onSignatureDrawn: (List<List<PdfPoint>>) -> Unit = {},
     onSignatureCancelled: () -> Unit = {},
@@ -320,6 +326,9 @@ internal fun ReaderScreen(
     SaveCopyResultEffect(ready?.saveCopyResult, onOpenDocument, annotationActions.onSaveCopyResultHandled)
     HandOffEffect(ready?.handOff, annotationActions.onHandOffHandled)
     RecognitionResultEffect(ready?.recognition?.result, recognitionActions.onResultShown)
+    if (ready?.signatures?.open == true) {
+        SignaturesSheet(ready.signatures.checks, onDismiss = onCloseSignatures)
+    }
     ready?.scriptDialog?.let { dialog ->
         // A new dialog starts afresh, even with the same text.
         key(dialog) { ScriptDialogView(dialog, onAnswer = onScriptAnswer) }
@@ -429,6 +438,8 @@ internal fun ReaderScreen(
                             onAddSignature = onAddSignature,
                             recognizing = ready.recognition.progress != null,
                             pagesArePdf = !ready.isXfa,
+                            signed = ready.signatures.checks.isNotEmpty(),
+                            onOpenSignatures = onOpenSignatures,
                             onRecognizeText = recognitionActions.onRequest,
                             onRotate = onRotate,
                             onCropMarginsChange = onCropMarginsChange,
@@ -512,6 +523,12 @@ internal fun ReaderScreen(
                         SignatureHint(onCancel = onSignatureCancelled, modifier = Modifier.navigationBarsPadding())
                     }
                     val recognition = ready?.recognition
+                    val signatureSummary = ready?.signatures?.summary
+                    val quiet = selection == null && ready?.editing?.annotating != true && ready?.signatureStep == null &&
+                        !(ready?.backToPage != null && canJumpBack)
+                    if (signatureSummary != null && ready.currentPage == 0 && quiet && recognition?.progress == null) {
+                        SignaturesChip(signatureSummary, onClick = onOpenSignatures, modifier = Modifier.navigationBarsPadding())
+                    }
                     if (recognition?.progress != null) {
                         RecognitionProgressBar(recognition.progress, onCancel = recognitionActions.onCancel, modifier = Modifier.navigationBarsPadding())
                     } else if (
@@ -1028,6 +1045,8 @@ private fun OverflowMenu(
     recognizing: Boolean,
     /** False on an XFA form, whose pages can't take a signature or recognised text. */
     pagesArePdf: Boolean,
+    signed: Boolean,
+    onOpenSignatures: () -> Unit,
     onRecognizeText: () -> Unit,
     onRotate: () -> Unit,
     onCropMarginsChange: (Boolean) -> Unit,
@@ -1072,6 +1091,16 @@ private fun OverflowMenu(
                     onAddSignature()
                 },
             )
+            if (signed) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.reader_signatures)) },
+                    leadingIcon = { Icon(painterResource(TilePdfIcons.Verified), contentDescription = null) },
+                    onClick = {
+                        onExpandedChange(false)
+                        onOpenSignatures()
+                    },
+                )
+            }
             DropdownMenuItem(
                 text = { Text(stringResource(R.string.reader_recognize_text)) },
                 leadingIcon = { Icon(painterResource(TilePdfIcons.TextScan), contentDescription = null) },

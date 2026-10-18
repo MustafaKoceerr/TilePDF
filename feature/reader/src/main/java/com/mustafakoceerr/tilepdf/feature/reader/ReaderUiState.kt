@@ -10,6 +10,7 @@ import com.mustafakoceerr.tilepdf.core.geometry.PdfRect
 import com.mustafakoceerr.tilepdf.model.DocumentView
 import com.mustafakoceerr.tilepdf.model.FormField
 import com.mustafakoceerr.tilepdf.model.Signature
+import com.mustafakoceerr.tilepdf.model.SignatureCheck
 import com.mustafakoceerr.tilepdf.core.pdf.PageSize
 import com.mustafakoceerr.tilepdf.core.render.PageImageSource
 import com.mustafakoceerr.tilepdf.core.render.ThumbnailSource
@@ -72,6 +73,7 @@ sealed interface ReaderUiState {
         val recognition: RecognitionUiState = RecognitionUiState(),
         /** A dialog the document's form scripts are waiting on. */
         val scriptDialog: ScriptDialog? = null,
+        val signatures: SignaturesUiState = SignaturesUiState(),
     ) : ReaderUiState
 }
 
@@ -157,4 +159,13 @@ data class RecognitionUiState(
 sealed interface RecognitionResult {
     data class Done(val pagesWithText: Int) : RecognitionResult
     data object Failed : RecognitionResult
+}
+
+/** The document's digital signatures, once checked; empty without any. */
+data class SignaturesUiState(
+    val checks: List<SignatureCheck> = emptyList(),
+    /** The list is open. */
+    val open: Boolean = false,
+) {
+    val summary: SignatureSummary? get() = signatureSummary(checks)
 }

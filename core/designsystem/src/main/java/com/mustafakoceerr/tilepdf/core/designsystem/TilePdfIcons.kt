@@ -27,6 +27,8 @@ object TilePdfIcons {
     @DrawableRes val Share = R.drawable.ic_share
     @DrawableRes val Signature = R.drawable.ic_signature
     @DrawableRes val TextScan = R.drawable.ic_text_scan
+    @DrawableRes val Verified = R.drawable.ic_verified
+    @DrawableRes val Warning = R.drawable.ic_warning
     @DrawableRes val Sort = R.drawable.ic_sort
     @DrawableRes val Star = R.drawable.ic_star
     @DrawableRes val StarBorder = R.drawable.ic_star_border
