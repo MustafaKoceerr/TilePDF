@@ -44,6 +44,10 @@ class CachingDocumentTextRepository @Inject constructor(
         return text
     }
 
+    override suspend fun forget(document: PdfDocument, pageIndex: Int) {
+        mutex.withLock { if (this.document === document) pages.remove(pageIndex) }
+    }
+
     override suspend fun release(document: PdfDocument) = mutex.withLock {
         if (this.document === document) {
             this.document = null

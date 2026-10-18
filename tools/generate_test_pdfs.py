@@ -25,6 +25,9 @@ Writes to core/testing/src/main/assets/:
                  "notes", check box "agree" (export Yes), radio group
                  "size" (S, L), combo box "city" (Ankara, İstanbul, İzmir)
                  and read-only text "id" (value 42); form filling.
+- scanned.pdf    1 A4 page that is only a 200 dpi grey image of three lines
+                 of text (no text objects); text recognition. Needs Pillow,
+                 and draws with the app's Noto Sans subset.
 """
 
 import hashlib
@@ -35,13 +38,15 @@ ASSETS = os.path.join(os.path.dirname(__file__), "..", "core", "testing", "src",
 FONT = "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"
 
 
-def write_pdf(objects, catalog_id, name, trailer_extra=""):
-    """Serializes numbered objects (1-based, in list order) with an xref table."""
+def write_pdf(objects, catalog_id, name, trailer_extra="", binary=None):
+    """Serializes numbered objects (1-based, in list order) with an xref table.
+    [binary] maps object numbers to raw bodies, for streams that aren't text."""
     out = b"%PDF-1.4\n"
     offsets = []
     for number, body in enumerate(objects, 1):
         offsets.append(len(out))
-        out += f"{number} 0 obj\n{body}\nendobj\n".encode("latin-1")
+        raw = (binary or {}).get(number)
+        out += f"{number} 0 obj\n".encode() + (raw if raw is not None else body.encode("latin-1")) + b"\nendobj\n"
     xref = len(out)
     out += f"xref\n0 {len(objects) + 1}\n0000000000 65535 f \n".encode()
     out += "".join(f"{offset:010d} 00000 n \n" for offset in offsets).encode()
@@ -315,6 +320,36 @@ def forms():
     write_pdf(objects, 5, "forms.pdf")
 
 
+SCANNED_LINES = ["Taranmış bir sayfa", "Metin tanıma örneği", "İstanbul Şişli 2026"]
+
+
+def scanned():
+    import zlib
+    from PIL import Image, ImageDraw, ImageFont
+
+    dpi = 200
+    width, height = 595 * dpi // 72, 842 * dpi // 72
+    image = Image.new("L", (width, height), 255)
+    draw = ImageDraw.Draw(image)
+    font_path = os.path.join(os.path.dirname(__file__), "..", "core", "pdf", "src", "main", "assets", "fonts",
+                             "NotoSans-TilePdf.ttf")
+    font = ImageFont.truetype(font_path, 24 * dpi // 72)
+    for i, line in enumerate(SCANNED_LINES):
+        draw.text((72 * dpi // 72, (100 + 48 * i) * dpi // 72), line, fill=0, font=font)
+    pixels = zlib.compress(image.tobytes(), 9)
+    image_object = (f"<< /Type /XObject /Subtype /Image /Width {width} /Height {height} /ColorSpace /DeviceGray "
+                    f"/BitsPerComponent 8 /Filter /FlateDecode /Length {len(pixels)} >>\nstream\n")
+    objects = [
+        "image",
+        stream("q 595 0 0 842 0 0 cm /Im1 Do Q"),
+        "<< /Type /Page /Parent 4 0 R /MediaBox [0 0 595 842] /Resources << /XObject << /Im1 1 0 R >> >> "
+        "/Contents 2 0 R >>",
+        "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        "<< /Type /Catalog /Pages 4 0 R >>",
+    ]
+    write_pdf(objects, 5, "scanned.pdf", binary={1: image_object.encode("latin-1") + pixels + b"\nendstream"})
+
+
 if __name__ == "__main__":
     sample()
     text_dense()
@@ -323,3 +358,4 @@ if __name__ == "__main__":
     links()
     annotated()
     forms()
+    scanned()

@@ -17,6 +17,12 @@ TilePDF has **no network access**. The release manifest removes
 `android.permission.INTERNET`, and no analytics, crash reporting, ads or
 accounts are included.
 
+Text recognition uses Google ML Kit's bundled model, which runs on the device.
+ML Kit is built to send usage metrics to Google, which Play's guidance would
+count as data the app shares, but only over the network: without `INTERNET`
+it can't send anything, so the answers above still hold. If `INTERNET` is
+ever allowed, ML Kit's metrics must be declared here.
+
 ## What stays on the device
 
 - PDFs the user opens are read through Android's file picker, or through "Open

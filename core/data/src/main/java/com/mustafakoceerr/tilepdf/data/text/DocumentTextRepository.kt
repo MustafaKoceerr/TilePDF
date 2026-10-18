@@ -20,6 +20,9 @@ interface DocumentTextRepository {
      */
     suspend fun pageText(document: PdfDocument, pageIndex: Int): PageText
 
+    /** Drops [pageIndex]'s cached text, e.g. once text was added to it; it is extracted again when needed. */
+    suspend fun forget(document: PdfDocument, pageIndex: Int)
+
     /** Frees the cached text of [document], e.g. when its reader closes. */
     suspend fun release(document: PdfDocument)
 }

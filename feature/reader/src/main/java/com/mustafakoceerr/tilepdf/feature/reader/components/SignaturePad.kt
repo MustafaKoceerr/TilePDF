@@ -17,6 +17,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -54,7 +55,7 @@ private val InkColor = Color.Black
  */
 @Composable
 internal fun SignaturePadDialog(saved: Signature?, onPlace: (List<List<PdfPoint>>) -> Unit, onDismiss: () -> Unit) {
-    var padWidth by remember { mutableStateOf(0f) }
+    var padWidth by remember { mutableFloatStateOf(0f) }
     val strokes = remember { mutableStateListOf<List<Offset>>() }
     var current by remember { mutableStateOf<List<Offset>>(emptyList()) }
     // The saved signature, fitted into the pad once its size is known.

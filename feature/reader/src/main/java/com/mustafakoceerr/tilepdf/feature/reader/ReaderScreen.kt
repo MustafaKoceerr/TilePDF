@@ -69,6 +69,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.mustafakoceerr.tilepdf.feature.reader.components.FormFieldDialog
+import com.mustafakoceerr.tilepdf.feature.reader.components.NoTextChip
+import com.mustafakoceerr.tilepdf.feature.reader.components.RecognitionProgressBar
+import com.mustafakoceerr.tilepdf.feature.reader.components.RecognizeTextDialog
 import com.mustafakoceerr.tilepdf.feature.reader.components.SignatureHint
 import com.mustafakoceerr.tilepdf.feature.reader.components.SignaturePadDialog
 import com.mustafakoceerr.tilepdf.feature.reader.components.showsSpreads
@@ -79,6 +82,7 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -176,6 +180,13 @@ fun ReaderScreen(
         onRotate = viewModel::onRotate,
         onFormValueSubmitted = viewModel::onFormValueSubmitted,
         onAddSignature = viewModel::onAddSignature,
+        recognitionActions = RecognitionActions(
+            onRequest = viewModel::onRecognizeTextRequested,
+            onRecognize = viewModel::onRecognizeText,
+            onDismissChoice = viewModel::onRecognizeChoiceDismissed,
+            onCancel = viewModel::onRecognitionCancelled,
+            onResultShown = viewModel::onRecognitionResultShown,
+        ),
         onSignatureDrawn = viewModel::onSignatureDrawn,
         onSignatureCancelled = viewModel::onSignatureCancelled,
         onFormEditorDismissed = viewModel::onFormEditorDismissed,
@@ -290,6 +301,7 @@ internal fun ReaderScreen(
     onRotate: () -> Unit = {},
     onFormValueSubmitted: (String) -> Unit = {},
     onAddSignature: () -> Unit = {},
+    recognitionActions: RecognitionActions = RecognitionActions.None,
     onSignatureDrawn: (List<List<PdfPoint>>) -> Unit = {},
     onSignatureCancelled: () -> Unit = {},
     onFormEditorDismissed: () -> Unit = {},
@@ -304,6 +316,10 @@ internal fun ReaderScreen(
     val saveCopy = { ready?.let { saveCopyLauncher.launch(copyName(it.title)) } }
     SaveCopyResultEffect(ready?.saveCopyResult, onOpenDocument, annotationActions.onSaveCopyResultHandled)
     HandOffEffect(ready?.handOff, annotationActions.onHandOffHandled)
+    RecognitionResultEffect(ready?.recognition?.result, recognitionActions.onResultShown)
+    if (ready?.recognition?.choosing == true) {
+        RecognizeTextDialog(onRecognize = recognitionActions.onRecognize, onDismiss = recognitionActions.onDismissChoice)
+    }
     val search = ready?.search
     val selection = ready?.selection
     val copySelection = rememberCopyAction(selection?.text, onCopied = onClearSelection)
@@ -404,6 +420,8 @@ internal fun ReaderScreen(
                             onPrint = annotationActions.onPrint,
                             cropMargins = ready.documentView.cropMargins,
                             onAddSignature = onAddSignature,
+                            recognizing = ready.recognition.progress != null,
+                            onRecognizeText = recognitionActions.onRequest,
                             onRotate = onRotate,
                             onCropMarginsChange = onCropMarginsChange,
                         )
@@ -484,6 +502,15 @@ internal fun ReaderScreen(
                 Column(Modifier.align(Alignment.BottomCenter), horizontalAlignment = Alignment.CenterHorizontally) {
                     if (ready?.signatureStep is SignatureStep.Place) {
                         SignatureHint(onCancel = onSignatureCancelled, modifier = Modifier.navigationBarsPadding())
+                    }
+                    val recognition = ready?.recognition
+                    if (recognition?.progress != null) {
+                        RecognitionProgressBar(recognition.progress, onCancel = recognitionActions.onCancel, modifier = Modifier.navigationBarsPadding())
+                    } else if (
+                        recognition?.currentPageHasNoText == true && selection == null && !ready.editing.annotating &&
+                        ready.signatureStep == null && !(ready.backToPage != null && canJumpBack)
+                    ) {
+                        NoTextChip(onClick = recognitionActions.onRequest, modifier = Modifier.navigationBarsPadding())
                     }
                     val backToPage = ready?.backToPage
                     if (backToPage != null && canJumpBack && selection == null) {
@@ -806,6 +833,41 @@ private fun SaveCopyResultEffect(result: SaveCopyResult?, onOpenDocument: (Strin
 
 private const val PDF_MIME_TYPE = "application/pdf"
 
+/** What text recognition on scanned pages can be asked to do. */
+internal data class RecognitionActions(
+    val onRequest: () -> Unit,
+    val onRecognize: (allPages: Boolean) -> Unit,
+    val onDismissChoice: () -> Unit,
+    val onCancel: () -> Unit,
+    val onResultShown: () -> Unit,
+) {
+    companion object {
+        val None = RecognitionActions({}, {}, {}, {}, {})
+    }
+}
+
+/** Tells how a finished recognition went; then forgets it. */
+@Composable
+private fun RecognitionResultEffect(result: RecognitionResult?, onShown: () -> Unit) {
+    val context = LocalContext.current
+    val resources = LocalResources.current
+    LaunchedEffect(result) {
+        when (result) {
+            null -> return@LaunchedEffect
+            is RecognitionResult.Done -> {
+                val message = if (result.pagesWithText == 0) {
+                    resources.getString(R.string.recognize_nothing_found)
+                } else {
+                    resources.getQuantityString(R.plurals.recognize_done, result.pagesWithText, result.pagesWithText)
+                }
+                Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+            }
+            RecognitionResult.Failed -> Toast.makeText(context, R.string.recognize_failed, Toast.LENGTH_LONG).show()
+        }
+        onShown()
+    }
+}
+
 /** Opens the share sheet or the print dialog for an exported document; then forgets it. */
 @Composable
 private fun HandOffEffect(handOff: HandOff?, onHandled: () -> Unit) {
@@ -955,6 +1017,8 @@ private fun OverflowMenu(
     onPrint: () -> Unit,
     cropMargins: Boolean,
     onAddSignature: () -> Unit,
+    recognizing: Boolean,
+    onRecognizeText: () -> Unit,
     onRotate: () -> Unit,
     onCropMarginsChange: (Boolean) -> Unit,
 ) {
@@ -995,6 +1059,15 @@ private fun OverflowMenu(
                 onClick = {
                     onExpandedChange(false)
                     onAddSignature()
+                },
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.reader_recognize_text)) },
+                leadingIcon = { Icon(painterResource(TilePdfIcons.TextScan), contentDescription = null) },
+                enabled = !recognizing,
+                onClick = {
+                    onExpandedChange(false)
+                    onRecognizeText()
                 },
             )
             DropdownMenuItem(

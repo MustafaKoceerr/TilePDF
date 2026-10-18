@@ -1,6 +1,6 @@
 # TilePDF Gizlilik Politikası
 
-*Yürürlük tarihi: 18 Ekim 2026*
+*Yürürlük tarihi: 19 Ekim 2026*
 
 TilePDF, Android için bir PDF okuyucudur. Tamamen cihazınızda çalışacak
 şekilde tasarlanmıştır.
@@ -12,6 +12,10 @@ TilePDF, Android için bir PDF okuyucudur. Tamamen cihazınızda çalışacak
 - TilePDF'te **analiz, reklam, hata raporlama veya hesap sistemi yoktur**.
 - Geliştirici hiçbir kişisel veriyi veya kullanım bilgisini **toplamaz,
   saklamaz, paylaşmaz**.
+- Taranmış sayfalarda **metin tanıma**, cihazınızda Google ML Kit'in
+  uygulamayla gelen modeliyle çalışır. Sayfalarınız hiçbir yere gönderilmez.
+  ML Kit kullanım istatistiklerini Google'a bildirecek şekilde yapılmıştır,
+  ancak internet erişimi olmadığı için bunu yapamaz.
 
 ## Uygulama neyi, nerede saklar?
 
@@ -20,8 +24,8 @@ Aşağıdakilerin hepsi cihazınızda, uygulamanın özel depolama alanında kal
 - **Açtığınız belgeler.** TilePDF bunları Android'in dosya seçicisiyle ya da
   başka bir uygulama paylaştığında okur. Bazı dosyalar sonradan yeniden
   açılabilmesi için özel depolamaya kopyalanır.
-- **Açıklamalar.** Vurgular, çizimler ve notlar PDF dosyasının içine
-  kaydedilir. Kaydedilene kadar uygulamanın özel veritabanında bir taslak
+- **Açıklamalar.** Vurgular, çizimler, notlar ve tanınan metin PDF dosyasının
+  içine kaydedilir. Kaydedilene kadar uygulamanın özel veritabanında bir taslak
   olarak durur.
 - **Kütüphane.** Açtığınız belgelerin listesi, okuma konumları, favoriler ve
   yer imleri.
