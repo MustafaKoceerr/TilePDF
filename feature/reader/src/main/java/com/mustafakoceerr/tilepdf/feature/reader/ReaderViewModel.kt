@@ -338,6 +338,10 @@ class ReaderViewModel @Inject constructor(
             }
             val reloaded = pages.associateWith { page -> fieldsOf(opened.document, page) }
             formFields.update { it + reloaded }
+            // The field may keep less than it was given (a length limit, say): the draft
+            // holds what the file will hold, or every save would fail to verify.
+            val kept = reloaded.values.flatten().firstOrNull { it.name == name }?.value
+            if (kept != null && kept != value) annotationRepository.setFormValue(opened.uri, name, kept)
         }
     }
 

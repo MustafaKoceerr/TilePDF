@@ -42,6 +42,10 @@ minSdk 29
 - Share and print the document with its annotations, even when the file
   itself can't be saved to
 - Library rows show each document's first page
+- Rotate pages and crop their empty margins, kept per document; two pages
+  side by side on wide screens in horizontal layout
+- Fill in AcroForm fields (text, check box, radio button, combo and list
+  box) and sign with a drawn signature; both are saved into the PDF
 - Text selection: long-press a word, drag Material-style handles, copy or
   select all from the system text toolbar
 - Vertical scrolling or horizontal single pages (swipe; each page fits the
@@ -335,6 +339,11 @@ rerunning it reproduces them byte for byte.
 ## Known limitations
 
 - Scanned (image-only) PDFs have no text, so search finds nothing (no OCR).
+- Forms: no JavaScript (calculations, validation), no XFA forms, and multi-
+  select list boxes show only their first choice. Letters a field's own font
+  lacks (often Turkish İ, ı, ş, ğ in Helvetica fields) are saved in the value
+  but missing from the appearance PDFium draws for it.
+- The signature is a drawing, not a cryptographic (PAdES) signature.
 
 ## Out of scope, on purpose
 
