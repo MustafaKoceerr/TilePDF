@@ -10,7 +10,6 @@ import com.mustafakoceerr.tilepdf.core.geometry.PdfRect
 import com.mustafakoceerr.tilepdf.model.FORM_VALUE_OFF
 import com.mustafakoceerr.tilepdf.model.FormFieldKind
 import com.mustafakoceerr.tilepdf.testing.TestAssets
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -28,7 +27,7 @@ import java.io.File
 class PdfiumFormTest {
 
     private val context = InstrumentationRegistry.getInstrumentation().targetContext
-    private val pdfium = Pdfium(context, Dispatchers.IO.limitedParallelism(1))
+    private val pdfium = Pdfium(context, PdfThread.dispatcher)
     private val saved = File(context.cacheDir, "forms-saved.pdf")
 
     private val values = mapOf(

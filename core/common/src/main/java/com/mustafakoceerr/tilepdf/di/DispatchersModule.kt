@@ -16,8 +16,9 @@ import javax.inject.Singleton
 annotation class IoDispatcher
 
 /**
- * Single-threaded dispatcher for every PDFium call. PDFium keeps global state
- * and is not thread-safe, so all documents share this one dispatcher.
+ * The dispatcher of every PDFium call: one thread for the whole process
+ * (core:pdf's PdfThread), shared by all documents. PDFium keeps global state
+ * and isn't thread-safe, and its script engine is bound to one thread.
  */
 @Qualifier
 @Retention(AnnotationRetention.BINARY)
@@ -35,11 +36,6 @@ object DispatchersModule {
     @Provides
     @IoDispatcher
     fun provideIoDispatcher(): CoroutineDispatcher = Dispatchers.IO
-
-    @Provides
-    @Singleton
-    @PdfDispatcher
-    fun providePdfDispatcher(): CoroutineDispatcher = Dispatchers.IO.limitedParallelism(1)
 
     @Provides
     @Singleton

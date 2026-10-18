@@ -3,7 +3,6 @@ package com.mustafakoceerr.tilepdf.core.pdf
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.mustafakoceerr.tilepdf.testing.TestAssets
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -16,7 +15,7 @@ class PdfiumLinkTest {
 
     private val pdfium = Pdfium(
         InstrumentationRegistry.getInstrumentation().targetContext,
-        Dispatchers.IO.limitedParallelism(1),
+        PdfThread.dispatcher,
     )
 
     private fun linkAt(x: Float, y: Float): PdfLink? = runBlocking {

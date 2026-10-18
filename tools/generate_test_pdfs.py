@@ -25,6 +25,11 @@ Writes to core/testing/src/main/assets/:
                  "notes", check box "agree" (export Yes), radio group
                  "size" (S, L), combo box "city" (Ankara, İstanbul, İzmir)
                  and read-only text "id" (value 42); form filling.
+- calc.pdf       1 A4 page with form scripts: text fields "a" and "b", a
+                 read-only "total" calculated as their sum (AFSimple_Calculate)
+                 and formatted with two decimals (AFNumber_Format), and "age",
+                 whose validate script alerts "Too old" and rejects values over
+                 150; form JavaScript.
 - scanned.pdf    1 A4 page that is only a 200 dpi grey image of three lines
                  of text (no text objects); text recognition. Needs Pillow,
                  and draws with the app's Noto Sans subset.
@@ -320,6 +325,30 @@ def forms():
     write_pdf(objects, 5, "forms.pdf")
 
 
+def calc():
+    # Balanced parentheses need no escaping in PDF literal strings.
+    widget = "/Type /Annot /Subtype /Widget /F 4 /P 3 0 R /DA (/Helv 12 Tf 0 g)"
+    sum_script = 'AFSimple_Calculate("SUM", new Array("a", "b"));'
+    format_script = 'AFNumber_Format(2, 0, 0, 0, "", true);'
+    age_script = 'if (event.value > 150) { app.alert("Too old"); event.rc = false; }'
+    objects = [
+        FONT,
+        stream("BT /F1 12 Tf 72 760 Td (Calculations) Tj ET"),
+        "<< /Type /Page /Parent 4 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 1 0 R >> >> "
+        "/Contents 2 0 R /Annots [7 0 R 8 0 R 9 0 R 10 0 R] >>",
+        "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        "<< /Type /Catalog /Pages 4 0 R /AcroForm 6 0 R >>",
+        "<< /Fields [7 0 R 8 0 R 9 0 R 10 0 R] /CO [9 0 R] /DR << /Font << /Helv 1 0 R >> >> "
+        "/DA (/Helv 12 Tf 0 g) /NeedAppearances true >>",
+        f"<< {widget} /FT /Tx /T (a) /Rect [72 700 200 724] >>",
+        f"<< {widget} /FT /Tx /T (b) /Rect [72 660 200 684] >>",
+        f"<< {widget} /FT /Tx /T (total) /Ff 1 /Rect [72 620 200 644] "
+        f"/AA << /C << /S /JavaScript /JS ({sum_script}) >> /F << /S /JavaScript /JS ({format_script}) >> >> >>",
+        f"<< {widget} /FT /Tx /T (age) /Rect [72 580 200 604] /AA << /V << /S /JavaScript /JS ({age_script}) >> >> >>",
+    ]
+    write_pdf(objects, 5, "calc.pdf")
+
+
 SCANNED_LINES = ["Taranmış bir sayfa", "Metin tanıma örneği", "İstanbul Şişli 2026"]
 
 
@@ -358,4 +387,5 @@ if __name__ == "__main__":
     links()
     annotated()
     forms()
+    calc()
     scanned()

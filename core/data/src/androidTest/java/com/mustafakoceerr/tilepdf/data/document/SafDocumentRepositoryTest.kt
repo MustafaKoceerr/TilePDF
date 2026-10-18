@@ -4,7 +4,11 @@ import android.net.Uri
 import androidx.core.net.toUri
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import com.mustafakoceerr.tilepdf.core.pdf.PdfThread
 import com.mustafakoceerr.tilepdf.core.pdf.Pdfium
+import java.io.File
+import java.io.FileNotFoundException
+import java.io.IOException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -17,15 +21,12 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
-import java.io.File
-import java.io.FileNotFoundException
-import java.io.IOException
 
 @RunWith(AndroidJUnit4::class)
 class SafDocumentRepositoryTest {
 
     private val context = InstrumentationRegistry.getInstrumentation().targetContext
-    private val pdfium = Pdfium(context, Dispatchers.IO.limitedParallelism(1))
+    private val pdfium = Pdfium(context, PdfThread.dispatcher)
     private val repository = SafDocumentRepository(context, Dispatchers.IO, pdfium)
     // Not backed up: copies of received PDFs must not leave the device.
     private val copies = File(context.noBackupFilesDir, "documents")

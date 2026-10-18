@@ -9,7 +9,6 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.mustafakoceerr.tilepdf.core.geometry.PdfPoint
 import com.mustafakoceerr.tilepdf.model.OcrWord
 import com.mustafakoceerr.tilepdf.testing.TestAssets
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -24,7 +23,7 @@ import java.io.File
 class PdfiumOcrWriteTest {
 
     private val context = InstrumentationRegistry.getInstrumentation().targetContext
-    private val pdfium = Pdfium(context, Dispatchers.IO.limitedParallelism(1))
+    private val pdfium = Pdfium(context, PdfThread.dispatcher)
     private val saved = File(context.cacheDir, "ocr-saved.pdf")
 
     private fun quad(left: Float, top: Float, right: Float, bottom: Float) =

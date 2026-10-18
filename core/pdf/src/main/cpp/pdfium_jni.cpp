@@ -27,6 +27,15 @@ namespace {
 
 bool g_initialized = false;
 
+// For calls from PDFium back into Java, which come on the PDF thread.
+JavaVM* g_vm = nullptr;
+
+// FormScriptHost's methods, resolved once in JNI_OnLoad.
+jmethodID g_hostAlert = nullptr;
+jmethodID g_hostResponse = nullptr;
+jmethodID g_hostPrint = nullptr;
+jmethodID g_hostGoToPage = nullptr;
+
 // The fallback font's bytes, also the font recognised text is written in.
 std::vector<uint8_t> g_textFont;
 
@@ -101,6 +110,14 @@ void HideOwnAnnotations(FPDF_PAGE page) {
 // pages cover the pages on screen.
 constexpr size_t kLoadedPages = 2;
 
+struct NativeDocument;
+
+// The JavaScript platform of one document: PDFium hands it back to every
+// callback, and it leads to the document's FormScriptHost.
+struct ScriptPlatform : IPDF_JSPLATFORM {
+    NativeDocument* owner = nullptr;
+};
+
 // PDFium reads the file lazily for as long as the document is open, so the
 // read callback and the descriptor it uses live as long as the document.
 struct NativeDocument {
@@ -116,6 +133,11 @@ struct NativeDocument {
     FPDF_FORMHANDLE form = nullptr;
     // The embedded font of recognised text, loaded when first needed.
     FPDF_FONT textFont = nullptr;
+    // Form scripts' platform, and the reader's FormScriptHost (a global ref)
+    // that answers them; without a host they get default answers.
+    ScriptPlatform scripts{};
+    jobject scriptHost = nullptr;
+    bool openActionDone = false;
 
     // The loaded page [index], from the cache when possible; null if it
     // can't be loaded. Owned by this document: callers must not close it.
@@ -155,6 +177,11 @@ struct NativeDocument {
         if (form) FPDFDOC_ExitFormFillEnvironment(form);
         if (textFont) FPDFFont_Close(textFont);
         FPDF_CloseDocument(document);
+        if (scriptHost) {
+            JNIEnv* env = nullptr;
+            if (g_vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6) == JNI_OK) env->DeleteGlobalRef(scriptHost);
+            scriptHost = nullptr;
+        }
     }
 };
 
@@ -168,6 +195,89 @@ int ReadBlock(void* param, unsigned long position, unsigned char* buffer, unsign
         done += static_cast<unsigned long>(read);
     }
     return 1;
+}
+
+// The JNIEnv of the PDF thread, a Java thread; null if there is none.
+JNIEnv* CurrentEnv() {
+    JNIEnv* env = nullptr;
+    return g_vm && g_vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6) == JNI_OK ? env : nullptr;
+}
+
+// A NUL-terminated UTF-16 string from PDFium as a Java string.
+jstring WideToJava(JNIEnv* env, FPDF_WIDESTRING text) {
+    if (!text) return env->NewString(nullptr, 0);
+    jsize length = 0;
+    while (text[length]) ++length;
+    return env->NewString(reinterpret_cast<const jchar*>(text), length);
+}
+
+// The reader's host of the document this platform belongs to, with an env to call it.
+jobject HostOf(IPDF_JSPLATFORM* platform, JNIEnv** env) {
+    auto* scripts = static_cast<ScriptPlatform*>(platform);
+    *env = CurrentEnv();
+    return scripts->owner && *env ? scripts->owner->scriptHost : nullptr;
+}
+
+// Whatever a host call threw is dropped: a script gets the default answer.
+bool Threw(JNIEnv* env) {
+    if (!env->ExceptionCheck()) return false;
+    env->ExceptionClear();
+    return true;
+}
+
+int ScriptAlert(IPDF_JSPLATFORM* platform, FPDF_WIDESTRING message, FPDF_WIDESTRING title, int type, int icon) {
+    const int fallback = type == JSPLATFORM_ALERT_BUTTON_YESNO || type == JSPLATFORM_ALERT_BUTTON_YESNOCANCEL
+                             ? JSPLATFORM_ALERT_RETURN_YES : JSPLATFORM_ALERT_RETURN_OK;
+    JNIEnv* env = nullptr;
+    jobject host = HostOf(platform, &env);
+    if (!host) return fallback;
+    jstring jMessage = WideToJava(env, message);
+    jstring jTitle = WideToJava(env, title);
+    const jint answer = env->CallIntMethod(host, g_hostAlert, jMessage, jTitle, type, icon);
+    env->DeleteLocalRef(jMessage);
+    env->DeleteLocalRef(jTitle);
+    return Threw(env) ? fallback : answer;
+}
+
+// Writes the answer as UTF-16LE into [response] when it fits; returns its size in bytes.
+int ScriptResponse(IPDF_JSPLATFORM* platform, FPDF_WIDESTRING question, FPDF_WIDESTRING title,
+                   FPDF_WIDESTRING defaultValue, FPDF_WIDESTRING label, FPDF_BOOL password,
+                   void* response, int length) {
+    JNIEnv* env = nullptr;
+    jobject host = HostOf(platform, &env);
+    if (!host) return 0;
+    jstring jQuestion = WideToJava(env, question);
+    jstring jTitle = WideToJava(env, title);
+    jstring jDefault = WideToJava(env, defaultValue);
+    jstring jLabel = WideToJava(env, label);
+    auto answer = static_cast<jstring>(
+            env->CallObjectMethod(host, g_hostResponse, jQuestion, jTitle, jDefault, jLabel, password ? JNI_TRUE : JNI_FALSE));
+    env->DeleteLocalRef(jQuestion);
+    env->DeleteLocalRef(jTitle);
+    env->DeleteLocalRef(jDefault);
+    env->DeleteLocalRef(jLabel);
+    if (Threw(env) || !answer) return 0;
+    const jsize chars = env->GetStringLength(answer);
+    const int bytes = static_cast<int>(chars) * static_cast<int>(sizeof(jchar));
+    if (response && length >= bytes) env->GetStringRegion(answer, 0, chars, static_cast<jchar*>(response));
+    env->DeleteLocalRef(answer);
+    return bytes;
+}
+
+void ScriptPrint(IPDF_JSPLATFORM* platform, FPDF_BOOL, int, int, FPDF_BOOL, FPDF_BOOL, FPDF_BOOL, FPDF_BOOL, FPDF_BOOL) {
+    JNIEnv* env = nullptr;
+    jobject host = HostOf(platform, &env);
+    if (!host) return;
+    env->CallVoidMethod(host, g_hostPrint);
+    Threw(env);
+}
+
+void ScriptGoToPage(IPDF_JSPLATFORM* platform, int pageIndex) {
+    JNIEnv* env = nullptr;
+    jobject host = HostOf(platform, &env);
+    if (!host) return;
+    env->CallVoidMethod(host, g_hostGoToPage, pageIndex);
+    Threw(env);
 }
 
 NativeDocument* FromHandle(jlong handle) {
@@ -595,6 +705,16 @@ extern "C" {
 JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void*) {
     JNIEnv* env = nullptr;
     if (vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6) != JNI_OK) return JNI_ERR;
+    g_vm = vm;
+    jclass host = env->FindClass("com/mustafakoceerr/tilepdf/core/pdf/FormScriptHost");
+    if (!host) return JNI_ERR;
+    g_hostAlert = env->GetMethodID(host, "alert", "(Ljava/lang/String;Ljava/lang/String;II)I");
+    g_hostResponse = env->GetMethodID(
+            host, "response", "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Z)Ljava/lang/String;");
+    g_hostPrint = env->GetMethodID(host, "print", "()V");
+    g_hostGoToPage = env->GetMethodID(host, "goToPage", "(I)V");
+    env->DeleteLocalRef(host);
+    if (!g_hostAlert || !g_hostResponse || !g_hostPrint || !g_hostGoToPage) return JNI_ERR;
     jclass local = env->FindClass("com/mustafakoceerr/tilepdf/core/pdf/NativePageText");
     if (!local) return JNI_ERR;
     g_pageTextClass = static_cast<jclass>(env->NewGlobalRef(local));
@@ -667,7 +787,16 @@ Java_com_mustafakoceerr_tilepdf_core_pdf_PdfiumNative_nativeOpen(
         // stays off until the reader can drive XFA forms.
         native->formInfo.version = 2;
         native->formInfo.xfa_disabled = 1;
+        native->scripts.version = 3;
+        native->scripts.app_alert = ScriptAlert;
+        native->scripts.app_response = ScriptResponse;
+        native->scripts.Doc_print = ScriptPrint;
+        native->scripts.Doc_gotoPage = ScriptGoToPage;
+        native->scripts.owner = native;
+        native->formInfo.m_pJsPlatform = &native->scripts;
         native->form = FPDFDOC_InitFormFillEnvironment(native->document, &native->formInfo);
+        // Field scripts call the functions the document-level scripts define.
+        if (native->form) FORM_DoDocumentJSAction(native->form);
     }
     return reinterpret_cast<jlong>(native);
 }
@@ -1285,6 +1414,19 @@ Java_com_mustafakoceerr_tilepdf_core_pdf_PdfiumNative_nativeHasRecognizedText(JN
         if (FPDFPageObj_GetType(object) == FPDF_PAGEOBJ_TEXT && HasMark(object, kOcrMark)) return JNI_TRUE;
     }
     return JNI_FALSE;
+}
+
+// Lets [host] answer the document's form scripts, or none with null. The
+// first host also runs the document's open action, as a reader opening it.
+JNIEXPORT void JNICALL
+Java_com_mustafakoceerr_tilepdf_core_pdf_PdfiumNative_nativeSetScriptHost(JNIEnv* env, jclass, jlong handle, jobject host) {
+    NativeDocument* document = FromHandle(handle);
+    if (document->scriptHost) env->DeleteGlobalRef(document->scriptHost);
+    document->scriptHost = host ? env->NewGlobalRef(host) : nullptr;
+    if (host && document->form && !document->openActionDone) {
+        document->openActionDone = true;
+        FORM_DoDocumentOpenAction(document->form);
+    }
 }
 
 }  // extern "C"

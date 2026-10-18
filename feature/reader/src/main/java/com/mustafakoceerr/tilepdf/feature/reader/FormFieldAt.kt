@@ -22,3 +22,10 @@ internal fun tapValue(field: FormField): String? = when (field.kind) {
 
 /** The usual "on" value of a check box that names none. */
 private const val DEFAULT_ON_VALUE = "Yes"
+
+/**
+ * What to keep in the draft after filling a field that held [before] and now
+ * holds [after]: the form's own value, as its scripts may have reformatted
+ * it, or null when it didn't change, as when a script rejected the value.
+ */
+internal fun acceptedFormValue(before: String, after: String): String? = after.takeIf { it != before }

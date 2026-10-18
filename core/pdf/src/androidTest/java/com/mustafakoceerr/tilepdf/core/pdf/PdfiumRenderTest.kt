@@ -24,7 +24,7 @@ import kotlin.math.abs
 class PdfiumRenderTest {
 
     private val context = InstrumentationRegistry.getInstrumentation().targetContext
-    private val dispatcher = Dispatchers.IO.limitedParallelism(1)
+    private val dispatcher = PdfThread.dispatcher
     private val pdfium = Pdfium(context, dispatcher)
     private lateinit var document: PdfiumDocument
 

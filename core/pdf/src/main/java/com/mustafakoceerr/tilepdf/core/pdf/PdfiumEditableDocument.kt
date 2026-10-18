@@ -72,6 +72,8 @@ class PdfiumEditableDocument internal constructor(
 
     override suspend fun applyFormEdits(edits: List<FormEdit>): Boolean = document.applyFormEdits(edits)
 
+    override suspend fun setScriptHost(host: FormScriptHost?) = document.setScriptHost(host)
+
     override suspend fun hasRecognizedText(pageIndex: Int): Boolean = document.hasRecognizedText(pageIndex)
 
     override suspend fun addRecognizedText(pageIndex: Int, words: List<OcrWord>) = document.addRecognizedText(pageIndex, words)

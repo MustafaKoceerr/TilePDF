@@ -14,3 +14,16 @@
     <init>(...);
     <fields>;
 }
+-keep class com.mustafakoceerr.tilepdf.core.pdf.NativeFormField {
+    <init>(...);
+    <fields>;
+}
+
+# Called back by the C++ code through GetMethodID on the interface.
+-keep interface com.mustafakoceerr.tilepdf.core.pdf.FormScriptHost { *; }
+-keepclassmembers class * implements com.mustafakoceerr.tilepdf.core.pdf.FormScriptHost {
+    public int alert(java.lang.String, java.lang.String, int, int);
+    public java.lang.String response(java.lang.String, java.lang.String, java.lang.String, java.lang.String, boolean);
+    public void print();
+    public void goToPage(int);
+}

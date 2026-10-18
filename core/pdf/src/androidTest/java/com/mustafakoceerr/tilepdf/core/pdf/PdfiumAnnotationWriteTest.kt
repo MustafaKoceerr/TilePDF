@@ -18,7 +18,6 @@ import com.mustafakoceerr.tilepdf.model.PageAnnotations
 import com.mustafakoceerr.tilepdf.model.TextMarkup
 import com.mustafakoceerr.tilepdf.model.newAnnotationId
 import com.mustafakoceerr.tilepdf.testing.TestAssets
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
@@ -38,7 +37,7 @@ import java.io.File
 class PdfiumAnnotationWriteTest {
 
     private val context = InstrumentationRegistry.getInstrumentation().targetContext
-    private val pdfium = Pdfium(context, Dispatchers.IO.limitedParallelism(1))
+    private val pdfium = Pdfium(context, PdfThread.dispatcher)
     private val saved = File(context.cacheDir, "annotated-saved.pdf")
 
     private val yellow = 0xFFFFEB3B.toInt()

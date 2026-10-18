@@ -18,6 +18,9 @@ interface FillableForm {
      * gets a new appearance. False if the engine refused one.
      */
     suspend fun applyFormEdits(edits: List<FormEdit>): Boolean = edits.isEmpty()
+
+    /** Lets [host] answer the form's scripts; without one they get default answers. */
+    suspend fun setScriptHost(host: FormScriptHost?) = Unit
 }
 
 /**
