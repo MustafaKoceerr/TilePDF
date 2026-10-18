@@ -3,6 +3,9 @@ package com.mustafakoceerr.tilepdf.core.pdfwriter
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 
+/** Signing an encrypted file would need its strings encrypted too, which this writer doesn't do. */
+class PdfEncryptedException : RuntimeException("The document is encrypted")
+
 class PdfSignatureTooLargeException(size: Int) :
     RuntimeException("The signature takes $size bytes; there is room for ${PdfSigner.SIGNATURE_BYTES}")
 
@@ -20,9 +23,11 @@ class PdfSigner {
      * itself, and returns the CMS to put there.
      * @throws PdfFormatException if the file can't be read or has no such stamp.
      * @throws PdfSignatureTooLargeException if the CMS doesn't fit.
+     * @throws PdfEncryptedException if the file is encrypted.
      */
     fun sign(pdf: ByteArray, stampName: String, signedAt: ZonedDateTime, reason: String, sign: (ByteArray) -> ByteArray): ByteArray {
         val file = PdfFile(pdf)
+        if (file.trailer["Encrypt"] != null) throw PdfEncryptedException()
         val rootRef = file.trailer["Root"] as? PdfRef ?: throw PdfFormatException("No catalog")
         val catalog = file.resolve(rootRef) as? PdfDict ?: throw PdfFormatException("No catalog")
         val stampRef = findStamp(file, catalog, stampName) ?: throw PdfFormatException("No stamp $stampName")

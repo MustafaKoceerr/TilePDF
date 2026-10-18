@@ -121,4 +121,19 @@ class PdfSignerTest {
         } catch (_: PdfFormatException) {
         }
     }
+
+    @Test
+    fun anEncryptedDocumentIsRefused() {
+        val pdf = TestPdf()
+            .obj(1, "<< /Type /Catalog /Pages 2 0 R >>")
+            .obj(2, "<< /Type /Pages /Kids [] /Count 0 >>")
+            .obj(3, "<< /Filter /Standard /V 1 /R 2 /O <00> /U <00> /P -4 >>")
+        pdf.xrefTable(listOf(1, 2, 3), "/Size 4 /Root 1 0 R /Encrypt 3 0 R")
+
+        try {
+            sign(pdf.bytes())
+            fail("signed")
+        } catch (_: PdfEncryptedException) {
+        }
+    }
 }

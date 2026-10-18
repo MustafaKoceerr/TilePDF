@@ -461,6 +461,16 @@ FS_POINTF ToPage(FPDF_PAGE page, float x, float y) {
     return FS_POINTF{static_cast<float>(pageX), static_cast<float>(pageY)};
 }
 
+// The document's embedded copy of the fallback font, for text TilePDF writes;
+// loaded when first needed, null without the font.
+FPDF_FONT TextFont(NativeDocument* document) {
+    if (!document->textFont && !g_textFont.empty()) {
+        document->textFont = FPDFText_LoadFont(document->document, g_textFont.data(),
+                                               static_cast<uint32_t>(g_textFont.size()), FPDF_FONT_TRUETYPE, true);
+    }
+    return document->textFont;
+}
+
 // Whether [object] carries the content mark [name].
 bool HasMark(FPDF_PAGEOBJECT object, const char* name) {
     const int count = FPDFPageObj_CountMarks(object);
@@ -1407,14 +1417,9 @@ Java_com_mustafakoceerr_tilepdf_core_pdf_PdfiumNative_nativeAddRecognizedText(
         JNIEnv* env, jclass, jlong handle, jint index, jobjectArray texts, jfloatArray quads) {
     NativeDocument* document = FromHandle(handle);
     FPDF_PAGE page = document->Page(index);
-    if (!page || g_textFont.empty()) return JNI_FALSE;
+    if (!page || !TextFont(document)) return JNI_FALSE;
     const jsize count = env->GetArrayLength(texts);
     if (env->GetArrayLength(quads) != count * 8) return JNI_FALSE;
-    if (!document->textFont) {
-        document->textFont = FPDFText_LoadFont(document->document, g_textFont.data(),
-                                               static_cast<uint32_t>(g_textFont.size()), FPDF_FONT_TRUETYPE, true);
-        if (!document->textFont) return JNI_FALSE;
-    }
     std::vector<jfloat> values(static_cast<size_t>(count) * 8);
     env->GetFloatArrayRegion(quads, 0, count * 8, values.data());
     for (jsize i = 0; i < count; ++i) {
@@ -1542,6 +1547,90 @@ Java_com_mustafakoceerr_tilepdf_core_pdf_PdfiumNative_nativeSignatures(JNIEnv* e
         }
     }
     return result;
+}
+
+// Adds a stamp named [name] whose appearance is a signature box: a thin
+// frame around [rect] (top-left left, top, right, bottom), [texts] in the
+// fallback font at [textPlaces] (x, baseline, size each) and the [strokes]
+// of a drawn signature (x, y pairs, [strokeSizes] points per stroke). All in
+// top-left points. Signing turns the stamp into the signature field.
+JNIEXPORT jboolean JNICALL
+Java_com_mustafakoceerr_tilepdf_core_pdf_PdfiumNative_nativeAddSignatureStamp(
+        JNIEnv* env, jclass, jlong handle, jint index, jfloatArray rect, jstring name, jobjectArray texts,
+        jfloatArray textPlaces, jfloatArray strokes, jintArray strokeSizes, jfloat strokeWidth) {
+    NativeDocument* document = FromHandle(handle);
+    FPDF_PAGE page = document->Page(index);
+    FPDF_FONT font = TextFont(document);
+    if (!page || !font || env->GetArrayLength(rect) != 4) return JNI_FALSE;
+    jfloat box[4];
+    env->GetFloatArrayRegion(rect, 0, 4, box);
+    Annotation annotation(FPDFPage_CreateAnnot(page, FPDF_ANNOT_STAMP));
+    if (!annotation.handle) return JNI_FALSE;
+    Bounds bounds;
+    const FS_POINTF topLeft = ToPage(page, box[0], box[1]);
+    const FS_POINTF bottomRight = ToPage(page, box[2], box[3]);
+    bounds.Add(topLeft.x, topLeft.y);
+    bounds.Add(bottomRight.x, bottomRight.y);
+    const FS_RECTF annotRect = bounds.Rect(0);
+    std::vector<jchar> nameChars = Chars(env, name);
+    nameChars.push_back(0);
+    if (!FPDFAnnot_SetRect(annotation.handle, &annotRect) ||
+        !FPDFAnnot_SetStringValue(annotation.handle, "NM", reinterpret_cast<FPDF_WIDESTRING>(nameChars.data()))) {
+        return JNI_FALSE;
+    }
+
+    // A frame just inside the box.
+    FPDF_PAGEOBJECT frame = FPDFPageObj_CreateNewRect(annotRect.left + 0.5f, annotRect.bottom + 0.5f,
+                                                      annotRect.right - annotRect.left - 1, annotRect.top - annotRect.bottom - 1);
+    if (!frame || !FPDFPageObj_SetStrokeColor(frame, 120, 120, 120, 255) || !FPDFPageObj_SetStrokeWidth(frame, 0.5f) ||
+        !FPDFPath_SetDrawMode(frame, FPDF_FILLMODE_NONE, true) || !FPDFAnnot_AppendObject(annotation.handle, frame)) {
+        return JNI_FALSE;
+    }
+
+    const jsize lines = env->GetArrayLength(texts);
+    if (env->GetArrayLength(textPlaces) != lines * 3) return JNI_FALSE;
+    std::vector<jfloat> places(static_cast<size_t>(lines) * 3);
+    env->GetFloatArrayRegion(textPlaces, 0, lines * 3, places.data());
+    for (jsize i = 0; i < lines; ++i) {
+        auto line = static_cast<jstring>(env->GetObjectArrayElement(texts, i));
+        std::vector<jchar> chars = Chars(env, line);
+        env->DeleteLocalRef(line);
+        chars.push_back(0);
+        const float size = places[static_cast<size_t>(i) * 3 + 2];
+        FPDF_PAGEOBJECT text = FPDFPageObj_CreateTextObj(document->document, font, size);
+        const FS_POINTF origin = ToPage(page, places[static_cast<size_t>(i) * 3], places[static_cast<size_t>(i) * 3 + 1]);
+        if (!text || !FPDFText_SetText(text, reinterpret_cast<FPDF_WIDESTRING>(chars.data())) ||
+            !FPDFPageObj_SetFillColor(text, 0, 0, 0, 255)) {
+            if (text) FPDFPageObj_Destroy(text);
+            return JNI_FALSE;
+        }
+        FPDFPageObj_Transform(text, 1, 0, 0, 1, origin.x, origin.y);
+        if (!FPDFAnnot_AppendObject(annotation.handle, text)) return JNI_FALSE;
+    }
+
+    const jsize strokeCount = env->GetArrayLength(strokeSizes);
+    std::vector<jint> sizes(static_cast<size_t>(strokeCount));
+    env->GetIntArrayRegion(strokeSizes, 0, strokeCount, sizes.data());
+    std::vector<jfloat> points(static_cast<size_t>(env->GetArrayLength(strokes)));
+    env->GetFloatArrayRegion(strokes, 0, static_cast<jsize>(points.size()), points.data());
+    size_t offset = 0;
+    for (jint size : sizes) {
+        if (size <= 0 || (offset + static_cast<size_t>(size)) * 2 > points.size()) return JNI_FALSE;
+        const FS_POINTF start = ToPage(page, points[offset * 2], points[offset * 2 + 1]);
+        FPDF_PAGEOBJECT path = FPDFPageObj_CreateNewPath(start.x, start.y);
+        if (!path) return JNI_FALSE;
+        for (jint i = 1; i < size; ++i) {
+            const FS_POINTF next = ToPage(page, points[(offset + i) * 2], points[(offset + i) * 2 + 1]);
+            FPDFPath_LineTo(path, next.x, next.y);
+        }
+        offset += static_cast<size_t>(size);
+        if (!FPDFPageObj_SetStrokeColor(path, 0, 0, 0, 255) || !FPDFPageObj_SetStrokeWidth(path, strokeWidth) ||
+            !FPDFPageObj_SetLineJoin(path, FPDF_LINEJOIN_ROUND) || !FPDFPageObj_SetLineCap(path, FPDF_LINECAP_ROUND) ||
+            !FPDFPath_SetDrawMode(path, FPDF_FILLMODE_NONE, true) || !FPDFAnnot_AppendObject(annotation.handle, path)) {
+            return JNI_FALSE;
+        }
+    }
+    return JNI_TRUE;
 }
 
 }  // extern "C"

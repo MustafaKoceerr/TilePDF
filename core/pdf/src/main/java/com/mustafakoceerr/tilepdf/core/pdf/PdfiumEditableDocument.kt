@@ -85,6 +85,23 @@ class PdfiumEditableDocument internal constructor(
 
     override suspend fun addRecognizedText(pageIndex: Int, words: List<OcrWord>) = document.addRecognizedText(pageIndex, words)
 
+    override suspend fun addSignatureStamp(pageIndex: Int, name: String, appearance: SignatureAppearance) {
+        val rect = appearance.rect
+        val added = document.withDocument(pageIndex) { handle ->
+            PdfiumNative.nativeAddSignatureStamp(
+                handle, pageIndex,
+                floatArrayOf(rect.left, rect.top, rect.right, rect.bottom),
+                name,
+                appearance.lines.map { it.text }.toTypedArray(),
+                appearance.lines.flatMap { listOf(it.x, it.baseline, it.size) }.toFloatArray(),
+                appearance.strokes.flatten().flatMap { listOf(it.x, it.y) }.toFloatArray(),
+                appearance.strokes.map { it.size }.toIntArray(),
+                appearance.strokeWidth,
+            )
+        }
+        if (!added) throw PdfWriteException("Could not add the signature box on page $pageIndex")
+    }
+
     override suspend fun saveIncremental(target: File) {
         val saved = ParcelFileDescriptor.open(
             target,
