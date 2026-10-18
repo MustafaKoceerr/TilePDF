@@ -21,4 +21,13 @@ class VolumeKeyPagingTest {
 
     @Test
     fun otherKeysAreNotPaging() = assertNull(pageForVolumeKey(KeyEvent.KEYCODE_VOLUME_MUTE, current = 4, count = 10))
+
+    @Test
+    fun spreadsTurnBySpread() {
+        // Spreads of 6 pages: [0], [1, 2], [3, 4], [5].
+        assertEquals(1, pageForVolumeKey(KeyEvent.KEYCODE_VOLUME_DOWN, current = 0, count = 6, spreads = true))
+        assertEquals(3, pageForVolumeKey(KeyEvent.KEYCODE_VOLUME_DOWN, current = 1, count = 6, spreads = true))
+        assertEquals(1, pageForVolumeKey(KeyEvent.KEYCODE_VOLUME_UP, current = 3, count = 6, spreads = true))
+        assertEquals(5, pageForVolumeKey(KeyEvent.KEYCODE_VOLUME_DOWN, current = 5, count = 6, spreads = true))
+    }
 }

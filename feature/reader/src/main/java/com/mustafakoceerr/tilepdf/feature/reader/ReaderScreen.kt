@@ -319,13 +319,6 @@ internal fun ReaderScreen(
     }
     BackHandler(enabled = search?.isActive == true, onBack = searchActions.onClose)
     KeepScreenOnEffect(ready?.preferences?.keepScreenOn == true)
-    // Page turns aren't jumps: no way back is offered for them.
-    VolumeKeyPagingEffect(
-        enabled = ready?.preferences?.volumeKeysTurnPages == true,
-        currentPage = ready?.currentPage ?: 0,
-        pageCount = ready?.pageSizes?.size ?: 0,
-        onTurn = { pageJump = PageJump(it) },
-    )
 
     // A TalkBack user can't find bars hidden by a tap, so they stay.
     val fullScreen = ready?.isFullScreen == true && !rememberTouchExplorationEnabled()
@@ -457,6 +450,8 @@ internal fun ReaderScreen(
                                 onGoToPage = { onJump(PageJump(it)) },
                                 pageJump = pageJump,
                                 onPageJumpHandled = { pageJump = null },
+                                // Page turns aren't jumps: no way back is offered for them.
+                                onTurnPage = { pageJump = PageJump(it) },
                                 onPositionChanged = onPositionChanged,
                                 onTapPage = onTapPage,
                                 onTapOutsidePage = onTapOutsidePage,
@@ -606,6 +601,7 @@ private fun ReaderPages(
     onGoToPage: (pageIndex: Int) -> Unit,
     pageJump: PageJump?,
     onPageJumpHandled: () -> Unit,
+    onTurnPage: (pageIndex: Int) -> Unit,
     onPositionChanged: (ReadingPosition) -> Unit,
     onTapPage: (pageIndex: Int, x: Float, y: Float) -> Unit,
     onTapOutsidePage: () -> Unit,
@@ -636,6 +632,13 @@ private fun ReaderPages(
         showsSpreads(ready.preferences.twoPageSpreads, spreadSpace.width.toDp().value, spreadSpace.height.toDp().value)
     }
     Box(Modifier.fillMaxSize().onSizeChanged { spreadSpace = it })
+    VolumeKeyPagingEffect(
+        enabled = ready.preferences.volumeKeysTurnPages,
+        currentPage = ready.currentPage,
+        pageCount = ready.pageSizes.size,
+        spreads = twoPageSpreads && ready.preferences.readingMode == ReadingMode.Horizontal,
+        onTurn = onTurnPage,
+    )
     when (ready.preferences.readingMode) {
         ReadingMode.Vertical -> PdfPageList(
             pageSizes = ready.pageSizes,
@@ -846,14 +849,14 @@ private fun SystemBarsEffect(hidden: Boolean) {
 /** Stops the screen from timing out while [enabled] and the reader is shown. */
 /** While [enabled], volume keys turn pages instead of changing the volume. */
 @Composable
-private fun VolumeKeyPagingEffect(enabled: Boolean, currentPage: Int, pageCount: Int, onTurn: (Int) -> Unit) {
+private fun VolumeKeyPagingEffect(enabled: Boolean, currentPage: Int, pageCount: Int, spreads: Boolean, onTurn: (Int) -> Unit) {
     val host = LocalActivity.current as? KeyEventHost ?: return
     val page by rememberUpdatedState(currentPage)
     val turn by rememberUpdatedState(onTurn)
-    DisposableEffect(host, enabled, pageCount) {
+    DisposableEffect(host, enabled, pageCount, spreads) {
         if (enabled && pageCount > 0) {
             host.setKeyHandler { event ->
-                val target = pageForVolumeKey(event.keyCode, page, pageCount) ?: return@setKeyHandler false
+                val target = pageForVolumeKey(event.keyCode, page, pageCount, spreads) ?: return@setKeyHandler false
                 // Both down and up are taken; held down, it keeps turning.
                 if (event.action == KeyEvent.ACTION_DOWN && target != page) turn(target)
                 true
