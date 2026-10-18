@@ -61,6 +61,8 @@ sealed interface ReaderUiState {
         val pageTransforms: List<PageViewTransform> = pageSizes.map { PageViewTransform.of(it) },
         /** This document's rotation and margin cropping, for the menu. */
         val documentView: DocumentView = DocumentView(),
+        /** An XFA form: annotation tools, signing and text recognition are off. */
+        val isXfa: Boolean = false,
         /** Fillable widgets of the pages near the reader, by page; empty without a form. */
         val formFields: Map<Int, List<FormField>> = emptyMap(),
         /** A text or choice field being filled in. */

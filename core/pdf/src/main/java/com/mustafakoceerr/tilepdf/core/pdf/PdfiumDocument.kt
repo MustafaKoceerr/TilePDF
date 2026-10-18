@@ -193,6 +193,8 @@ class PdfiumDocument internal constructor(
     override suspend fun xfaTap(pageIndex: Int, at: PdfPoint): String? =
         withDocument(pageIndex) { PdfiumNative.nativeFormTap(it, pageIndex, at.x, at.y) }
 
+    override suspend fun xfaPageCount(): Int = withDocument { PdfiumNative.nativePageCount(it) }
+
     override suspend fun xfaWrite(pageIndex: Int, text: String) {
         val written = withDocument(pageIndex) { PdfiumNative.nativeFormReplaceText(it, pageIndex, text) }
         if (!written) throw PdfWriteException("Could not write to the XFA field on page $pageIndex")

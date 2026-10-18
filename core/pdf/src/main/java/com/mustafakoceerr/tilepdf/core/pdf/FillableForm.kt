@@ -30,6 +30,9 @@ interface FillableForm {
      */
     suspend fun xfaTap(pageIndex: Int, at: PdfPoint): String? = null
 
+    /** How many pages the XFA form has now: a dynamic form may add some as it's filled. */
+    suspend fun xfaPageCount(): Int = pageCount
+
     /**
      * Replaces the text of the XFA field the last tap focused.
      * @throws PdfWriteException if the engine refused it.

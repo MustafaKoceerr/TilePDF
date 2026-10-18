@@ -15,6 +15,8 @@ import com.mustafakoceerr.tilepdf.core.geometry.PdfPoint
 import com.mustafakoceerr.tilepdf.core.geometry.PdfRect
 import com.mustafakoceerr.tilepdf.core.pdf.addMissingRecognizedText
 import com.mustafakoceerr.tilepdf.core.pdf.fill
+import com.mustafakoceerr.tilepdf.core.pdf.replay
+import com.mustafakoceerr.tilepdf.model.XfaEdit
 import com.mustafakoceerr.tilepdf.core.ocr.TextRecognizer
 import com.mustafakoceerr.tilepdf.core.ocr.recognizedWords
 import com.mustafakoceerr.tilepdf.model.OcrWord
@@ -94,6 +96,9 @@ private const val SIGNATURE_WIDTH_PT = 160f
 private const val SIGNATURE_PEN_PT = 1.5f
 private const val SIGNATURE_COLOR = 0xFF000000.toInt()
 
+/** The widget index of an XFA field in the text dialog: XFA fields aren't widgets. */
+private const val XFA_FIELD = -1
+
 /** Pages flip by quickly while scrolling; only the one the reader stops on is checked for text. */
 private const val TEXT_CHECK_DELAY_MS = 400L
 
@@ -144,6 +149,12 @@ class ReaderViewModel @Inject constructor(
 
     /** Whether the open document has a form to fill; read once per open. */
     private var documentHasForm = false
+
+    /** Whether it's an XFA form, whose fields the engine lays out: taps go to it. */
+    private var documentIsXfa = false
+
+    /** The XFA text field being filled in through the dialog: its page and tap point. */
+    private var xfaFocus: XfaEdit? = null
 
     /** Fillable widgets by page, loaded around the reader as it moves. */
     private val formFields = MutableStateFlow<Map<Int, List<FormField>>>(emptyMap())
@@ -227,6 +238,7 @@ class ReaderViewModel @Inject constructor(
                 pageSizes = document.transforms.map { it.size },
                 pageTransforms = document.transforms,
                 documentView = document.view,
+                isXfa = document.isXfa,
                 pageImages = document.pageImages,
                 thumbnails = document.thumbnails,
                 initialPosition = start ?: document.opened.position,
@@ -298,6 +310,12 @@ class ReaderViewModel @Inject constructor(
                     runCatchingCancellable {
                         opened.document.addMissingRecognizedText(annotationRepository.recognizedText(opened.uri, recognizedPages))
                     }
+                }
+                documentIsXfa = documentHasForm && runCatchingCancellable { opened.document.isXfa() }.getOrDefault(false)
+                // An XFA form shows what was filled in but not saved yet by doing it again.
+                if (documentIsXfa) {
+                    val edits = annotationRepository.observe(opened.uri).first()?.xfaEdits.orEmpty()
+                    runCatchingCancellable { opened.document.replay(edits) }
                 }
                 formFields.value = emptyMap()
                 val view = libraryRepository.documentView(opened.uri)
@@ -371,11 +389,17 @@ class ReaderViewModel @Inject constructor(
     fun onFormValueSubmitted(value: String) {
         val field = formEditor.value ?: return
         formEditor.value = null
+        xfaFocus?.let { focus ->
+            xfaFocus = null
+            writeXfa(focus, value)
+            return
+        }
         if (value != field.value) setFormValue(field.name, value)
     }
 
     fun onFormEditorDismissed() {
         formEditor.value = null
+        xfaFocus = null
     }
 
     /**
@@ -406,6 +430,46 @@ class ReaderViewModel @Inject constructor(
         }
     }
 
+    /**
+     * A tap on an XFA form, which goes to the engine as a finger's would. A
+     * text field it focuses opens the text dialog; any other tap may have
+     * changed something, such as a check box, so it is kept as an edit.
+     */
+    private suspend fun onXfaTap(document: PdfDocument, pageIndex: Int, at: PdfPoint) {
+        val opened = (documentState.value as? DocumentState.Opened)?.opened ?: return
+        // The draft must exist before edits can wait in it.
+        if (controller.value?.state?.value?.ready != true) return
+        val text = runCatchingCancellable { document.xfaTap(pageIndex, at) }.getOrNull()
+        if (text != null) {
+            xfaFocus = XfaEdit(pageIndex, at)
+            formEditor.value = FormField(pageIndex, XFA_FIELD, "", FormFieldKind.Text, text, PdfRect(at.x, at.y, at.x, at.y))
+            return
+        }
+        annotationRepository.addXfaEdit(opened.uri, XfaEdit(pageIndex, at))
+        xfaChanged(opened)
+    }
+
+    private fun writeXfa(focus: XfaEdit, text: String) {
+        val opened = (documentState.value as? DocumentState.Opened)?.opened ?: return
+        viewModelScope.launch {
+            val written = runCatchingCancellable { opened.document.xfaWrite(focus.pageIndex, text) }.isSuccess
+            if (!written) return@launch
+            annotationRepository.addXfaEdit(opened.uri, focus.copy(text = text))
+            xfaChanged(opened)
+        }
+    }
+
+    /** Redraws the form; one that grew or shrank a page is opened again, which replays its edits. */
+    private suspend fun xfaChanged(opened: OpenedDocument) {
+        val shown = stateOf(opened) ?: return
+        for (page in 0 until opened.document.pageCount) {
+            shown.pageImages.invalidate(page)
+            shown.thumbnails.invalidate(page)
+        }
+        val pages = runCatchingCancellable { opened.document.xfaPageCount() }.getOrDefault(opened.document.pageCount)
+        if (pages != opened.document.pageCount) reopenAfterSave(shown)
+    }
+
     /** The library's picture of the first page; redrawn on every open, so it follows changes to the file. */
     private fun saveThumbnail(opened: OpenedDocument) = viewModelScope.launch {
         // The document may close while this runs; the library then keeps the old picture.
@@ -418,6 +482,7 @@ class ReaderViewModel @Inject constructor(
     private fun shown(opened: OpenedDocument, view: DocumentView): DocumentState.Opened {
         val transforms = pageTransforms(opened.document.pageSizes, view, margins)
         return DocumentState.Opened(
+            isXfa = documentIsXfa,
             opened = opened,
             pageImages = TiledPageImageSource(opened.document, pageRenderer, viewModelScope, transforms = transforms),
             thumbnails = ThumbnailSource(opened.document, pageRenderer, transforms = transforms),
@@ -594,6 +659,10 @@ class ReaderViewModel @Inject constructor(
         }
         val document = openedDocument() ?: return
         viewModelScope.launch {
+            if (documentIsXfa) {
+                onXfaTap(document, pageIndex, PdfPoint(x, y))
+                return@launch
+            }
             if (documentHasForm && !tools.annotating) {
                 val fields = formFields.value[pageIndex] ?: fieldsOf(document, pageIndex).also { loaded ->
                     formFields.update { it + (pageIndex to loaded) }
@@ -766,7 +835,7 @@ class ReaderViewModel @Inject constructor(
     }
 
     /** Shows or hides the annotation toolbar; hiding it goes back to reading. */
-    fun onToggleAnnotating() = editing.update {
+    fun onToggleAnnotating() = if (documentIsXfa) Unit else editing.update {
         if (it.annotating) AnnotationEditing() else it.copy(annotating = true, tool = AnnotationTool.Select)
     }
 
@@ -800,7 +869,7 @@ class ReaderViewModel @Inject constructor(
 
     /** Asks which pages to recognise text on. */
     fun onRecognizeTextRequested() {
-        if (recognitionJob?.isActive == true) return
+        if (documentIsXfa || recognitionJob?.isActive == true) return
         recognition.update { it.copy(choosing = true) }
     }
 
@@ -886,7 +955,7 @@ class ReaderViewModel @Inject constructor(
                 .distinctUntilChanged()
                 .debounce(TEXT_CHECK_DELAY_MS)
                 .collectLatest { (page, document) ->
-                    val noText = document != null && page in 0 until document.pageCount && needsText(document, page)
+                    val noText = document != null && !documentIsXfa && page in 0 until document.pageCount && needsText(document, page)
                     recognition.update { it.copy(currentPageHasNoText = noText) }
                 }
         }
@@ -894,7 +963,7 @@ class ReaderViewModel @Inject constructor(
 
     /** Opens the signature pad, with the saved signature when there is one. */
     fun onAddSignature() {
-        if (controller.value?.state?.value?.ready != true) return
+        if (documentIsXfa || controller.value?.state?.value?.ready != true) return
         viewModelScope.launch { signatureStep.value = SignatureStep.Pad(signatureStore.load()) }
     }
 
@@ -1109,6 +1178,8 @@ class ReaderViewModel @Inject constructor(
         data class Failed(val reason: ReaderError) : DocumentState
         data class NeedsPassword(val wrongPassword: Boolean) : DocumentState
         data class Opened(
+            /** An XFA form: its pages aren't PDF pages, so annotations and text recognition are off. */
+            val isXfa: Boolean,
             val opened: OpenedDocument,
             val pageImages: TiledPageImageSource,
             val thumbnails: ThumbnailSource,

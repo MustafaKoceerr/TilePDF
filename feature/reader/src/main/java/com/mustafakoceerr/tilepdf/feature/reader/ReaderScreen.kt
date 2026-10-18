@@ -395,7 +395,7 @@ internal fun ReaderScreen(
                             )
                         }
                         // Always there: it also holds the bookmarks.
-                        if (ready.annotations.ready) {
+                        if (ready.annotations.ready && !ready.isXfa) {
                             IconButton(onClick = annotationActions.onToggleAnnotating) {
                                 Icon(
                                     painter = painterResource(TilePdfIcons.Edit),
@@ -428,6 +428,7 @@ internal fun ReaderScreen(
                             cropMargins = ready.documentView.cropMargins,
                             onAddSignature = onAddSignature,
                             recognizing = ready.recognition.progress != null,
+                            pagesArePdf = !ready.isXfa,
                             onRecognizeText = recognitionActions.onRequest,
                             onRotate = onRotate,
                             onCropMarginsChange = onCropMarginsChange,
@@ -1025,6 +1026,8 @@ private fun OverflowMenu(
     cropMargins: Boolean,
     onAddSignature: () -> Unit,
     recognizing: Boolean,
+    /** False on an XFA form, whose pages can't take a signature or recognised text. */
+    pagesArePdf: Boolean,
     onRecognizeText: () -> Unit,
     onRotate: () -> Unit,
     onCropMarginsChange: (Boolean) -> Unit,
@@ -1063,6 +1066,7 @@ private fun OverflowMenu(
             DropdownMenuItem(
                 text = { Text(stringResource(R.string.reader_add_signature)) },
                 leadingIcon = { Icon(painterResource(TilePdfIcons.Signature), contentDescription = null) },
+                enabled = pagesArePdf,
                 onClick = {
                     onExpandedChange(false)
                     onAddSignature()
@@ -1071,7 +1075,7 @@ private fun OverflowMenu(
             DropdownMenuItem(
                 text = { Text(stringResource(R.string.reader_recognize_text)) },
                 leadingIcon = { Icon(painterResource(TilePdfIcons.TextScan), contentDescription = null) },
-                enabled = !recognizing,
+                enabled = !recognizing && pagesArePdf,
                 onClick = {
                     onExpandedChange(false)
                     onRecognizeText()

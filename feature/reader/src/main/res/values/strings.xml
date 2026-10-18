@@ -78,6 +78,7 @@
     <string name="signature_hint">Tap where to sign</string>
     <string name="reader_recognize_text">Recognise text</string>
     <string name="script_title">This document says</string>
+    <string name="form_text_field">Text field</string>
     <string name="script_ok">OK</string>
     <string name="script_yes">Yes</string>
     <string name="script_no">No</string>

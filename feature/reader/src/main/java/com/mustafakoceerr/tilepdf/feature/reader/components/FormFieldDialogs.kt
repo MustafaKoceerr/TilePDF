@@ -56,7 +56,7 @@ private fun FormTextDialog(field: FormField, onSubmit: (String) -> Unit, onDismi
     LaunchedEffect(focus) { focus.requestFocus() }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(field.name) },
+        title = { Text(field.name.ifBlank { stringResource(R.string.form_text_field) }) },
         text = {
             OutlinedTextField(
                 value = text,
@@ -76,7 +76,7 @@ private fun FormTextDialog(field: FormField, onSubmit: (String) -> Unit, onDismi
 private fun FormChoiceDialog(field: FormField, onSubmit: (String) -> Unit, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(field.name) },
+        title = { Text(field.name.ifBlank { stringResource(R.string.form_text_field) }) },
         text = {
             Column(Modifier.selectableGroup().verticalScroll(rememberScrollState())) {
                 field.options.forEach { option ->
