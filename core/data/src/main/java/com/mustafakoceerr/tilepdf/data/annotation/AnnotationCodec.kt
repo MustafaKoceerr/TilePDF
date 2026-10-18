@@ -9,6 +9,7 @@ import com.mustafakoceerr.tilepdf.model.MarkupKind
 import com.mustafakoceerr.tilepdf.model.Note
 import com.mustafakoceerr.tilepdf.model.OcrWord
 import com.mustafakoceerr.tilepdf.model.TextMarkup
+import com.mustafakoceerr.tilepdf.model.XfaEdit
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
@@ -56,6 +57,13 @@ internal object AnnotationCodec {
 
     fun decodeFormValues(text: String): Map<String, String> = json.decodeFromString(text)
 
+    /** XFA edits in order: page, tap point and the text written, if any. */
+    fun encodeXfaEdits(edits: List<XfaEdit>): String =
+        json.encodeToString(edits.map { XfaEditJson(it.pageIndex, it.at.x, it.at.y, it.text) })
+
+    fun decodeXfaEdits(text: String): List<XfaEdit> =
+        json.decodeFromString<List<XfaEditJson>>(text).map { XfaEdit(it.p, PdfPoint(it.x, it.y), it.t) }
+
     /** A page's recognised words: each its text and its quad as eight numbers. */
     fun encodeWords(words: List<OcrWord>): String =
         json.encodeToString(words.map { word -> WordJson(word.text, word.quad.flatMap { listOf(it.x, it.y) }) })
@@ -97,6 +105,9 @@ internal object AnnotationCodec {
             else -> null
         }
     }
+
+    @Serializable
+    private data class XfaEditJson(val p: Int, val x: Float, val y: Float, val t: String? = null)
 
     @Serializable
     private data class WordJson(val t: String, val q: List<Float>)

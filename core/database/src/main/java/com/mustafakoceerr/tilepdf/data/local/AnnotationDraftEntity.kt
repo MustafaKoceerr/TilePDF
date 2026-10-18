@@ -33,4 +33,7 @@ data class AnnotationDraftEntity(
     val updatedAt: Long,
     /** Added in schema 7: pending form values, a JSON object of field name to value. */
     @ColumnInfo(defaultValue = "{}") val formValues: String = "{}",
+    /** Steps filling in an XFA form, in order, as JSON; not yet saved. */
+    @ColumnInfo(defaultValue = "[]")
+    val xfaEdits: String = "[]",
 )

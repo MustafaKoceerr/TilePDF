@@ -1,5 +1,6 @@
 package com.mustafakoceerr.tilepdf.data.annotation
 
+import com.mustafakoceerr.tilepdf.model.XfaEdit
 import com.mustafakoceerr.tilepdf.core.geometry.PdfPoint
 import com.mustafakoceerr.tilepdf.data.text.FakePdfDocument
 import com.mustafakoceerr.tilepdf.model.Annotation
@@ -348,5 +349,52 @@ class AnnotationSaverTest {
 
         assertTrue(files.openForReading(target, null).hasRecognizedText(2))
         assertEquals(setOf(2), draft()!!.recognizedPages)
+    }
+
+    private val nameField = PdfPoint(200f, 122f)
+
+    @Test
+    fun savesXfaEdits() = runTest {
+        givenDraft(emptyList(), pdf = FakePdf(xfa = mapOf(nameField to "")))
+        repository.addXfaEdit(uri, XfaEdit(0, nameField, "Ada"))
+
+        assertEquals(SaveResult.Saved(uri), saver.save(uri))
+
+        assertEquals(mapOf(nameField to "Ada"), files.pdfs.getValue(uri).xfa)
+        assertEquals(emptyList<XfaEdit>(), draft()!!.xfaEdits)
+        assertFalse(draft()!!.dirty)
+    }
+
+    @Test
+    fun lostXfaTextFailsTheSave() = runTest {
+        givenDraft(emptyList(), pdf = FakePdf(xfa = mapOf(nameField to "")))
+        repository.addXfaEdit(uri, XfaEdit(0, nameField, "Ada"))
+        files.loseXfaOnSave = true
+
+        assertEquals(SaveResult.Failed(SaveError.Failed), saver.save(uri))
+
+        assertEquals(emptyList<String>(), files.replaced)
+    }
+
+    @Test
+    fun theLastTextAtAPointIsWhatIsChecked() = runTest {
+        givenDraft(emptyList(), pdf = FakePdf(xfa = mapOf(nameField to "")))
+        repository.addXfaEdit(uri, XfaEdit(0, nameField, "Ada"))
+        repository.addXfaEdit(uri, XfaEdit(0, nameField, "Grace"))
+
+        assertEquals(SaveResult.Saved(uri), saver.save(uri))
+
+        assertEquals("Grace", files.pdfs.getValue(uri).xfa[nameField])
+    }
+
+    @Test
+    fun exportReplaysXfaEdits() = runTest {
+        givenDraft(emptyList(), pdf = FakePdf(xfa = mapOf(nameField to "")))
+        repository.addXfaEdit(uri, XfaEdit(0, nameField, "Ada"))
+        val target = tmp.newFile("shared.pdf")
+
+        assertTrue(saver.export(uri, target))
+
+        assertEquals("Ada", files.openForReading(target, null).xfaTap(0, nameField))
     }
 }

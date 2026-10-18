@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import android.graphics.Matrix
 import android.os.ParcelFileDescriptor
 import androidx.annotation.VisibleForTesting
+import com.mustafakoceerr.tilepdf.core.geometry.PdfPoint
 import com.mustafakoceerr.tilepdf.core.geometry.PdfRect
 import com.mustafakoceerr.tilepdf.model.FormField
 import com.mustafakoceerr.tilepdf.model.OcrWord
@@ -186,6 +187,16 @@ class PdfiumDocument internal constructor(
 
     override suspend fun setScriptHost(host: FormScriptHost?, openAction: Boolean) =
         withDocument { PdfiumNative.nativeSetScriptHost(it, host, openAction) }
+
+    override suspend fun isXfa(): Boolean = withDocument { PdfiumNative.nativeIsXfa(it) }
+
+    override suspend fun xfaTap(pageIndex: Int, at: PdfPoint): String? =
+        withDocument(pageIndex) { PdfiumNative.nativeFormTap(it, pageIndex, at.x, at.y) }
+
+    override suspend fun xfaWrite(pageIndex: Int, text: String) {
+        val written = withDocument(pageIndex) { PdfiumNative.nativeFormReplaceText(it, pageIndex, text) }
+        if (!written) throw PdfWriteException("Could not write to the XFA field on page $pageIndex")
+    }
 
     override suspend fun hasRecognizedText(pageIndex: Int): Boolean =
         withDocument(pageIndex) { PdfiumNative.nativeHasRecognizedText(it, pageIndex) }

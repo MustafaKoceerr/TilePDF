@@ -217,6 +217,32 @@ class TilePdfDatabaseMigrationTest {
     }
 
     @Test
+    fun migrate8To9KeepsDraftsWithNoXfaEdits() {
+        helper.createDatabase(DB_NAME, 8).use { db ->
+            db.execSQL(
+                "INSERT INTO documents (uri, displayName, pageCount, lastPage, pageOffsetFraction, zoom, panFraction, " +
+                    "addedAt, lastOpenedAt, favorite, rotation, cropMargins) " +
+                    "VALUES ('content://book', 'Book.pdf', 3, 1, 0, 1, 0, 1, 2, 0, 0, 0)"
+            )
+            db.execSQL(
+                "INSERT INTO annotation_drafts (uri, annotations, removedForeign, dirty, baseSize, " +
+                    "baseModified, saveError, updatedAt, formValues) VALUES ('content://book', '[]', '[]', 1, 10, NULL, NULL, 3, '{}')"
+            )
+        }
+
+        // Validates the migrated schema against the exported 9.json.
+        helper.runMigrationsAndValidate(DB_NAME, 9, true).close()
+
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val database = Room.databaseBuilder(context, TilePdfDatabase::class.java, DB_NAME).build()
+        val draft = runBlocking { database.annotationDraftDao().get("content://book") }
+        database.close()
+
+        assertEquals(true, draft!!.dirty)
+        assertEquals("[]", draft.xfaEdits)
+    }
+
+    @Test
     fun viewSettingsAreStored() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val database = Room.inMemoryDatabaseBuilder(context, TilePdfDatabase::class.java).build()

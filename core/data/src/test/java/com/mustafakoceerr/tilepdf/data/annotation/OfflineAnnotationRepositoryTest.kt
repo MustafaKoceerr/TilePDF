@@ -1,5 +1,6 @@
 package com.mustafakoceerr.tilepdf.data.annotation
 
+import com.mustafakoceerr.tilepdf.model.XfaEdit
 import com.mustafakoceerr.tilepdf.core.geometry.PdfPoint
 import com.mustafakoceerr.tilepdf.data.text.FakePdfDocument
 import com.mustafakoceerr.tilepdf.model.Annotation
@@ -257,5 +258,44 @@ class OfflineAnnotationRepositoryTest {
 
         assertEquals(setOf(1), repository.observe("content://copy").first()!!.recognizedPages)
         assertEquals(emptyMap<Int, List<OcrWord>>(), repository.recognizedText(uri, setOf(0, 1)))
+    }
+
+    @Test
+    fun xfaEditsAreKeptInOrderUntilSaved() = runTest {
+        repository.prepare(uri, document)
+        val name = XfaEdit(0, PdfPoint(200f, 122f), "Ada")
+        val agree = XfaEdit(0, PdfPoint(80f, 170f))
+
+        repository.addXfaEdit(uri, name)
+        repository.addXfaEdit(uri, agree)
+
+        assertEquals(listOf(name, agree), stored().xfaEdits)
+        assertTrue(stored().dirty)
+    }
+
+    @Test
+    fun markSavedDropsTheSavedXfaEditsAndKeepsNewerOnes() = runTest {
+        repository.prepare(uri, document)
+        val first = XfaEdit(0, PdfPoint(200f, 122f), "Ada")
+        val later = XfaEdit(0, PdfPoint(200f, 122f), "Grace")
+        repository.addXfaEdit(uri, first)
+        val saved = stored()
+        repository.addXfaEdit(uri, later)
+
+        repository.markSaved(uri, saved, FileStamp(200, 6))
+
+        assertEquals(listOf(later), stored().xfaEdits)
+        assertTrue(stored().dirty)
+    }
+
+    @Test
+    fun savingEveryXfaEditLeavesTheDraftClean() = runTest {
+        repository.prepare(uri, document)
+        repository.addXfaEdit(uri, XfaEdit(0, PdfPoint(200f, 122f), "Ada"))
+
+        repository.markSaved(uri, stored(), FileStamp(200, 6))
+
+        assertEquals(emptyList<XfaEdit>(), stored().xfaEdits)
+        assertFalse(stored().dirty)
     }
 }

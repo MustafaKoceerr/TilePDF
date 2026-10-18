@@ -15,6 +15,7 @@ enum class SaveError { NoWritePermission, FileChanged, NeedsPassword, Failed }
  * @param base the file version [removedForeign] keys and the saved state refer to.
  * @param formValues form fields the user filled in, not yet saved.
  * @param recognizedPages pages whose recognised text isn't in the file yet.
+ * @param xfaEdits steps filling in an XFA form, in order, not yet saved.
  */
 data class AnnotationDraft(
     val uri: String,
@@ -26,4 +27,5 @@ data class AnnotationDraft(
     /** Form values the user set (field name → `/V`), not yet saved. */
     val formValues: Map<String, String> = emptyMap(),
     val recognizedPages: Set<Int> = emptySet(),
+    val xfaEdits: List<XfaEdit> = emptyList(),
 )

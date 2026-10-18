@@ -30,6 +30,10 @@ Writes to core/testing/src/main/assets/:
                  and formatted with two decimals (AFNumber_Format), and "age",
                  whose validate script alerts "Too old" and rejects values over
                  150; form JavaScript.
+- xfa.pdf        A dynamic XFA form (NeedsRendering): a Letter page with a
+                 caption "Name" and a text field "name" at 1 in, 1.5 in, 3 in
+                 wide, and a check box "agree" below it. Its PDF page only
+                 says "Please wait"; XFA forms.
 - scanned.pdf    1 A4 page that is only a 200 dpi grey image of three lines
                  of text (no text objects); text recognition. Needs Pillow,
                  and draws with the app's Noto Sans subset.
@@ -349,6 +353,41 @@ def calc():
     write_pdf(objects, 5, "calc.pdf")
 
 
+XFA_TEMPLATE = """<?xml version="1.0" encoding="UTF-8"?>
+<xdp:xdp xmlns:xdp="http://ns.adobe.com/xdp/">
+<config xmlns="http://www.xfa.org/schema/xci/3.1/"><acrobat><acrobat7><dynamicRender>required</dynamicRender></acrobat7></acrobat></config>
+<template xmlns="http://www.xfa.org/schema/xfa-template/3.3/">
+<subform name="form1" layout="tb" locale="en_US">
+<pageSet><pageArea name="Page1" id="Page1"><contentArea x="0in" y="0in" w="8.5in" h="11in"/>
+<medium stock="letter" short="8.5in" long="11in"/></pageArea></pageSet>
+<subform name="main" w="8.5in" h="11in">
+<field name="name" x="1in" y="1.5in" w="3in" h="0.4in"><ui><textEdit/></ui>
+<font typeface="Helvetica" size="12pt"/>
+<caption reserve="0.8in"><value><text>Name</text></value></caption></field>
+<field name="agree" x="1in" y="2.2in" w="2in" h="0.3in"><ui><checkButton/></ui>
+<caption reserve="1in"><value><text>Agree</text></value></caption>
+<items><integer>1</integer><integer>0</integer></items></field>
+</subform>
+</subform>
+</template>
+<xfa:datasets xmlns:xfa="http://www.xfa.org/schema/xfa-data/1.0/"><xfa:data><form1><main><name/><agree>0</agree></main></form1></xfa:data></xfa:datasets>
+</xdp:xdp>"""
+
+
+def xfa():
+    objects = [
+        FONT,
+        stream("BT /F1 18 Tf 72 720 Td (Please wait) Tj ET"),
+        "<< /Type /Page /Parent 4 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 1 0 R >> >> "
+        "/Contents 2 0 R >>",
+        "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        "<< /Type /Catalog /Pages 4 0 R /AcroForm 6 0 R /NeedsRendering true >>",
+        "<< /Fields [] /XFA 7 0 R >>",
+        stream(XFA_TEMPLATE),
+    ]
+    write_pdf(objects, 5, "xfa.pdf")
+
+
 SCANNED_LINES = ["Taranmış bir sayfa", "Metin tanıma örneği", "İstanbul Şişli 2026"]
 
 
@@ -388,4 +427,5 @@ if __name__ == "__main__":
     annotated()
     forms()
     calc()
+    xfa()
     scanned()

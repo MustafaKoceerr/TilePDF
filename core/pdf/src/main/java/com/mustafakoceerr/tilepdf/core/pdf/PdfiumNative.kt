@@ -186,6 +186,21 @@ internal object PdfiumNative {
     @JvmStatic
     external fun nativeSetScriptHost(document: Long, host: FormScriptHost?, openAction: Boolean)
 
+    /** Whether the document is an XFA form whose pages PDFium lays out itself. */
+    @JvmStatic
+    external fun nativeIsXfa(document: Long): Boolean
+
+    /**
+     * Taps top-left point ([x], [y]) of page [index] as a finger would.
+     * Returns the text of the field it focused if that's a text field.
+     */
+    @JvmStatic
+    external fun nativeFormTap(document: Long, index: Int, x: Float, y: Float): String?
+
+    /** Replaces the text of the focused field on page [index] and commits it. */
+    @JvmStatic
+    external fun nativeFormReplaceText(document: Long, index: Int, text: String): Boolean
+
     /** Whether page [index] has text TilePDF recognised. */
     @JvmStatic
     external fun nativeHasRecognizedText(document: Long, index: Int): Boolean

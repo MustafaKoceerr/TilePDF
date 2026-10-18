@@ -2,6 +2,7 @@ package com.mustafakoceerr.tilepdf.core.pdf
 
 import android.os.ParcelFileDescriptor
 import androidx.annotation.VisibleForTesting
+import com.mustafakoceerr.tilepdf.core.geometry.PdfPoint
 import com.mustafakoceerr.tilepdf.model.Annotation
 import com.mustafakoceerr.tilepdf.model.FormField
 import com.mustafakoceerr.tilepdf.model.Ink
@@ -73,6 +74,12 @@ class PdfiumEditableDocument internal constructor(
     override suspend fun applyFormEdits(edits: List<FormEdit>): Boolean = document.applyFormEdits(edits)
 
     override suspend fun setScriptHost(host: FormScriptHost?, openAction: Boolean) = document.setScriptHost(host, openAction)
+
+    override suspend fun isXfa(): Boolean = document.isXfa()
+
+    override suspend fun xfaTap(pageIndex: Int, at: PdfPoint): String? = document.xfaTap(pageIndex, at)
+
+    override suspend fun xfaWrite(pageIndex: Int, text: String) = document.xfaWrite(pageIndex, text)
 
     override suspend fun hasRecognizedText(pageIndex: Int): Boolean = document.hasRecognizedText(pageIndex)
 

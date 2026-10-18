@@ -11,6 +11,7 @@ import com.mustafakoceerr.tilepdf.model.FileStamp
 import com.mustafakoceerr.tilepdf.model.ForeignRef
 import com.mustafakoceerr.tilepdf.model.OcrWord
 import com.mustafakoceerr.tilepdf.model.SaveError
+import com.mustafakoceerr.tilepdf.model.XfaEdit
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
@@ -70,6 +71,13 @@ class OfflineAnnotationRepository internal constructor(
         }
     }
 
+    override suspend fun addXfaEdit(uri: String, edit: XfaEdit) {
+        dao.update(uri) {
+            val edits = AnnotationCodec.decodeXfaEdits(it.xfaEdits) + edit
+            it.copy(xfaEdits = AnnotationCodec.encodeXfaEdits(edits), dirty = true, updatedAt = now())
+        }
+    }
+
     override suspend fun setRecognizedText(uri: String, pageIndex: Int, words: List<OcrWord>) {
         recognized.upsert(RecognizedTextEntity(uri, pageIndex, AnnotationCodec.encodeWords(words)))
         dao.update(uri) { it.copy(dirty = true, updatedAt = now()) }
@@ -119,10 +127,15 @@ class OfflineAnnotationRepository internal constructor(
         val kept = removed.filterNot { it.key.startsWith("#") }.toSet()
         // Values changed again since the save started are still pending.
         val pendingValues = AnnotationCodec.decodeFormValues(formValues).filter { (name, value) -> saved.formValues[name] != value }
+        // Edits made since the save started come after the saved ones.
+        val edits = AnnotationCodec.decodeXfaEdits(xfaEdits)
+        val pendingEdits = if (edits.take(saved.xfaEdits.size) == saved.xfaEdits) edits.drop(saved.xfaEdits.size) else edits
         return copy(
             removedForeign = AnnotationCodec.encodeRefs(kept),
             formValues = AnnotationCodec.encodeFormValues(pendingValues),
-            dirty = annotations != saved.annotations || kept.isNotEmpty() || pendingValues.isNotEmpty() || recognizedPending,
+            xfaEdits = AnnotationCodec.encodeXfaEdits(pendingEdits),
+            dirty = annotations != saved.annotations || kept.isNotEmpty() || pendingValues.isNotEmpty() ||
+                pendingEdits.isNotEmpty() || recognizedPending,
             baseSize = newBase.size,
             baseModified = newBase.lastModified,
             saveError = null,
@@ -138,6 +151,7 @@ class OfflineAnnotationRepository internal constructor(
         base = FileStamp(baseSize, baseModified),
         saveError = saveError?.let { name -> SaveError.entries.firstOrNull { it.name == name } },
         formValues = AnnotationCodec.decodeFormValues(formValues),
+        xfaEdits = AnnotationCodec.decodeXfaEdits(xfaEdits),
     )
 
     private fun AnnotationDraft.toEntity() = AnnotationDraftEntity(
@@ -150,5 +164,6 @@ class OfflineAnnotationRepository internal constructor(
         saveError = saveError?.name,
         updatedAt = now(),
         formValues = AnnotationCodec.encodeFormValues(formValues),
+        xfaEdits = AnnotationCodec.encodeXfaEdits(xfaEdits),
     )
 }
