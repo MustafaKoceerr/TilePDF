@@ -24,6 +24,18 @@ class IncomingDocumentTest {
     }
 
     @Test
+    fun sharedXPdfStreamOpensIt() {
+        // Some apps label PDFs with the legacy type.
+        assertEquals(pdf, incomingDocumentUri(ACTION_SEND, data = null, stream = pdf, type = "application/x-pdf"))
+    }
+
+    @Test
+    fun sharedOctetStreamIsIgnored() {
+        // A share must say what it is; "Open with" is where unknown types are matched by name.
+        assertNull(incomingDocumentUri(ACTION_SEND, data = null, stream = pdf, type = "application/octet-stream"))
+    }
+
+    @Test
     fun sharedTextIsIgnored() {
         assertNull(incomingDocumentUri(ACTION_SEND, data = null, stream = pdf, type = "text/plain"))
     }

@@ -16,7 +16,9 @@ minSdk 29
 ## Features
 
 - Open any PDF through the Storage Access Framework, or from another app with
-  "Open with" or "Share"; recent documents are kept in a local library (no
+  "Open with" or "Share" (also when a file manager labels the file
+  application/x-pdf, or sends an unknown type for a name ending in .pdf,
+  and from browser downloads); recent documents are kept in a local library (no
   cloud, no accounts). Files the app couldn't reopen later (no lasting
   permission, or a stream of unknown size) are kept as a private copy
 - Password-protected PDFs open after entering the password; it is never

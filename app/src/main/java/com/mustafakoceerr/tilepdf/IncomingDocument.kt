@@ -11,7 +11,7 @@ import androidx.core.content.IntentCompat
 internal fun incomingDocumentUri(action: String?, data: String?, stream: String?, type: String?): String? {
     val uri = when (action) {
         Intent.ACTION_VIEW -> data
-        Intent.ACTION_SEND -> stream.takeIf { type == PDF_MIME_TYPE }
+        Intent.ACTION_SEND -> stream.takeIf { type in PDF_MIME_TYPES }
         else -> null
     }
     return uri?.takeIf { it.startsWith("content://") }
@@ -24,4 +24,5 @@ internal fun Intent.incomingDocumentUri(): String? = incomingDocumentUri(
     type = type,
 )
 
-private const val PDF_MIME_TYPE = "application/pdf"
+/** The standard type and the legacy one some apps still send. */
+private val PDF_MIME_TYPES = setOf("application/pdf", "application/x-pdf")
