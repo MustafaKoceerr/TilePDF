@@ -1,8 +1,13 @@
 package com.mustafakoceerr.tilepdf.data.preferences
 
+import com.mustafakoceerr.tilepdf.model.PageTheme
+import com.mustafakoceerr.tilepdf.model.ReaderPreferences
+import com.mustafakoceerr.tilepdf.model.ReadingMode
 import kotlinx.coroutines.flow.Flow
 
 interface ReaderPreferencesRepository {
-    val nightMode: Flow<Boolean>
-    suspend fun toggleNightMode()
+    val preferences: Flow<ReaderPreferences>
+    suspend fun setPageTheme(theme: PageTheme)
+    suspend fun setReadingMode(mode: ReadingMode)
+    suspend fun setKeepScreenOn(enabled: Boolean)
 }

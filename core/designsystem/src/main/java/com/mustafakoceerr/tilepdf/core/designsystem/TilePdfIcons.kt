@@ -18,4 +18,5 @@ object TilePdfIcons {
     @DrawableRes val Search = R.drawable.ic_search
     @DrawableRes val Tag = R.drawable.ic_tag
     @DrawableRes val Toc = R.drawable.ic_toc
+    @DrawableRes val Tune = R.drawable.ic_tune
 }

@@ -1,6 +1,7 @@
 package com.mustafakoceerr.tilepdf.feature.reader.components
 
 import androidx.compose.foundation.gestures.animateScrollBy
+import androidx.compose.foundation.lazy.LazyListLayoutInfo
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.geometry.Offset
@@ -137,6 +138,13 @@ internal suspend fun scrollToPage(
 }
 
 /**
+ * Whether a span from viewport y [top], [height] tall, is clear of the bars
+ * drawn over the list's top and bottom content padding.
+ */
+internal fun LazyListLayoutInfo.isUnobscured(top: Float, height: Float): Boolean =
+    top >= beforeContentPadding && top + height <= viewportSize.height - afterContentPadding
+
+/**
  * Brings [match] into view, a third of the way down the screen, unless it is
  * already fully visible. When zoomed, also pans it horizontally into the centre.
  */
@@ -156,7 +164,7 @@ internal suspend fun scrollToMatch(
     if (item != null) {
         val top = item.offset - info.viewportStartOffset + rect.top
         val left = layout.pageLeft + rect.left
-        val fullyVisible = top >= 0 && top + rect.height <= viewportHeight &&
+        val fullyVisible = info.isUnobscured(top, rect.height) &&
             left >= 0 && left + rect.width <= zoomState.viewportWidth
         if (fullyVisible) return
         listState.animateScrollBy(top - viewportHeight / 3f)

@@ -21,6 +21,8 @@ import com.mustafakoceerr.tilepdf.domain.OpenedDocument
 import com.mustafakoceerr.tilepdf.feature.reader.components.PageJump
 import com.mustafakoceerr.tilepdf.feature.reader.navigation.ReaderRoute
 import com.mustafakoceerr.tilepdf.model.PageText
+import com.mustafakoceerr.tilepdf.model.PageTheme
+import com.mustafakoceerr.tilepdf.model.ReadingMode
 import com.mustafakoceerr.tilepdf.model.ReadingPosition
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
@@ -74,17 +76,21 @@ class ReaderViewModel @Inject constructor(
     private val selection = MutableStateFlow<Selection?>(null)
     private val linkTargets = MutableStateFlow(LinkTargets())
     private val currentPage = MutableStateFlow(0)
+    private val fullScreen = MutableStateFlow(false)
+
+    /** Where the page view starts: the saved position, or the latest one after a mode change. */
+    private val startPosition = MutableStateFlow<ReadingPosition?>(null)
     private var selectionJob: Job? = null
     private val positionUpdates = MutableSharedFlow<ReadingPosition>(extraBufferCapacity = 1)
 
     val uiState: StateFlow<ReaderUiState> = combine(
         documentState,
-        preferencesRepository.nightMode,
+        preferencesRepository.preferences,
         searchState,
         toc,
-        combine(selection, linkTargets, currentPage, ::Triple),
-    ) { document, nightMode, search, toc, selectionAndLinks ->
-        val (selection, links, page) = selectionAndLinks
+        combine(selection, linkTargets, currentPage, fullScreen, startPosition, ::PageState),
+    ) { document, preferences, search, toc, pageState ->
+        val (selection, links, page, fullScreen, start) = pageState
         when (document) {
             DocumentState.Loading -> ReaderUiState.Loading
             is DocumentState.Failed -> ReaderUiState.Error(document.reason)
@@ -94,8 +100,8 @@ class ReaderViewModel @Inject constructor(
                 pageSizes = document.opened.document.pageSizes,
                 pageImages = document.pageImages,
                 thumbnails = document.thumbnails,
-                initialPosition = document.opened.position,
-                nightMode = nightMode,
+                initialPosition = start ?: document.opened.position,
+                preferences = preferences,
                 search = search,
                 toc = toc,
                 selection = selection?.toUiState(),
@@ -103,6 +109,7 @@ class ReaderViewModel @Inject constructor(
                 externalLink = links.externalLink,
                 currentPage = page,
                 isCurrentPageBookmarked = toc.bookmarks.any { it.pageIndex == page },
+                isFullScreen = fullScreen,
             )
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ReaderUiState.Loading)
@@ -156,8 +163,23 @@ class ReaderViewModel @Inject constructor(
                 is LinkAction.Jump -> linkTargets.update { it.copy(jump = action.jump) }
                 is LinkAction.Open -> linkTargets.update { it.copy(externalLink = action.uri) }
                 LinkAction.Ignore -> Unit
+                LinkAction.NoLink -> toggleFullScreen()
             }
         }
+    }
+
+    /** A tap between pages: clears a selection, otherwise toggles full screen. */
+    fun onTapOutsidePage() {
+        if (selection.value != null) {
+            selection.value = null
+        } else {
+            toggleFullScreen()
+        }
+    }
+
+    /** The search bar stays while searching, so the query can still be edited. */
+    private fun toggleFullScreen() {
+        if (!searchState.value.isActive) fullScreen.update { !it }
     }
 
     /** Bookmarks the page at the top of the screen, or removes its bookmark. */
@@ -183,6 +205,7 @@ class ReaderViewModel @Inject constructor(
     }
 
     fun onOpenToc() {
+        fullScreen.value = false
         val opened = (documentState.value as? DocumentState.Opened)?.opened ?: return
         val at = position ?: opened.position
         // The position is the fraction scrolled into the top page; convert to points.
@@ -203,8 +226,20 @@ class ReaderViewModel @Inject constructor(
         toc.update { it.copy(isOpen = false) }
     }
 
-    fun onToggleNightMode() {
-        viewModelScope.launch { preferencesRepository.toggleNightMode() }
+    fun onPageThemeSelected(theme: PageTheme) {
+        viewModelScope.launch { preferencesRepository.setPageTheme(theme) }
+    }
+
+    fun onReadingModeSelected(mode: ReadingMode) {
+        // The other page view starts where this one is now.
+        (documentState.value as? DocumentState.Opened)?.opened?.let { opened ->
+            startPosition.value = positionForModeSwitch(position ?: opened.position, opened.document.pageCount)
+        }
+        viewModelScope.launch { preferencesRepository.setReadingMode(mode) }
+    }
+
+    fun onKeepScreenOnChange(enabled: Boolean) {
+        viewModelScope.launch { preferencesRepository.setKeepScreenOn(enabled) }
     }
 
     /** Selects the word at a point on a page, given in top-left PDF points. */
@@ -246,6 +281,7 @@ class ReaderViewModel @Inject constructor(
     }
 
     fun onOpenSearch() {
+        fullScreen.value = false
         searchState.update { it.copy(isActive = true) }
     }
 
@@ -325,6 +361,15 @@ class ReaderViewModel @Inject constructor(
     }
 
     private fun openedDocument() = (documentState.value as? DocumentState.Opened)?.opened?.document
+
+    /** State of the page view that changes with taps and scrolling. */
+    private data class PageState(
+        val selection: Selection?,
+        val links: LinkTargets,
+        val currentPage: Int,
+        val fullScreen: Boolean,
+        val startPosition: ReadingPosition?,
+    )
 
     /** Where a tapped link leads, until the screen has acted on it. */
     private data class LinkTargets(val jump: PageJump? = null, val externalLink: String? = null)

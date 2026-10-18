@@ -48,7 +48,7 @@ import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 
 /** How long the scrollbar and page indicator stay after scrolling stops. */
-private const val HIDE_DELAY_MS = 1_500L
+internal const val HIDE_DELAY_MS = 1_500L
 
 private val ThumbTouchWidth = 48.dp
 private val ThumbHeight = 56.dp
@@ -142,7 +142,7 @@ internal fun PageNavigationOverlay(
 }
 
 @Composable
-private fun PageIndicator(pageNumber: Int, pageCount: Int, onClick: () -> Unit) {
+internal fun PageIndicator(pageNumber: Int, pageCount: Int, onClick: () -> Unit) {
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(50),

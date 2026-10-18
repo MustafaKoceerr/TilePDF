@@ -37,7 +37,13 @@ minSdk 29
 - Page grid: every page as a thumbnail, tap one to jump there
 - Text selection: long-press a word, drag Material-style handles, copy or
   select all from the system text toolbar
-- Night mode by colour inversion (no re-rendering)
+- Vertical scrolling or horizontal single pages (swipe; each page fits the
+  screen and zooms on its own); switching keeps the current page
+- Light, night (colour inversion) and sepia pages, recoloured without
+  re-rendering
+- Keep screen on while reading
+- Tap a page to hide the top bar and system bars for full-screen reading;
+  the pages don't move
 - Reopens a document exactly where you left it: page, offset within the page,
   zoom and horizontal pan
 
