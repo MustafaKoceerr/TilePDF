@@ -43,6 +43,9 @@ interface PdfDocument : Closeable, FillableForm, RecognizedTextPages {
      */
     suspend fun setForeignHidden(pageIndex: Int, key: String, hidden: Boolean)
 
+    /** The document's digital signatures, as the file holds them. */
+    suspend fun signatures(): List<PdfSignature> = emptyList()
+
     /** The link at top-left point ([x], [y]) on [pageIndex], if any. */
     suspend fun linkAt(pageIndex: Int, x: Float, y: Float): PdfLink?
 

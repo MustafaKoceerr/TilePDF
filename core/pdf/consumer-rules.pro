@@ -27,3 +27,7 @@
     public void print();
     public void goToPage(int);
 }
+-keep class com.mustafakoceerr.tilepdf.core.pdf.NativeSignature {
+    <init>(...);
+    <fields>;
+}

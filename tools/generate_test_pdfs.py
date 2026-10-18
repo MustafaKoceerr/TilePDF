@@ -35,6 +35,12 @@ Writes to core/testing/src/main/assets/:
                  wide, and a check box "agree" below it. Its config makes
                  it dynamic and interactive (fillable). Its PDF page only
                  says "Please wait"; XFA forms.
+- signed.pdf     1 A4 page with an adbe.pkcs7.detached signature over the
+                 whole file (field "Signature1", reason "Test", /M 19 Oct
+                 2026 12:00 +03:00) by a self-signed "TilePDF Test Signer"
+                 certificate. Needs the `cryptography` package. The key is
+                 made at generation time and thrown away, so this file
+                 differs on every run; signature checks.
 - scanned.pdf    1 A4 page that is only a 200 dpi grey image of three lines
                  of text (no text objects); text recognition. Needs Pillow,
                  and draws with the app's Noto Sans subset.
@@ -396,6 +402,57 @@ def xfa():
     write_pdf(objects, 5, "xfa.pdf")
 
 
+SIGNATURE_HOLE = 8192  # hex digits for the signature
+
+
+def signed():
+    import datetime
+    from cryptography import x509
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import rsa
+    from cryptography.hazmat.primitives.serialization import pkcs7
+    from cryptography.x509.oid import NameOID
+
+    placeholder_range = "/ByteRange [0 0000000000 0000000000 0000000000]"
+    objects = [
+        FONT,
+        stream("BT /F1 24 Tf 72 742 Td (Signed document) Tj ET"),
+        "<< /Type /Page /Parent 4 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 1 0 R >> >> "
+        "/Contents 2 0 R /Annots [7 0 R] >>",
+        "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        "<< /Type /Catalog /Pages 4 0 R /AcroForm 6 0 R >>",
+        "<< /Fields [7 0 R] /SigFlags 3 >>",
+        "<< /Type /Annot /Subtype /Widget /FT /Sig /T (Signature1) /V 8 0 R /Rect [0 0 0 0] /F 132 /P 3 0 R >>",
+        "<< /Type /Sig /Filter /Adobe.PPKLite /SubFilter /adbe.pkcs7.detached /Reason (Test) "
+        f"/M (D:20261019120000+03'00') {placeholder_range} /Contents <{'0' * SIGNATURE_HOLE}> >>",
+    ]
+    write_pdf(objects, 5, "signed.pdf")
+
+    path = os.path.join(ASSETS, "signed.pdf")
+    data = bytearray(open(path, "rb").read())
+    hole_start = data.index(b"/Contents <") + len(b"/Contents ")
+    hole_end = hole_start + SIGNATURE_HOLE + 2
+    byte_range = f"/ByteRange [0 {hole_start:010d} {hole_end:010d} {len(data) - hole_end:010d}]".encode()
+    at = data.index(placeholder_range.encode())
+    data[at:at + len(byte_range)] = byte_range
+
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "TilePDF Test Signer")])
+    certificate = (x509.CertificateBuilder().subject_name(name).issuer_name(name).public_key(key.public_key())
+                   .serial_number(1).not_valid_before(datetime.datetime(2026, 1, 1))
+                   .not_valid_after(datetime.datetime(2036, 1, 1)).sign(key, hashes.SHA256()))
+    signed_bytes = bytes(data[:hole_start] + data[hole_end:])
+    # Binary: the bytes as they are, not turned into S/MIME's CRLF lines.
+    signature = (pkcs7.PKCS7SignatureBuilder().set_data(signed_bytes).add_signer(certificate, key, hashes.SHA256())
+                 .sign(serialization.Encoding.DER, [pkcs7.PKCS7Options.DetachedSignature, pkcs7.PKCS7Options.Binary]))
+    hex_signature = signature.hex().encode()
+    assert len(hex_signature) <= SIGNATURE_HOLE
+    data[hole_start + 1:hole_start + 1 + len(hex_signature)] = hex_signature
+    with open(path, "wb") as f:
+        f.write(data)
+    print(f"signed.pdf: signed {len(signature)} bytes")
+
+
 SCANNED_LINES = ["Taranmış bir sayfa", "Metin tanıma örneği", "İstanbul Şişli 2026"]
 
 
@@ -436,4 +493,5 @@ if __name__ == "__main__":
     forms()
     calc()
     xfa()
+    signed()
     scanned()

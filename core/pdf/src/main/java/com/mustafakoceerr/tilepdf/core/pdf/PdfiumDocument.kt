@@ -188,6 +188,9 @@ class PdfiumDocument internal constructor(
     override suspend fun setScriptHost(host: FormScriptHost?, openAction: Boolean) =
         withDocument { PdfiumNative.nativeSetScriptHost(it, host, openAction) }
 
+    override suspend fun signatures(): List<PdfSignature> =
+        withDocument { PdfiumNative.nativeSignatures(it) }.orEmpty().mapNotNull { it?.toPdfSignature() }
+
     override suspend fun isXfa(): Boolean = withDocument { PdfiumNative.nativeIsXfa(it) }
 
     override suspend fun xfaTap(pageIndex: Int, at: PdfPoint): String? =
