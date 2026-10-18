@@ -297,6 +297,7 @@ private fun DocumentList(items: List<LibraryItem>, actions: LibraryActions) {
             val document = item.document
             ListItem(
                 headlineContent = { Text(document.displayName, maxLines = 2, overflow = TextOverflow.Ellipsis) },
+                leadingContent = { DocumentThumbnail(item.thumbnail, dimmed = !item.isAccessible) },
                 supportingContent = {
                     if (item.isAccessible) {
                         Text(stringResource(R.string.library_page_progress, document.position.pageIndex + 1, document.pageCount))

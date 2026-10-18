@@ -12,6 +12,7 @@ import com.mustafakoceerr.tilepdf.core.render.ThumbnailSource
 import com.mustafakoceerr.tilepdf.core.render.TiledPageImageSource
 import com.mustafakoceerr.tilepdf.core.geometry.PdfPoint
 import com.mustafakoceerr.tilepdf.data.document.SharedDocuments
+import com.mustafakoceerr.tilepdf.data.thumbnail.ThumbnailStore
 import com.mustafakoceerr.tilepdf.data.annotation.AnnotationRepository
 import com.mustafakoceerr.tilepdf.data.annotation.AnnotationSaveScheduler
 import com.mustafakoceerr.tilepdf.data.annotation.SaveResult
@@ -74,6 +75,9 @@ import javax.inject.Inject
 private const val SAVE_POSITION_DEBOUNCE_MS = 500L
 private const val SEARCH_DEBOUNCE_MS = 300L
 
+/** Twice the library's 40 dp row picture at most densities, still small as a PNG. */
+private const val THUMBNAIL_WIDTH_PX = 240
+
 @HiltViewModel
 class ReaderViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
@@ -88,6 +92,7 @@ class ReaderViewModel @Inject constructor(
     private val sessionPasswords: SessionPasswords,
     private val saveAsCopy: SaveAsCopyUseCase,
     private val sharedDocuments: SharedDocuments,
+    private val thumbnailStore: ThumbnailStore,
     @param:ApplicationScope private val applicationScope: CoroutineScope,
 ) : ViewModel() {
 
@@ -215,6 +220,7 @@ class ReaderViewModel @Inject constructor(
                 loadOutline(opened.document)
                 currentPage.value = opened.position.pageIndex
                 observeBookmarks(opened)
+                saveThumbnail(opened)
                 DocumentState.Opened(
                     opened = opened,
                     pageImages = TiledPageImageSource(opened.document, pageRenderer, viewModelScope),
@@ -228,6 +234,14 @@ class ReaderViewModel @Inject constructor(
                     is OpenFailure.Failed -> DocumentState.Failed(failure.reason)
                 }
             }
+        }
+    }
+
+    /** The library's picture of the first page; redrawn on every open, so it follows changes to the file. */
+    private fun saveThumbnail(opened: OpenedDocument) = viewModelScope.launch {
+        // The document may close while this runs; the library then keeps the old picture.
+        runCatchingCancellable {
+            thumbnailStore.save(opened.uri, pageRenderer.renderPagePng(opened.document, 0, THUMBNAIL_WIDTH_PX))
         }
     }
 

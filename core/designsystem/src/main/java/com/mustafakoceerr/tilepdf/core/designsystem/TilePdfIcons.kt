@@ -11,6 +11,7 @@ object TilePdfIcons {
     @DrawableRes val Close = R.drawable.ic_close
     @DrawableRes val DarkMode = R.drawable.ic_dark_mode
     @DrawableRes val Delete = R.drawable.ic_delete
+    @DrawableRes val Document = R.drawable.ic_document
     @DrawableRes val Edit = R.drawable.ic_edit
     @DrawableRes val ErrorOutline = R.drawable.ic_error_outline
     @DrawableRes val Grid = R.drawable.ic_grid

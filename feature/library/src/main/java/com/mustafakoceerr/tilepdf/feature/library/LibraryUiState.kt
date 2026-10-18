@@ -1,5 +1,6 @@
 package com.mustafakoceerr.tilepdf.feature.library
 
+import com.mustafakoceerr.tilepdf.data.thumbnail.Thumbnail
 import com.mustafakoceerr.tilepdf.model.LibraryDocument
 import com.mustafakoceerr.tilepdf.model.LibrarySort
 
@@ -27,4 +28,6 @@ data class LibraryItem(
      * was moved or the provider revoked it; the user must pick it again.
      */
     val isAccessible: Boolean,
+    /** The first page, once the reader has drawn it. */
+    val thumbnail: Thumbnail? = null,
 )
