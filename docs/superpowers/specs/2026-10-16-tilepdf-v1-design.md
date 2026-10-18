@@ -39,7 +39,10 @@ getirmez. PDFium'u doğrudan paketlemek:
   artımlı kayıt (`FPDF_SaveAsCopy` + `FPDF_INCREMENTAL`) tek API'de.
 
 Derleme: `bblanchon/pdfium-binaries` hazır Android derlemeleri (arm64-v8a,
-armeabi-v7a, x86_64; x86 yok). Bizim kodumuz yalnızca ince bir JNI köprüsü.
+armeabi-v7a, x86_64, x86; 32-bit x86 emülatörler için x86 da paketlenir).
+Sürüm sabitlenir (`chromium/8076`), arşivler SHA-256 ile doğrulanarak build
+sırasında indirilir; repoya binary girmez. Bizim kodumuz yalnızca ince bir JNI
+köprüsü.
 PdfBox-Android ve `PdfRenderer` tamamen kaldırılır.
 
 Riskler ve önlemler:
@@ -90,7 +93,7 @@ app                  MainActivity, NavHost, Hilt kökü, intent işleme
 feature:library      kütüphane ekranı
 feature:reader       sayfa listesi, zoom, arama, seçim, TOC, küçük resim, yer imi
 feature:annotation   araç çubuğu, araçlar, geri al/yinele, açıklama listesi
-core:pdf             motor modülü: bugün PdfRenderer; Aşama 2'de PDFium JNI köprüsü + PdfEngine
+core:pdf             motor modülü: PDFium JNI köprüsü (`Pdfium`, `PdfiumDocument`); Aşama 3'e kadar PdfRenderer da burada
 core:render          tile, BitmapPool, BitmapCache
 core:data            repository'ler
 core:database        Room: belgeler, yer imleri, açıklama taslakları
@@ -158,9 +161,16 @@ Her aşama kendi uygulama planıyla (writing-plans) ve yeşil testlerle biter.
 
 0. Spec + benchmark temizliği
 1. `build-logic` ve modül iskeleti; mevcut kodu davranış değiştirmeden taşı
-2. `core:pdf` içine PDFium: JNI köprüsü, `PdfEngine`, testler
-3. Okuyucuyu PDFium'a geçir; PdfBox ve `PdfRenderer` kaldırılır
-4. Eksik okuma özellikleri
-5. `feature:annotation` + taslak + güvenli kayıt
+2. `core:pdf` içine PDFium (okuma tarafı): açma/şifre, sayfa boyutu, render,
+   metin + karakter kutuları, içindekiler, testler
+3. Okuyucuyu PDFium'a geçir; PdfBox ve `PdfRenderer` kaldırılır. Performans,
+   motoru değiştirerek değil kullanımıyla kazanılır (MuPDF AGPL, Poppler GPL;
+   PDFium lisansı uygun en iyi C++ motor): görünür sayfalar native tarafta açık
+   tutulur (karo başına parse yok), metin sayfası tek yüklenir, ekrandan çıkan
+   karonun render'ı iptal edilir; etkisi gerçek cihazda Perfetto ile ölçülür
+4. Eksik okuma özellikleri; PDFium link okuma burada eklenir
+5. `feature:annotation` + taslak + güvenli kayıt; PDFium annotation yazma ve
+   artımlı kayıt burada eklenir
 6. Kütüphane, adaptive, TR/EN, erişilebilirlik, hata ekranları
-7. Play hazırlığı: R8, imzalama (anahtarlar env'den), Data Safety, mağaza metinleri
+7. Play hazırlığı: R8, imzalama (anahtarlar env'den), Data Safety, mağaza
+   metinleri, PDFium ve diğer üçüncü taraf lisanslarının uygulama içinde gösterimi

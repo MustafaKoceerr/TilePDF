@@ -11,10 +11,13 @@ Writes to core/testing/src/main/assets/:
 - sample.pdf     3 pages (A4, A4, A4 landscape): a heading and a black
                  rectangle per page; rendering, tiles and text positions.
 - text-dense.pdf 80 A4 pages of dense text; text-provider tests.
+- encrypted.pdf  1 A4 page, RC4 40-bit (R2); user password "secret",
+                 owner password "owner"; password handling.
 - outline.pdf    12 pages with an outline covering XYZ, Fit, named and GoTo
                  destinations and UTF-16 Turkish titles; table of contents.
 """
 
+import hashlib
 import os
 import random
 
@@ -22,7 +25,7 @@ ASSETS = os.path.join(os.path.dirname(__file__), "..", "core", "testing", "src",
 FONT = "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"
 
 
-def write_pdf(objects, catalog_id, name):
+def write_pdf(objects, catalog_id, name, trailer_extra=""):
     """Serializes numbered objects (1-based, in list order) with an xref table."""
     out = b"%PDF-1.4\n"
     offsets = []
@@ -32,7 +35,7 @@ def write_pdf(objects, catalog_id, name):
     xref = len(out)
     out += f"xref\n0 {len(objects) + 1}\n0000000000 65535 f \n".encode()
     out += "".join(f"{offset:010d} 00000 n \n" for offset in offsets).encode()
-    out += (f"trailer\n<< /Size {len(objects) + 1} /Root {catalog_id} 0 R >>\n"
+    out += (f"trailer\n<< /Size {len(objects) + 1} /Root {catalog_id} 0 R{trailer_extra} >>\n"
             f"startxref\n{xref}\n%%EOF\n").encode()
     with open(os.path.join(ASSETS, name), "wb") as f:
         f.write(out)
@@ -67,6 +70,58 @@ def sample():
     objects.append(f"<< /Type /Pages /Kids [{kids(page_ids)}] /Count {len(page_ids)} >>")
     objects.append(f"<< /Type /Catalog /Pages {pages_id} 0 R >>")
     write_pdf(objects, len(objects), "sample.pdf")
+
+
+# Standard security handler, revision 2 (PDF 1.7 spec, algorithms 3.1-3.4).
+PASSWORD_PAD = bytes.fromhex("28BF4E5E4E758A4164004E56FFFA01082E2E00B6D0683E802F0CA9FE6453697A")
+
+
+def rc4(key, data):
+    state = list(range(256))
+    j = 0
+    for i in range(256):
+        j = (j + state[i] + key[i % len(key)]) % 256
+        state[i], state[j] = state[j], state[i]
+    out = bytearray()
+    i = j = 0
+    for byte in data:
+        i = (i + 1) % 256
+        j = (j + state[i]) % 256
+        state[i], state[j] = state[j], state[i]
+        out.append(byte ^ state[(state[i] + state[j]) % 256])
+    return bytes(out)
+
+
+def padded(password):
+    return (password.encode("latin-1") + PASSWORD_PAD)[:32]
+
+
+def encrypted():
+    # One A4 page like sample.pdf, encrypted with RC4 40-bit.
+    user, owner, permissions = "secret", "owner", -4
+    file_id = hashlib.md5(b"tilepdf encrypted.pdf").digest()
+    o_value = rc4(hashlib.md5(padded(owner)).digest()[:5], padded(user))
+    key = hashlib.md5(
+        padded(user) + o_value + permissions.to_bytes(4, "little", signed=True) + file_id
+    ).digest()[:5]
+    u_value = rc4(key, PASSWORD_PAD)
+
+    def encrypt_stream(number, content):
+        object_key = hashlib.md5(key + number.to_bytes(3, "little") + bytes(2)).digest()[:10]
+        data = rc4(object_key, content.encode("latin-1")).decode("latin-1")
+        return f"<< /Length {len(data)} >>\nstream\n{data}\nendstream"
+
+    objects = [
+        FONT,
+        encrypt_stream(2, "BT /F1 36 Tf 72 742 Td (Encrypted page) Tj ET"),
+        "<< /Type /Page /Parent 4 0 R /MediaBox [0 0 595 842] "
+        "/Resources << /Font << /F1 1 0 R >> >> /Contents 2 0 R >>",
+        "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        "<< /Type /Catalog /Pages 4 0 R >>",
+        f"<< /Filter /Standard /V 1 /R 2 /O <{o_value.hex()}> /U <{u_value.hex()}> /P {permissions} >>",
+    ]
+    write_pdf(objects, 5, "encrypted.pdf",
+              f" /Encrypt 6 0 R /ID [<{file_id.hex()}> <{file_id.hex()}>]")
 
 
 def text_dense():
@@ -161,3 +216,4 @@ if __name__ == "__main__":
     sample()
     text_dense()
     outline()
+    encrypted()

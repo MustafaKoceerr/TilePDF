@@ -74,6 +74,27 @@ Each feature owns its type-safe route and `NavGraphBuilder` extension.
 Stateless screens take `UiState` plus callbacks, so they render in previews and
 tests without a ViewModel.
 
+## PDF engine
+
+`core:pdf` embeds [PDFium](https://pdfium.googlesource.com/pdfium/) through a
+small JNI library (`src/main/cpp/pdfium_jni.cpp`), so every API level from 29
+up gets the same renderer, text extraction and outline reader. `Pdfium` opens
+documents (with an optional password) and `PdfiumDocument` renders pages,
+extracts text with per-character boxes and reads the table of contents. Every
+call goes through the single `@PdfDispatcher`, because PDFium's state is global
+to the process.
+
+The prebuilt libraries come from
+[bblanchon/pdfium-binaries](https://github.com/bblanchon/pdfium-binaries) for
+arm64-v8a, armeabi-v7a, x86_64 and x86. The `tilepdf.pdfium` convention plugin
+downloads them into `.gradle/pdfium/`, and the build fails if an archive's
+SHA-256 differs from the pinned one; no binaries are committed. To update
+PDFium, change `RELEASE` and the four hashes in
+`build-logic/convention/src/main/kotlin/PdfiumConventionPlugin.kt`.
+
+The reader still renders with `PdfRenderer` and extracts text with PdfBox; it
+moves to PDFium next, and both go away.
+
 ## Rendering pipeline
 
 ```
