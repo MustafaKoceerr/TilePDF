@@ -13,6 +13,12 @@ android {
         versionName = "1.0"
     }
 
+    androidResources {
+        generateLocaleConfig = true
+        // Only our languages; libraries' translations would list dozens more.
+        localeFilters += listOf("en", "tr")
+    }
+
     buildTypes {
         release {
             optimization {
@@ -31,6 +37,7 @@ dependencies {
     implementation(projects.feature.reader)
 
     implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.appcompat)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.navigation.compose)

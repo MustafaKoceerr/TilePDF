@@ -7,6 +7,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -41,6 +42,18 @@ import com.mustafakoceerr.tilepdf.feature.reader.R
 internal val AnnotationPalette = listOf(
     0xFFFFEB3B, 0xFF66BB6A, 0xFF42A5F5, 0xFFEC407A, 0xFFE53935, 0xFF212121,
 ).map { it.toInt() }
+
+/** TalkBack's name for a palette colour; a colour outside the palette is just "Color". */
+@StringRes
+internal fun colorNameRes(color: Int): Int = when (AnnotationPalette.indexOf(color)) {
+    0 -> R.string.annotation_color_yellow
+    1 -> R.string.annotation_color_green
+    2 -> R.string.annotation_color_blue
+    3 -> R.string.annotation_color_pink
+    4 -> R.string.annotation_color_red
+    5 -> R.string.annotation_color_black
+    else -> R.string.annotation_color
+}
 
 /** Pen widths in points. */
 internal val PenWidths = listOf(1f, 2f, 4f)
@@ -86,10 +99,12 @@ internal fun AnnotationToolbar(
                 TextButton(onClick = onDone) { Text(stringResource(R.string.reader_annotate_done)) }
             }
             when (state.tool) {
-                AnnotationTool.Pen -> Row(verticalAlignment = Alignment.CenterVertically) {
+                // Wraps on narrow phones rather than squeezing the widths below 48 dp.
+                AnnotationTool.Pen -> FlowRow(itemVerticalAlignment = Alignment.CenterVertically) {
                     Swatches(state.penColor, onPenColor)
-                    Spacer(Modifier.width(12.dp))
-                    PenWidths.forEach { width -> WidthChoice(width, selected = width == state.penWidthPt, onClick = { onPenWidth(width) }) }
+                    Row(Modifier.padding(start = 8.dp)) {
+                        PenWidths.forEach { width -> WidthChoice(width, selected = width == state.penWidthPt, onClick = { onPenWidth(width) }) }
+                    }
                 }
                 AnnotationTool.Select, AnnotationTool.Note -> Swatches(state.markupColor, onMarkupColor)
                 AnnotationTool.Eraser -> Unit
@@ -100,12 +115,12 @@ internal fun AnnotationToolbar(
 
 @Composable
 private fun Swatches(selected: Int, onSelect: (Int) -> Unit) {
-    val description = stringResource(R.string.annotation_color)
     Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp)) {
         AnnotationPalette.forEach { color ->
+            val description = stringResource(colorNameRes(color))
             Box(
                 modifier = Modifier
-                    .size(40.dp)
+                    .size(48.dp)
                     .selectable(selected = color == selected, role = Role.RadioButton, onClick = { onSelect(color) })
                     .semantics { contentDescription = description },
                 contentAlignment = Alignment.Center,
@@ -128,12 +143,12 @@ private fun Swatches(selected: Int, onSelect: (Int) -> Unit) {
 /** A width shown as a line that thick. */
 @Composable
 private fun WidthChoice(widthPt: Float, selected: Boolean, onClick: () -> Unit) {
-    val description = stringResource(R.string.annotation_width)
+    val description = stringResource(R.string.annotation_width_value, widthPt.toInt())
     Box(
         modifier = Modifier
-            .size(40.dp)
+            .size(48.dp)
             .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
-            .semantics { contentDescription = "$description ${widthPt.toInt()}" }
+            .semantics { contentDescription = description }
             .background(if (selected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent, CircleShape),
         contentAlignment = Alignment.Center,
     ) {

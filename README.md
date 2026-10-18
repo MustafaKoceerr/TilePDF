@@ -53,7 +53,15 @@ minSdk 29
   and deleted. Every annotation is listed next to the table of contents. A
   file that can't be written is offered as an annotated copy
 - Tap a page to hide the top bar and system bars for full-screen reading;
-  the pages don't move
+  the pages don't move (with TalkBack on, the bars stay)
+- English and Turkish: follows the device, or pick a language in the
+  library's menu (also in Android 13+ app settings)
+- Accessible: every control has its own TalkBack label (colours by name,
+  widths in points) and a 48 dp touch target, checked with the
+  Accessibility Test Framework in UI tests; layouts hold at 200% font size
+- A document that doesn't open says why, with the next step: choose the
+  file again (moved, deleted or permission lost), try again (out of
+  memory), or back to the library (damaged); passwords are asked for
 - Reopens a document exactly where you left it: page, offset within the page,
   zoom and horizontal pan
 

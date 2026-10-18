@@ -1,5 +1,6 @@
 package com.mustafakoceerr.tilepdf.feature.library
 
+import com.mustafakoceerr.tilepdf.model.AppLanguage
 import com.mustafakoceerr.tilepdf.model.LibraryDocument
 import com.mustafakoceerr.tilepdf.model.LibrarySort
 
@@ -17,6 +18,8 @@ sealed interface LibraryUiState {
         val hasDocuments: Boolean = items.isNotEmpty(),
         /** A removal waiting for its undo window to end; its row is hidden meanwhile. */
         val pendingRemoval: String? = null,
+        /** The language chosen in the app; [AppLanguage.System] follows the device. */
+        val language: AppLanguage = AppLanguage.System,
     ) : LibraryUiState
 }
 

@@ -24,3 +24,18 @@ Tarih: 2026-10-17 · Durum: incelemede · Üst belge: `2026-10-16-tilepdf-v1-des
   kopyayı ve kaydedilmemiş açıklamaları da sildiği için geri alınabilmesi
   gerekir.
 - **v1 dışı:** kütüphanede ilk sayfa küçük resmi (her belgeyi açmak gerekir).
+
+## 6b kararları
+
+- **Dil:** İngilizce `values/`, Türkçe `values-tr/`. Uygulama içi seçim
+  kütüphanenin ⋮ menüsünde: Sistem varsayılanı, English, Türkçe (dil adları
+  kendi dillerinde). AppCompat'in uygulama başına dil API'si; Android 13+
+  sistem ayarlarında da görünür.
+- **Hata ekranları:** bulunamadı ve izin kaybı → "Dosya seç" + "Kütüphaneye
+  dön"; bozuk → "Kütüphaneye dön"; bellek → "Tekrar dene" + "Kütüphaneye dön".
+  Şifre mevcut diyalogla sorulur.
+- **Erişilebilirlik:** 48 dp dokunma hedefleri, renk ve kalınlıklar için ayrı
+  etiketler, TalkBack açıkken okuyucu çubukları gizlenmez; ATF denetimleri UI
+  testlerinde.
+- **Kapsam dışı:** render sırasındaki bellek baskısı (önbellek bütçeleri zaten
+  sınırlı).
