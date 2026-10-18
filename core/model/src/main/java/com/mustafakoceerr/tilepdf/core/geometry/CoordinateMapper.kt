@@ -16,7 +16,8 @@ data class PixelRectF(val left: Float, val top: Float, val right: Float, val bot
  * zoom.
  *
  * Text providers already deliver top-left-origin, crop-box-relative,
- * rotation-adjusted points, so this is a pure scale.
+ * rotation-adjusted points. A page shown turned or cropped also passes
+ * through its [PageViewTransform]; the scale comes from the laid-out size.
  */
 object CoordinateMapper {
 
@@ -30,4 +31,14 @@ object CoordinateMapper {
         val scale = pageWidthPx / pageSize.widthPt
         return PixelRectF(rect.left * scale, rect.top * scale, rect.right * scale, rect.bottom * scale)
     }
+
+    /** A touch on a page laid out through [transform], in the page's own points. */
+    fun toPdfPoints(xPx: Float, yPx: Float, transform: PageViewTransform, pageWidthPx: Float): PdfPoint {
+        val (x, y) = toPdfPoints(xPx, yPx, transform.size, pageWidthPx)
+        return transform.toPage(PdfPoint(x, y))
+    }
+
+    /** A rectangle in the page's own points, where it shows on a page laid out through [transform]. */
+    fun toPagePixels(rect: PdfRect, transform: PageViewTransform, pageWidthPx: Float): PixelRectF =
+        toPagePixels(transform.toView(rect), transform.size, pageWidthPx)
 }
