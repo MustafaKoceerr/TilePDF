@@ -5,6 +5,7 @@ import android.graphics.Matrix
 import android.os.ParcelFileDescriptor
 import androidx.annotation.VisibleForTesting
 import com.mustafakoceerr.tilepdf.core.geometry.PdfRect
+import com.mustafakoceerr.tilepdf.model.FormField
 import com.mustafakoceerr.tilepdf.model.OutlineEntry
 import com.mustafakoceerr.tilepdf.model.PageAnnotations
 import com.mustafakoceerr.tilepdf.model.PageText
@@ -165,6 +166,23 @@ class PdfiumDocument internal constructor(
         withDocument(pageIndex) { PdfiumNative.nativeAnnotationCount(it, pageIndex) }
 
     /** Runs [block] with the native handle, after checking [pageIndex] if given. */
+    override suspend fun hasForm(): Boolean = withDocument { PdfiumNative.nativeHasForm(it) }
+
+    override suspend fun formFields(pageIndex: Int): List<FormField> =
+        withDocument(pageIndex) { PdfiumNative.nativeFormFields(it, pageIndex) }
+            ?.mapNotNull { it?.toFormField(pageIndex) }
+            ?: throw PdfCorruptException("Page $pageIndex could not be loaded")
+
+    override suspend fun applyFormEdits(edits: List<FormEdit>): Boolean = edits.all { edit ->
+        withDocument(edit.pageIndex) { handle ->
+            when (edit) {
+                is FormEdit.SetText -> PdfiumNative.nativeSetFormText(handle, edit.pageIndex, edit.annotIndex, edit.text)
+                is FormEdit.SetChecked -> PdfiumNative.nativeSetFormChecked(handle, edit.pageIndex, edit.annotIndex, edit.checked)
+                is FormEdit.SetChoice -> PdfiumNative.nativeSetFormChoice(handle, edit.pageIndex, edit.annotIndex, edit.optionIndex)
+            }
+        }
+    }
+
     internal suspend fun <T> withDocument(pageIndex: Int? = null, block: (Long) -> T): T {
         if (pageIndex != null) {
             require(pageIndex in 0 until pageCount) { "Page $pageIndex out of 0 until $pageCount" }

@@ -11,12 +11,12 @@ import java.io.Closeable
  * An open PDF. One instance serves rendering, text and the outline for as
  * long as a reader shows it. Calls after [close] throw [IllegalStateException].
  */
-interface PdfDocument : Closeable {
+interface PdfDocument : Closeable, FillableForm {
 
     /** Size of every page in points, read once when the document is opened. */
     val pageSizes: List<PageSize>
 
-    val pageCount: Int get() = pageSizes.size
+    override val pageCount: Int get() = pageSizes.size
 
     /**
      * Renders [pageIndex] into an ARGB_8888 [bitmap]. [transform] maps top-left
