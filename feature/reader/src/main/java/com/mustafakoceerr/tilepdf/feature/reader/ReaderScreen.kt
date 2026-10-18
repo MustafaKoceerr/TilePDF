@@ -39,6 +39,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -74,6 +75,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.state.ToggleableState
+import androidx.compose.ui.semantics.toggleableState
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -161,6 +165,8 @@ fun ReaderScreen(
         onReadingModeSelected = viewModel::onReadingModeSelected,
         onKeepScreenOnChange = viewModel::onKeepScreenOnChange,
         onVolumeKeysChange = viewModel::onVolumeKeysChange,
+        onRotate = viewModel::onRotate,
+        onCropMarginsChange = viewModel::onCropMarginsChange,
         annotationActions = AnnotationActions(
             onMarkup = viewModel::onMarkup,
             onMenuDismissed = viewModel::onAnnotationMenuDismissed,
@@ -267,6 +273,8 @@ internal fun ReaderScreen(
     onReadingModeSelected: (ReadingMode) -> Unit = {},
     onKeepScreenOnChange: (Boolean) -> Unit = {},
     onVolumeKeysChange: (Boolean) -> Unit = {},
+    onRotate: () -> Unit = {},
+    onCropMarginsChange: (Boolean) -> Unit = {},
     annotationActions: AnnotationActions = AnnotationActions.None,
     onOpenDocument: (uri: String) -> Unit = {},
 ) {
@@ -382,6 +390,9 @@ internal fun ReaderScreen(
                             onSaveCopy = { saveCopy() },
                             onShare = annotationActions.onShare,
                             onPrint = annotationActions.onPrint,
+                            cropMargins = ready.documentView.cropMargins,
+                            onRotate = onRotate,
+                            onCropMarginsChange = onCropMarginsChange,
                         )
                     }
                 },
@@ -614,6 +625,7 @@ private fun ReaderPages(
     when (ready.preferences.readingMode) {
         ReadingMode.Vertical -> PdfPageList(
             pageSizes = ready.pageSizes,
+            pageTransforms = ready.pageTransforms,
             pageImages = ready.pageImages,
             initialPosition = ready.initialPosition,
             pageTheme = ready.preferences.pageTheme,
@@ -635,6 +647,7 @@ private fun ReaderPages(
         )
         ReadingMode.Horizontal -> PdfPagePager(
             pageSizes = ready.pageSizes,
+            pageTransforms = ready.pageTransforms,
             pageImages = ready.pageImages,
             initialPage = ready.initialPosition.pageIndex,
             pageTheme = ready.preferences.pageTheme,
@@ -893,6 +906,9 @@ private fun OverflowMenu(
     onSaveCopy: () -> Unit,
     onShare: () -> Unit,
     onPrint: () -> Unit,
+    cropMargins: Boolean,
+    onRotate: () -> Unit,
+    onCropMarginsChange: (Boolean) -> Unit,
 ) {
     Box {
         IconButton(onClick = { onExpandedChange(true) }) {
@@ -924,6 +940,24 @@ private fun OverflowMenu(
                     onExpandedChange(false)
                     onGoToPage()
                 },
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.reader_rotate)) },
+                leadingIcon = { Icon(painterResource(TilePdfIcons.RotateRight), contentDescription = null) },
+                onClick = {
+                    // Stays open: turning again is one more tap.
+                    onRotate()
+                },
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.reader_crop_margins)) },
+                leadingIcon = { Icon(painterResource(TilePdfIcons.Crop), contentDescription = null) },
+                trailingIcon = { Checkbox(checked = cropMargins, onCheckedChange = null) },
+                onClick = {
+                    onExpandedChange(false)
+                    onCropMarginsChange(!cropMargins)
+                },
+                modifier = Modifier.semantics { toggleableState = ToggleableState(cropMargins) },
             )
             DropdownMenuItem(
                 text = { Text(stringResource(R.string.reader_share)) },

@@ -8,6 +8,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import com.mustafakoceerr.tilepdf.core.geometry.CoordinateMapper
+import com.mustafakoceerr.tilepdf.core.geometry.PageViewTransform
+import com.mustafakoceerr.tilepdf.core.geometry.PdfPoint
 import com.mustafakoceerr.tilepdf.core.geometry.PageLayout
 import com.mustafakoceerr.tilepdf.core.pdf.PageSize
 import com.mustafakoceerr.tilepdf.core.render.PageImageSource
@@ -98,7 +100,7 @@ internal fun pagePointAt(
     position: Offset,
     listState: LazyListState,
     zoomState: ZoomState,
-    pageSizes: List<PageSize>,
+    pageTransforms: List<PageViewTransform>,
     density: Density,
 ): Triple<Int, Float, Float>? {
     val layout = zoomedPageLayout(zoomState, density)
@@ -108,7 +110,7 @@ internal fun pagePointAt(
         val x = position.x - layout.pageLeft
         val y = position.y - top
         if (x in 0f..layout.pageWidth.toFloat() && y in 0f..item.size.toFloat()) {
-            val (xPt, yPt) = CoordinateMapper.toPdfPoints(x, y, pageSizes[item.index], layout.pageWidth.toFloat())
+            val (xPt, yPt) = CoordinateMapper.toPdfPoints(x, y, pageTransforms[item.index], layout.pageWidth.toFloat())
             return Triple(item.index, xPt, yPt)
         }
     }
@@ -117,24 +119,34 @@ internal fun pagePointAt(
 
 
 /**
- * Scrolls so the page starts at the top of the screen or, with [topPt], so
- * that point on the page does. Uses the renderer's points-to-pixels factor
- * for the page's current laid-out width, like search highlights do.
+ * Scrolls so the page starts at the top of the screen; with a top point, so
+ * that point on the page does (a little below the top); with an offset
+ * fraction, exactly that far into the page. Uses the renderer's
+ * points-to-pixels factor for the page's current laid-out width, like search
+ * highlights do.
  */
 internal suspend fun scrollToPage(
     listState: LazyListState,
     zoomState: ZoomState,
-    pageIndex: Int,
-    topPt: Float?,
-    pageSize: PageSize,
+    jump: PageJump,
+    transform: PageViewTransform,
     density: Density,
 ) {
     val pageWidth = zoomedPageLayout(zoomState, density).pageWidth
-    val offset = topPt?.let {
-        val marginPx = with(density) { JUMP_MARGIN.roundToPx() }
-        (it * pageSize.scaleForWidth(pageWidth) - marginPx).roundToInt().coerceAtLeast(0)
-    } ?: 0
-    listState.scrollToItem(pageIndex, offset)
+    val pageSize = transform.size
+    val fraction = jump.offsetFraction
+    val topPt = jump.topPt
+    val offset = when {
+        fraction != null -> (fraction * pageSize.heightForWidth(pageWidth)).roundToInt()
+        topPt != null -> {
+            // Where the point's line shows on the page as turned: a quarter turn puts it at the side.
+            val viewTop = transform.toView(PdfPoint(transform.crop.left, topPt)).y.coerceAtLeast(0f)
+            val marginPx = with(density) { JUMP_MARGIN.roundToPx() }
+            (viewTop * pageSize.scaleForWidth(pageWidth) - marginPx).roundToInt().coerceAtLeast(0)
+        }
+        else -> 0
+    }
+    listState.scrollToItem(jump.pageIndex, offset)
 }
 
 /**
@@ -152,11 +164,11 @@ internal suspend fun scrollToMatch(
     listState: LazyListState,
     zoomState: ZoomState,
     match: SearchMatch,
-    pageSize: PageSize,
+    transform: PageViewTransform,
     density: Density,
 ) {
     val layout = zoomedPageLayout(zoomState, density)
-    val rect = CoordinateMapper.toPagePixels(match.rects.first(), pageSize, layout.pageWidth.toFloat())
+    val rect = CoordinateMapper.toPagePixels(match.rects.first(), transform, layout.pageWidth.toFloat())
     val info = listState.layoutInfo
     val viewportHeight = info.viewportSize.height
     val item = info.visibleItemsInfo.firstOrNull { it.index == match.pageIndex }

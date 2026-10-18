@@ -24,6 +24,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -35,8 +36,8 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import com.mustafakoceerr.tilepdf.feature.reader.R
 import com.mustafakoceerr.tilepdf.core.geometry.CoordinateMapper
+import com.mustafakoceerr.tilepdf.core.geometry.PageViewTransform
 import com.mustafakoceerr.tilepdf.core.geometry.PdfRect
-import com.mustafakoceerr.tilepdf.core.pdf.PageSize
 import com.mustafakoceerr.tilepdf.core.render.PageImageSource
 import com.mustafakoceerr.tilepdf.core.render.RenderedTile
 import com.mustafakoceerr.tilepdf.core.render.Tile
@@ -63,7 +64,8 @@ private val SelectionColor = Color(0x553D7BFF)
 @Composable
 internal fun PdfPage(
     pageIndex: Int,
-    pageSize: PageSize,
+    /** How the page is shown; its size is the laid-out page's. */
+    transform: PageViewTransform,
     draftWidthPx: Int,
     pageImages: PageImageSource,
     pageTheme: PageTheme,
@@ -96,6 +98,7 @@ internal fun PdfPage(
         if (draft == null) draft = pageImages.loadDraft(pageIndex, draftWidthPx)
     }
     val colorFilter = remember(pageTheme) { pageTheme.colorFilter() }
+    val pageSize = transform.size
     var pageWidthPx by remember { mutableFloatStateOf(0f) }
     var coordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
 
@@ -116,8 +119,7 @@ internal fun PdfPage(
                         drawing = { currentDrawing ?: drawing },
                         own = { currentAnnotations },
                         toPoint = { position ->
-                            val (x, y) = CoordinateMapper.toPdfPoints(position.x, position.y, pageSize, pageWidthPx)
-                            PdfPoint(x, y)
+                            CoordinateMapper.toPdfPoints(position.x, position.y, transform, pageWidthPx)
                         },
                         onLiveStroke = { liveStroke = it },
                         onLiveErase = { pendingErase = it },
@@ -136,19 +138,22 @@ internal fun PdfPage(
                     pageImages.renderedTiles(pageIndex).forEach { drawTile(it, colorFilter) }
                     matches.forEach { match ->
                         val color = if (match == currentMatch) CurrentHighlightColor else HighlightColor
-                        match.rects.forEach { drawHighlight(it, pageSize, color) }
+                        match.rects.forEach { drawHighlight(it, transform, color) }
                     }
                     val erasing = pendingErase.ids
-                    drawAnnotations(
-                        if (erasing.isEmpty()) annotations else annotations.filterNot { it.id in erasing },
-                        pageSize,
-                        pageTheme,
-                    )
-                    val pen = drawing
-                    if (pen != null && liveStroke.isNotEmpty()) {
-                        drawLiveStroke(liveStroke, pen.penColor, pen.penWidthPt, pageSize, pageTheme)
+                    // In page points, through the page's turn and crop: underlines stay under their text.
+                    withTransform({ transform(transform.drawMatrix(size.width / pageSize.widthPt)) }) {
+                        drawAnnotations(
+                            if (erasing.isEmpty()) annotations else annotations.filterNot { it.id in erasing },
+                            scale = 1f,
+                            theme = pageTheme,
+                        )
+                        val pen = drawing
+                        if (pen != null && liveStroke.isNotEmpty()) {
+                            drawLiveStroke(liveStroke, pen.penColor, pen.penWidthPt, scale = 1f, theme = pageTheme)
+                        }
                     }
-                    selection?.rects?.forEach { drawHighlight(it, pageSize, SelectionColor) }
+                    selection?.rects?.forEach { drawHighlight(it, transform, SelectionColor) }
                 },
         ) {
             draft?.let {
@@ -164,8 +169,8 @@ internal fun PdfPage(
         // Siblings of the page layer, not its children: the page draws its
         // tiles after its children, which would cover the handles.
         if (selection != null && pageWidthPx > 0f) {
-            SelectionHandles(selection, pageSize, pageWidthPx, selectionActions.onDragHandle)
-            SelectionToolbarEffect(selection, pageSize, pageWidthPx, coordinates, selectionActions)
+            SelectionHandles(selection, transform, pageWidthPx, selectionActions.onDragHandle)
+            SelectionToolbarEffect(selection, transform, pageWidthPx, coordinates, selectionActions)
         }
     }
 }
@@ -177,7 +182,7 @@ internal fun PdfPage(
 @Composable
 private fun SelectionToolbarEffect(
     selection: SelectionUiState,
-    pageSize: PageSize,
+    transform: PageViewTransform,
     pageWidthPx: Float,
     coordinates: LayoutCoordinates?,
     actions: SelectionActions,
@@ -186,7 +191,7 @@ private fun SelectionToolbarEffect(
     val handleHeightPx = with(LocalDensity.current) { HandleTouchSize.toPx() }
     LaunchedEffect(selection, coordinates, pageWidthPx) {
         val page = coordinates?.takeIf { it.isAttached } ?: return@LaunchedEffect
-        val rects = selection.rects.map { CoordinateMapper.toPagePixels(it, pageSize, pageWidthPx) }
+        val rects = selection.rects.map { CoordinateMapper.toPagePixels(it, transform, pageWidthPx) }
         val topLeft = page.localToRoot(Offset(rects.minOf { it.left }, rects.minOf { it.top }))
         // Include the handles hanging below the text, so a toolbar placed
         // under the selection doesn't cover them.
@@ -204,10 +209,10 @@ private fun SelectionToolbarEffect(
 
 private fun DrawScope.drawHighlight(
     rect: PdfRect,
-    pageSize: PageSize,
+    transform: PageViewTransform,
     color: Color,
 ) {
-    val px = CoordinateMapper.toPagePixels(rect, pageSize, size.width)
+    val px = CoordinateMapper.toPagePixels(rect, transform, size.width)
     drawRect(color, topLeft = Offset(px.left, px.top), size = Size(px.width, px.height))
 }
 

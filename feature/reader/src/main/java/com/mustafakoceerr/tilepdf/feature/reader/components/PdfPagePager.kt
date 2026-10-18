@@ -41,6 +41,7 @@ import androidx.compose.ui.util.fastAny
 import androidx.compose.ui.util.fastForEach
 import com.mustafakoceerr.tilepdf.core.geometry.CoordinateMapper
 import com.mustafakoceerr.tilepdf.core.geometry.Viewport
+import com.mustafakoceerr.tilepdf.core.geometry.PageViewTransform
 import com.mustafakoceerr.tilepdf.core.pdf.PageSize
 import com.mustafakoceerr.tilepdf.core.render.PageImageSource
 import com.mustafakoceerr.tilepdf.core.render.TileGrid
@@ -67,6 +68,8 @@ private const val TILE_REQUEST_DEBOUNCE_MS = 80L
 @Composable
 internal fun PdfPagePager(
     pageSizes: List<PageSize>,
+    /** How each page is shown; [pageSizes] are their laid-out sizes. */
+    pageTransforms: List<PageViewTransform>,
     pageImages: PageImageSource,
     initialPage: Int,
     pageTheme: PageTheme,
@@ -139,6 +142,7 @@ internal fun PdfPagePager(
             modifier = Modifier.fillMaxSize(),
         ) { pageIndex ->
             val pageSize = pageSizes[pageIndex]
+            val transform = pageTransforms[pageIndex]
             // Pages sliding in or out stay fitted.
             val restingZoom = remember(pageIndex, viewport) { PageZoom(fitPage(pageSize, viewport), viewport) }
             val pageZoom = if (pageIndex == zoomedPage) zoom else restingZoom
@@ -147,11 +151,11 @@ internal fun PdfPagePager(
             Box(
                 Modifier
                     .fillMaxSize()
-                    .pageGestures(pageZoom, pageIndex, pageSize, onTapPage, onTapOutsidePage, selectionActions, drawingFor != null),
+                    .pageGestures(pageZoom, pageIndex, transform, onTapPage, onTapOutsidePage, selectionActions, drawingFor != null),
             ) {
                 PdfPage(
                     pageIndex = pageIndex,
-                    pageSize = pageSize,
+                    transform = transform,
                     draftWidthPx = draftWidthPx,
                     pageImages = pageImages,
                     pageTheme = pageTheme,
@@ -212,7 +216,7 @@ internal fun PdfPagePager(
 private fun Modifier.pageGestures(
     zoom: PageZoom,
     pageIndex: Int,
-    pageSize: PageSize,
+    transform: PageViewTransform,
     onTapPage: (pageIndex: Int, x: Float, y: Float) -> Unit,
     onTapOutsidePage: () -> Unit,
     selectionActions: SelectionActions,
@@ -220,7 +224,7 @@ private fun Modifier.pageGestures(
     drawing: Boolean,
 ): Modifier {
     fun pdfPoint(position: Offset) = zoom.toPagePixels(position)?.let { (x, y) ->
-        CoordinateMapper.toPdfPoints(x, y, pageSize, zoom.fitted.width.toFloat())
+        CoordinateMapper.toPdfPoints(x, y, transform, zoom.fitted.width.toFloat())
     }
     return this
         .pointerInput(zoom) {

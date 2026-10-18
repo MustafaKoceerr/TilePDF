@@ -5,7 +5,9 @@ import com.mustafakoceerr.tilepdf.feature.reader.annotation.AnnotationsUiState
 import com.mustafakoceerr.tilepdf.feature.reader.components.PageJump
 import com.mustafakoceerr.tilepdf.model.Bookmark
 
+import com.mustafakoceerr.tilepdf.core.geometry.PageViewTransform
 import com.mustafakoceerr.tilepdf.core.geometry.PdfRect
+import com.mustafakoceerr.tilepdf.model.DocumentView
 import com.mustafakoceerr.tilepdf.core.pdf.PageSize
 import com.mustafakoceerr.tilepdf.core.render.PageImageSource
 import com.mustafakoceerr.tilepdf.core.render.ThumbnailSource
@@ -24,6 +26,7 @@ sealed interface ReaderUiState {
 
     data class Ready(
         val title: String,
+        /** Pages as laid out: turned and cropped as [pageTransforms] say. */
         val pageSizes: List<PageSize>,
         val pageImages: PageImageSource,
         /** Small page images for the page grid. */
@@ -52,6 +55,10 @@ sealed interface ReaderUiState {
         val saveCopyResult: SaveCopyResult? = null,
         /** A document ready for "Paylaş" or "Yazdır"; the screen hands it over. */
         val handOff: HandOff? = null,
+        /** How each page is shown; the document's own pages when untouched. */
+        val pageTransforms: List<PageViewTransform> = pageSizes.map { PageViewTransform.of(it) },
+        /** This document's rotation and margin cropping, for the menu. */
+        val documentView: DocumentView = DocumentView(),
     ) : ReaderUiState
 }
 

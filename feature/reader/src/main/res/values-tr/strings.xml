@@ -66,6 +66,8 @@
     <string name="annotation_page">Sayfa %1$d</string>
     <string name="reader_save_copy">Kopya olarak kaydet</string>
     <string name="reader_share">Paylaş</string>
+    <string name="reader_rotate">Sayfaları döndür</string>
+    <string name="reader_crop_margins">Kenar boşluklarını kırp</string>
     <string name="reader_print">Yazdır</string>
     <string name="reader_hand_off_failed">Belge hazırlanamadı.</string>
     <string name="reader_no_app_for_share">Bu belgeyi alabilecek uygulama yok</string>
