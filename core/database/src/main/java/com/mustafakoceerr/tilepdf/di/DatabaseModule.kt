@@ -2,6 +2,7 @@ package com.mustafakoceerr.tilepdf.di
 
 import android.content.Context
 import androidx.room.Room
+import com.mustafakoceerr.tilepdf.data.local.BookmarkDao
 import com.mustafakoceerr.tilepdf.data.local.DocumentDao
 import com.mustafakoceerr.tilepdf.data.local.TilePdfDatabase
 import dagger.Module
@@ -22,4 +23,7 @@ object DatabaseModule {
 
     @Provides
     fun providesDocumentDao(database: TilePdfDatabase): DocumentDao = database.documentDao()
+
+    @Provides
+    fun providesBookmarkDao(database: TilePdfDatabase): BookmarkDao = database.bookmarkDao()
 }

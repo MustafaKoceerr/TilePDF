@@ -137,6 +137,7 @@ class OpenDocumentUseCaseTest {
         override suspend fun pageText(pageIndex: Int): PageText = error("unused")
         override suspend fun outline(): List<OutlineEntry> = error("unused")
         override suspend fun trimMemory() = Unit
+        override suspend fun linkAt(pageIndex: Int, x: Float, y: Float): com.mustafakoceerr.tilepdf.core.pdf.PdfLink? = null
         override fun close() {
             closed = true
         }

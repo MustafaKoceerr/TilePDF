@@ -71,6 +71,9 @@ gen-external-apklibs
 *_BASE_*.txt
 *_LOCAL_*.txt
 *_REMOTE_*.txt
+# Room schemas live in the data.local package, which *.LOCAL.* matches on
+# case-insensitive file systems.
+!core/database/schemas/**
 
 ### Java ###
 # Compiled class file

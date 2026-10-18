@@ -8,6 +8,8 @@ import com.mustafakoceerr.tilepdf.data.preferences.DataStoreReaderPreferencesRep
 import com.mustafakoceerr.tilepdf.data.preferences.ReaderPreferencesRepository
 import com.mustafakoceerr.tilepdf.data.text.CachingDocumentTextRepository
 import com.mustafakoceerr.tilepdf.data.text.DocumentTextRepository
+import com.mustafakoceerr.tilepdf.data.bookmark.BookmarkRepository
+import com.mustafakoceerr.tilepdf.data.bookmark.OfflineBookmarkRepository
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -16,6 +18,9 @@ import dagger.hilt.components.SingletonComponent
 @Module
 @InstallIn(SingletonComponent::class)
 interface DataModule {
+    @Binds
+    fun bindsBookmarkRepository(impl: OfflineBookmarkRepository): BookmarkRepository
+
 
     @Binds
     fun bindsDocumentRepository(impl: SafDocumentRepository): DocumentRepository

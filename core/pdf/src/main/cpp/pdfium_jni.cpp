@@ -9,6 +9,7 @@
 #include <cmath>
 #include <cstdint>
 #include <list>
+#include <string>
 #include <unistd.h>
 #include <utility>
 #include <vector>
@@ -103,6 +104,25 @@ void PageToTopLeft(FPDF_PAGE page, double x, double y, float* outX, float* outY)
     FPDF_PageToDevice(page, 0, 0, width, height, 0, x, y, &deviceX, &deviceY);
     *outX = static_cast<float>(deviceX) / kDeviceScale;
     *outY = static_cast<float>(deviceY) / kDeviceScale;
+}
+
+// The inverse of PageToTopLeft: top-left points to page user space.
+void TopLeftToPage(FPDF_PAGE page, float x, float y, double* outX, double* outY) {
+    const int width = static_cast<int>(FPDF_GetPageWidthF(page) * kDeviceScale + 0.5f);
+    const int height = static_cast<int>(FPDF_GetPageHeightF(page) * kDeviceScale + 0.5f);
+    FPDF_DeviceToPage(page, 0, 0, width, height, 0,
+                      static_cast<int>(x * kDeviceScale + 0.5f), static_cast<int>(y * kDeviceScale + 0.5f),
+                      outX, outY);
+}
+
+// The link annotation under top-left point (x, y) of page [index], or null.
+FPDF_LINK LinkAt(NativeDocument* document, int index, float x, float y) {
+    FPDF_PAGE page = document->Page(index);
+    if (!page) return nullptr;
+    double pageX = 0;
+    double pageY = 0;
+    TopLeftToPage(page, x, y, &pageX, &pageY);
+    return FPDFLink_GetLinkAtPoint(page, pageX, pageY);
 }
 
 // A cached page and its text page; the text page lives for one call.
@@ -281,6 +301,63 @@ Java_com_mustafakoceerr_tilepdf_core_pdf_PdfiumNative_nativePageText(
     if (!boxArray) return nullptr;  // OutOfMemoryError is pending.
     env->SetFloatArrayRegion(boxArray, 0, count * 4, boxes.data());
     return env->NewObject(g_pageTextClass, g_pageTextConstructor, text, boxArray);
+}
+
+// [pageIndex, userX, userY] of the GoTo link at top-left (x, y) on page
+// [index]; userY is NaN when the destination gives no position. Null if there
+// is no link there or it doesn't go to a page.
+JNIEXPORT jfloatArray JNICALL
+Java_com_mustafakoceerr_tilepdf_core_pdf_PdfiumNative_nativeLinkTargetAt(
+        JNIEnv* env, jclass, jlong handle, jint index, jfloat x, jfloat y) {
+    NativeDocument* native = FromHandle(handle);
+    FPDF_LINK link = LinkAt(native, index, x, y);
+    if (!link) return nullptr;
+    FPDF_DEST dest = FPDFLink_GetDest(native->document, link);
+    if (!dest) {
+        FPDF_ACTION action = FPDFLink_GetAction(link);
+        if (action && FPDFAction_GetType(action) == PDFACTION_GOTO) dest = FPDFAction_GetDest(native->document, action);
+    }
+    if (!dest) return nullptr;
+    jfloat target[] = {static_cast<jfloat>(FPDFDest_GetDestPageIndex(native->document, dest)), 0, NAN};
+    FPDF_BOOL hasX = 0, hasY = 0, hasZoom = 0;
+    FS_FLOAT destX = 0, destY = 0, zoom = 0;
+    if (FPDFDest_GetLocationInPage(dest, &hasX, &hasY, &hasZoom, &destX, &destY, &zoom) && hasY) {
+        target[1] = hasX ? destX : 0;
+        target[2] = destY;
+    }
+    jfloatArray result = env->NewFloatArray(3);
+    if (!result) return nullptr;  // OutOfMemoryError is pending.
+    env->SetFloatArrayRegion(result, 0, 3, target);
+    return result;
+}
+
+// The URI of the link at top-left (x, y) on page [index], or null. Bytes
+// outside 7-bit ASCII are percent-encoded: NewStringUTF aborts on invalid input.
+JNIEXPORT jstring JNICALL
+Java_com_mustafakoceerr_tilepdf_core_pdf_PdfiumNative_nativeLinkUriAt(
+        JNIEnv* env, jclass, jlong handle, jint index, jfloat x, jfloat y) {
+    NativeDocument* native = FromHandle(handle);
+    FPDF_LINK link = LinkAt(native, index, x, y);
+    if (!link) return nullptr;
+    FPDF_ACTION action = FPDFLink_GetAction(link);
+    if (!action || FPDFAction_GetType(action) != PDFACTION_URI) return nullptr;
+    const unsigned long length = FPDFAction_GetURIPath(native->document, action, nullptr, 0);
+    if (length <= 1) return nullptr;
+    std::vector<char> raw(length);
+    FPDFAction_GetURIPath(native->document, action, raw.data(), length);
+    std::string uri;
+    static const char kHex[] = "0123456789ABCDEF";
+    for (unsigned long i = 0; i + 1 < length && raw[i] != '\0'; ++i) {
+        const auto byte = static_cast<unsigned char>(raw[i]);
+        if (byte >= 0x80 || byte < 0x20) {
+            uri += '%';
+            uri += kHex[byte >> 4];
+            uri += kHex[byte & 0x0F];
+        } else {
+            uri += static_cast<char>(byte);
+        }
+    }
+    return env->NewStringUTF(uri.c_str());
 }
 
 // First child of [parent], or of the outline root when [parent] is 0; 0 if none.

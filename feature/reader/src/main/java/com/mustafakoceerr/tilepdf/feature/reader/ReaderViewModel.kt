@@ -8,7 +8,9 @@ import com.mustafakoceerr.tilepdf.core.common.runCatchingCancellable
 import com.mustafakoceerr.tilepdf.core.pdf.PdfDocument
 import com.mustafakoceerr.tilepdf.core.render.PageRenderer
 import com.mustafakoceerr.tilepdf.core.text.TextSelection
+import com.mustafakoceerr.tilepdf.core.render.ThumbnailSource
 import com.mustafakoceerr.tilepdf.core.render.TiledPageImageSource
+import com.mustafakoceerr.tilepdf.data.bookmark.BookmarkRepository
 import com.mustafakoceerr.tilepdf.data.library.LibraryRepository
 import com.mustafakoceerr.tilepdf.data.preferences.ReaderPreferencesRepository
 import com.mustafakoceerr.tilepdf.data.text.DocumentTextRepository
@@ -16,6 +18,7 @@ import com.mustafakoceerr.tilepdf.di.ApplicationScope
 import com.mustafakoceerr.tilepdf.domain.OpenDocumentUseCase
 import com.mustafakoceerr.tilepdf.domain.OutlineLocator
 import com.mustafakoceerr.tilepdf.domain.OpenedDocument
+import com.mustafakoceerr.tilepdf.feature.reader.components.PageJump
 import com.mustafakoceerr.tilepdf.feature.reader.navigation.ReaderRoute
 import com.mustafakoceerr.tilepdf.model.PageText
 import com.mustafakoceerr.tilepdf.model.ReadingPosition
@@ -47,6 +50,7 @@ private const val SEARCH_DEBOUNCE_MS = 300L
 class ReaderViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val openDocument: OpenDocumentUseCase,
+    private val bookmarkRepository: BookmarkRepository,
     private val pageRenderer: PageRenderer,
     private val libraryRepository: LibraryRepository,
     private val preferencesRepository: ReaderPreferencesRepository,
@@ -68,6 +72,8 @@ class ReaderViewModel @Inject constructor(
      */
     private var position: ReadingPosition? = null
     private val selection = MutableStateFlow<Selection?>(null)
+    private val linkTargets = MutableStateFlow(LinkTargets())
+    private val currentPage = MutableStateFlow(0)
     private var selectionJob: Job? = null
     private val positionUpdates = MutableSharedFlow<ReadingPosition>(extraBufferCapacity = 1)
 
@@ -76,8 +82,9 @@ class ReaderViewModel @Inject constructor(
         preferencesRepository.nightMode,
         searchState,
         toc,
-        selection,
-    ) { document, nightMode, search, toc, selection ->
+        combine(selection, linkTargets, currentPage, ::Triple),
+    ) { document, nightMode, search, toc, selectionAndLinks ->
+        val (selection, links, page) = selectionAndLinks
         when (document) {
             DocumentState.Loading -> ReaderUiState.Loading
             is DocumentState.Failed -> ReaderUiState.Error(document.reason)
@@ -86,11 +93,16 @@ class ReaderViewModel @Inject constructor(
                 title = document.opened.displayName,
                 pageSizes = document.opened.document.pageSizes,
                 pageImages = document.pageImages,
+                thumbnails = document.thumbnails,
                 initialPosition = document.opened.position,
                 nightMode = nightMode,
                 search = search,
                 toc = toc,
                 selection = selection?.toUiState(),
+                jump = links.jump,
+                externalLink = links.externalLink,
+                currentPage = page,
+                isCurrentPageBookmarked = toc.bookmarks.any { it.pageIndex == page },
             )
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ReaderUiState.Loading)
@@ -111,9 +123,12 @@ class ReaderViewModel @Inject constructor(
             documentState.value = try {
                 val opened = openDocument(uri, password)
                 loadOutline(opened.document)
+                currentPage.value = opened.position.pageIndex
+                observeBookmarks(opened)
                 DocumentState.Opened(
                     opened = opened,
                     pageImages = TiledPageImageSource(opened.document, pageRenderer, viewModelScope),
+                    thumbnails = ThumbnailSource(opened.document, pageRenderer),
                 )
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
@@ -125,8 +140,45 @@ class ReaderViewModel @Inject constructor(
         }
     }
 
+    /**
+     * A tap at top-left point ([x], [y]) on [pageIndex]: clears a selection
+     * if there is one, otherwise follows a link there.
+     */
+    fun onTap(pageIndex: Int, x: Float, y: Float) {
+        if (selection.value != null) {
+            selection.value = null
+            return
+        }
+        val document = openedDocument() ?: return
+        viewModelScope.launch {
+            val link = runCatchingCancellable { document.linkAt(pageIndex, x, y) }.getOrNull()
+            when (val action = linkAction(link, document.pageCount)) {
+                is LinkAction.Jump -> linkTargets.update { it.copy(jump = action.jump) }
+                is LinkAction.Open -> linkTargets.update { it.copy(externalLink = action.uri) }
+                LinkAction.Ignore -> Unit
+            }
+        }
+    }
+
+    /** Bookmarks the page at the top of the screen, or removes its bookmark. */
+    fun onToggleBookmark() {
+        val opened = (documentState.value as? DocumentState.Opened)?.opened ?: return
+        val page = currentPage.value
+        viewModelScope.launch { bookmarkRepository.toggle(opened.uri, page) }
+    }
+
+    private fun observeBookmarks(opened: OpenedDocument) = viewModelScope.launch {
+        bookmarkRepository.observe(opened.uri, opened.document.pageCount)
+            .collect { bookmarks -> toc.update { it.copy(bookmarks = bookmarks) } }
+    }
+
+    fun onJumpHandled() = linkTargets.update { it.copy(jump = null) }
+
+    fun onExternalLinkHandled() = linkTargets.update { it.copy(externalLink = null) }
+
     fun onPositionChanged(position: ReadingPosition) {
         this.position = position
+        currentPage.value = position.pageIndex
         positionUpdates.tryEmit(position)
     }
 
@@ -274,6 +326,9 @@ class ReaderViewModel @Inject constructor(
 
     private fun openedDocument() = (documentState.value as? DocumentState.Opened)?.opened?.document
 
+    /** Where a tapped link leads, until the screen has acted on it. */
+    private data class LinkTargets(val jump: PageJump? = null, val externalLink: String? = null)
+
     /** The page's text is kept so dragging handles needs no reload. */
     private data class Selection(val page: PageText, val range: IntRange) {
         fun toUiState(): SelectionUiState {
@@ -297,6 +352,7 @@ class ReaderViewModel @Inject constructor(
         data class Opened(
             val opened: OpenedDocument,
             val pageImages: TiledPageImageSource,
+            val thumbnails: ThumbnailSource,
         ) : DocumentState
     }
 }

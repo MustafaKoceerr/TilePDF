@@ -30,6 +30,11 @@ minSdk 29
   by number
 - Table of contents from the PDF outline: nested entries, jumps to the
   exact heading position (XYZ, named and GoTo destinations)
+- Links: tapping one jumps to its target page and position; web and mail
+  links (`http`, `https`, `mailto` only) open in another app
+- Bookmarks per document, listed next to the table of contents and removed
+  with the library entry
+- Page grid: every page as a thumbnail, tap one to jump there
 - Text selection: long-press a word, drag Material-style handles, copy or
   select all from the system text toolbar
 - Night mode by colour inversion (no re-rendering)
@@ -147,6 +152,7 @@ is tested with fakes.
 | On-screen tiles | what's visible | Snapshot state the UI draws |
 | Tile LRU cache | `min(maxMemory / 4, 96 MB)`, by bytes | Instant scroll-back and zoom-back |
 | Draft cache | 24 MB | Whole-page placeholders |
+| Thumbnail cache | 16 MB | Page grid; only visible items render |
 | Bitmap pool | 16 tiles | Reuse evicted 1 MB bitmaps instead of allocating |
 
 - An evicted bitmap that is still on screen isn't pooled until it leaves the

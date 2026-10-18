@@ -83,6 +83,17 @@ internal object PdfiumNative {
     @JvmStatic
     external fun nativeLoadedPageCount(document: Long): Int
 
+    /**
+     * `[pageIndex, userX, userY]` of the GoTo link at top-left ([x], [y]) on
+     * page [index]; userY is NaN without a position. Null if there is none.
+     */
+    @JvmStatic
+    external fun nativeLinkTargetAt(document: Long, index: Int, x: Float, y: Float): FloatArray?
+
+    /** The URI of the link at top-left ([x], [y]) on page [index], or null. */
+    @JvmStatic
+    external fun nativeLinkUriAt(document: Long, index: Int, x: Float, y: Float): String?
+
     /** PDFium's `FPDF_ERR_PASSWORD`. */
     const val ERROR_PASSWORD = 4
 }

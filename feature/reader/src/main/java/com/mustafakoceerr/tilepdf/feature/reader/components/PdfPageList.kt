@@ -21,6 +21,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
@@ -94,6 +95,7 @@ internal fun PdfPageList(
     onGoToPageOpenChange: (Boolean) -> Unit,
     pageJump: PageJump?,
     onPageJumpHandled: () -> Unit,
+    onTapPage: (pageIndex: Int, x: Float, y: Float) -> Unit,
     selection: SelectionUiState?,
     selectionActions: SelectionActions,
     modifier: Modifier = Modifier,
@@ -133,7 +135,7 @@ internal fun PdfPageList(
             requestVisibleTiles(listState, zoomState, pageSizes, pageImages, density)
         }
 
-        TrimMemoryEffect(pageImages)
+        TrimMemoryEffect(pageImages) { uiHidden -> pageImages.trimMemory(uiHidden) }
 
         LaunchedEffect(pageJump) {
             val jump = pageJump ?: return@LaunchedEffect
@@ -154,7 +156,12 @@ internal fun PdfPageList(
                 .zoomable(
                     zoomState = zoomState,
                     listState = listState,
-                    onTap = { selectionActions.onClear() },
+                    onTap = { position ->
+                        // On a page: the reader clears a selection or follows a link.
+                        pagePointAt(position, listState, zoomState, pageSizes, density)
+                            ?.let { (page, x, y) -> onTapPage(page, x, y) }
+                            ?: selectionActions.onClear()
+                    },
                     onLongPress = { position ->
                         pagePointAt(position, listState, zoomState, pageSizes, density)
                             ?.let { (page, x, y) -> selectionActions.onLongPress(page, x, y) }
@@ -206,16 +213,21 @@ internal fun PdfPageList(
     }
 }
 
+/**
+ * Calls [onTrim] when the system asks for memory back, with `uiHidden` true
+ * once nothing is being drawn; a new [key] registers again.
+ */
 @Composable
-private fun TrimMemoryEffect(pageImages: PageImageSource) {
+internal fun TrimMemoryEffect(key: Any, onTrim: (uiHidden: Boolean) -> Unit) {
     val context = LocalContext.current
-    DisposableEffect(context, pageImages) {
+    val currentOnTrim by rememberUpdatedState(onTrim)
+    DisposableEffect(context, key) {
         val callbacks = object : ComponentCallbacks2 {
             override fun onTrimMemory(level: Int) {
                 // Since Android 14 only UI_HIDDEN and BACKGROUND are delivered:
                 // drop off-screen caches once the reader isn't visible. Every
                 // level from UI_HIDDEN up means nothing is being drawn.
-                if (level >= ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN) pageImages.trimMemory(uiHidden = true)
+                if (level >= ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN) currentOnTrim(true)
             }
 
             override fun onConfigurationChanged(newConfig: Configuration) = Unit
@@ -223,7 +235,7 @@ private fun TrimMemoryEffect(pageImages: PageImageSource) {
             // Still in the foreground: evict, but a frame may still reference
             // what's evicted, so leave freeing it to the garbage collector.
             @Deprecated("Deprecated in Java")
-            override fun onLowMemory() = pageImages.trimMemory(uiHidden = false)
+            override fun onLowMemory() = currentOnTrim(false)
         }
         context.registerComponentCallbacks(callbacks)
         onDispose { context.unregisterComponentCallbacks(callbacks) }

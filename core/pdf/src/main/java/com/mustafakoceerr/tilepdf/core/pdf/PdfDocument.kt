@@ -30,6 +30,9 @@ interface PdfDocument : Closeable {
     /** The table of contents, flattened depth first; empty if there is none. */
     suspend fun outline(): List<OutlineEntry>
 
+    /** The link at top-left point ([x], [y]) on [pageIndex], if any. */
+    suspend fun linkAt(pageIndex: Int, x: Float, y: Float): PdfLink?
+
     /**
      * Frees what the engine keeps to make the next render faster, such as
      * parsed pages. Called when the app is low on memory or hidden.
