@@ -6,6 +6,7 @@ import android.os.ParcelFileDescriptor
 import androidx.annotation.VisibleForTesting
 import com.mustafakoceerr.tilepdf.core.geometry.PdfRect
 import com.mustafakoceerr.tilepdf.model.OutlineEntry
+import com.mustafakoceerr.tilepdf.model.PageAnnotations
 import com.mustafakoceerr.tilepdf.model.PageText
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -137,6 +138,16 @@ class PdfiumDocument internal constructor(
         }
     }
 
+    override suspend fun annotations(pageIndex: Int): PageAnnotations {
+        val natives = withDocument(pageIndex) { PdfiumNative.nativePageAnnotations(it, pageIndex) }
+            ?: return PageAnnotations(emptyList(), emptyList())
+        return toPageAnnotations(pageIndex, natives.filterNotNull().toTypedArray())
+    }
+
+    override suspend fun setForeignHidden(pageIndex: Int, key: String, hidden: Boolean) {
+        withDocument(pageIndex) { PdfiumNative.nativeSetForeignHidden(it, pageIndex, key, hidden) }
+    }
+
     override suspend fun trimMemory() {
         try {
             withDocument { PdfiumNative.nativeTrim(it) }
@@ -148,6 +159,10 @@ class PdfiumDocument internal constructor(
     /** Pages PDFium currently keeps loaded for this document. */
     @VisibleForTesting
     internal suspend fun loadedPageCount(): Int = withDocument { PdfiumNative.nativeLoadedPageCount(it) }
+
+    @VisibleForTesting
+    internal suspend fun annotationCount(pageIndex: Int): Int =
+        withDocument(pageIndex) { PdfiumNative.nativeAnnotationCount(it, pageIndex) }
 
     /** Runs [block] with the native handle, after checking [pageIndex] if given. */
     internal suspend fun <T> withDocument(pageIndex: Int? = null, block: (Long) -> T): T {

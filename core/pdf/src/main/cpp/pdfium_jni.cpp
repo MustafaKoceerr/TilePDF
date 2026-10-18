@@ -9,12 +9,15 @@
 #include <cmath>
 #include <cstdint>
 #include <list>
+#include <set>
 #include <string>
 #include <unistd.h>
 #include <utility>
 #include <vector>
 
+#include "fpdf_annot.h"
 #include "fpdf_doc.h"
+#include "fpdf_save.h"
 #include "fpdf_text.h"
 #include "fpdfview.h"
 
@@ -25,6 +28,57 @@ bool g_initialized = false;
 // NativePageText(String, float[]), resolved once in JNI_OnLoad.
 jclass g_pageTextClass = nullptr;
 jmethodID g_pageTextConstructor = nullptr;
+
+// NativeAnnotation(int, int, String, String, int, float, float[], float[], int[], boolean).
+jclass g_annotationClass = nullptr;
+jmethodID g_annotationConstructor = nullptr;
+
+// /NM prefix of the annotations TilePDF creates.
+constexpr char kOwnPrefix[] = "tilepdf-";
+
+// Closes an annotation handle when it goes out of scope.
+struct Annotation {
+    FPDF_ANNOTATION handle;
+
+    explicit Annotation(FPDF_ANNOTATION annotation) : handle(annotation) {}
+    ~Annotation() {
+        if (handle) FPDFPage_CloseAnnot(handle);
+    }
+
+    Annotation(const Annotation&) = delete;
+    Annotation& operator=(const Annotation&) = delete;
+};
+
+// The UTF-16 value of string [key] without its terminating NUL; empty if absent.
+std::vector<jchar> StringValue(FPDF_ANNOTATION annotation, const char* key) {
+    const unsigned long bytes = FPDFAnnot_GetStringValue(annotation, key, nullptr, 0);
+    if (bytes <= sizeof(FPDF_WCHAR)) return {};
+    std::vector<jchar> value(bytes / sizeof(FPDF_WCHAR));
+    FPDFAnnot_GetStringValue(annotation, key, reinterpret_cast<FPDF_WCHAR*>(value.data()), bytes);
+    value.pop_back();
+    return value;
+}
+
+bool IsOwn(const std::vector<jchar>& name) {
+    const size_t length = sizeof(kOwnPrefix) - 1;
+    if (name.size() < length) return false;
+    for (size_t i = 0; i < length; ++i) {
+        if (name[i] != static_cast<jchar>(kOwnPrefix[i])) return false;
+    }
+    return true;
+}
+
+// Hides the annotations TilePDF made: the reader draws those itself. Only
+// ever done to documents that are not saved.
+void HideOwnAnnotations(FPDF_PAGE page) {
+    const int count = FPDFPage_GetAnnotCount(page);
+    for (int i = 0; i < count; ++i) {
+        Annotation annotation(FPDFPage_GetAnnot(page, i));
+        if (annotation.handle && IsOwn(StringValue(annotation.handle, "NM"))) {
+            FPDFAnnot_SetFlags(annotation.handle, FPDFAnnot_GetFlags(annotation.handle) | FPDF_ANNOT_FLAG_HIDDEN);
+        }
+    }
+}
 
 // Pages kept loaded per document. Loading parses the page's content, so a
 // page drawn as a dozen tiles is parsed once instead of once per tile: on a
@@ -40,6 +94,8 @@ constexpr size_t kLoadedPages = 2;
 struct NativeDocument {
     FPDF_FILEACCESS access{};
     FPDF_DOCUMENT document = nullptr;
+    // A reader's document: our annotations are hidden as pages load.
+    bool hideOwn = false;
     // Most recently used first.
     std::list<std::pair<int, FPDF_PAGE>> pages;
 
@@ -54,6 +110,7 @@ struct NativeDocument {
         }
         FPDF_PAGE page = FPDF_LoadPage(document, index);
         if (!page) return nullptr;
+        if (hideOwn) HideOwnAnnotations(page);
         pages.emplace_front(index, page);
         if (pages.size() > kLoadedPages) {
             FPDF_ClosePage(pages.back().second);
@@ -141,6 +198,226 @@ struct TextPage {
     TextPage& operator=(const TextPage&) = delete;
 };
 
+// Whether the annotation at [index] has foreign [key]: its /NM, or "#index"
+// when it has none.
+bool MatchesKey(FPDF_ANNOTATION annotation, int index, const std::vector<jchar>& key) {
+    const std::vector<jchar> name = StringValue(annotation, "NM");
+    if (!name.empty()) return name == key;
+    const std::string byIndex = "#" + std::to_string(index);
+    return key.size() == byIndex.size() && std::equal(key.begin(), key.end(), byIndex.begin());
+}
+
+std::vector<jchar> Chars(JNIEnv* env, jstring string) {
+    const jsize length = env->GetStringLength(string);
+    std::vector<jchar> chars(static_cast<size_t>(length));
+    env->GetStringRegion(string, 0, length, chars.data());
+    return chars;
+}
+
+// Markup annotations a user may delete; links, popups and widgets are not.
+bool IsDeletable(int subtype) {
+    switch (subtype) {
+        case FPDF_ANNOT_TEXT:
+        case FPDF_ANNOT_FREETEXT:
+        case FPDF_ANNOT_LINE:
+        case FPDF_ANNOT_SQUARE:
+        case FPDF_ANNOT_CIRCLE:
+        case FPDF_ANNOT_POLYGON:
+        case FPDF_ANNOT_POLYLINE:
+        case FPDF_ANNOT_HIGHLIGHT:
+        case FPDF_ANNOT_UNDERLINE:
+        case FPDF_ANNOT_SQUIGGLY:
+        case FPDF_ANNOT_STRIKEOUT:
+        case FPDF_ANNOT_STAMP:
+        case FPDF_ANNOT_CARET:
+        case FPDF_ANNOT_INK:
+        case FPDF_ANNOT_FILEATTACHMENT:
+            return true;
+        default:
+            return false;
+    }
+}
+
+std::vector<std::vector<jchar>> StringList(JNIEnv* env, jobjectArray strings) {
+    const jsize count = env->GetArrayLength(strings);
+    std::vector<std::vector<jchar>> result;
+    for (jsize i = 0; i < count; ++i) {
+        auto string = static_cast<jstring>(env->GetObjectArrayElement(strings, i));
+        result.push_back(Chars(env, string));
+        env->DeleteLocalRef(string);
+    }
+    return result;
+}
+
+jobjectArray NewStringArray(JNIEnv* env, const std::vector<std::vector<jchar>>& strings) {
+    jclass stringClass = env->FindClass("java/lang/String");
+    if (!stringClass) return nullptr;
+    jobjectArray result = env->NewObjectArray(static_cast<jsize>(strings.size()), stringClass, nullptr);
+    env->DeleteLocalRef(stringClass);
+    if (!result) return nullptr;
+    for (size_t i = 0; i < strings.size(); ++i) {
+        jstring string = env->NewString(strings[i].data(), static_cast<jsize>(strings[i].size()));
+        if (!string) return nullptr;
+        env->SetObjectArrayElement(result, static_cast<jsize>(i), string);
+        env->DeleteLocalRef(string);
+    }
+    return result;
+}
+
+// Sets /NM, /Contents (when not empty), the color, and the Print flag.
+bool Describe(JNIEnv* env, FPDF_ANNOTATION annotation, jint color, jstring id, jstring contents) {
+    const auto argb = static_cast<uint32_t>(color);
+    if (!FPDFAnnot_SetColor(annotation, FPDFANNOT_COLORTYPE_Color, (argb >> 16) & 0xFF, (argb >> 8) & 0xFF,
+                            argb & 0xFF, argb >> 24)) {
+        return false;
+    }
+    std::vector<jchar> name = Chars(env, id);
+    name.push_back(0);
+    if (!FPDFAnnot_SetStringValue(annotation, "NM", reinterpret_cast<FPDF_WIDESTRING>(name.data()))) return false;
+    if (contents) {
+        std::vector<jchar> text = Chars(env, contents);
+        if (!text.empty()) {
+            text.push_back(0);
+            if (!FPDFAnnot_SetStringValue(annotation, "Contents", reinterpret_cast<FPDF_WIDESTRING>(text.data()))) {
+                return false;
+            }
+        }
+    }
+    return FPDFAnnot_SetFlags(annotation, FPDF_ANNOT_FLAG_PRINT);
+}
+
+// Page-space bounds of points added with Add().
+struct Bounds {
+    float left = INFINITY, bottom = INFINITY, right = -INFINITY, top = -INFINITY;
+
+    void Add(float x, float y) {
+        left = std::min(left, x);
+        right = std::max(right, x);
+        bottom = std::min(bottom, y);
+        top = std::max(top, y);
+    }
+
+    FS_RECTF Rect(float inset) const { return FS_RECTF{left - inset, top + inset, right + inset, bottom - inset}; }
+};
+
+FS_POINTF ToPage(FPDF_PAGE page, float x, float y) {
+    double pageX = 0, pageY = 0;
+    TopLeftToPage(page, x, y, &pageX, &pageY);
+    return FS_POINTF{static_cast<float>(pageX), static_cast<float>(pageY)};
+}
+
+constexpr float kNoteIconSize = 20;
+
+// Writes the file through an open descriptor; failed is set on a write error.
+struct FdWriter : FPDF_FILEWRITE {
+    int fd = -1;
+    bool failed = false;
+};
+
+int WriteBlock(FPDF_FILEWRITE* self, const void* data, unsigned long size) {
+    auto* writer = static_cast<FdWriter*>(self);
+    const auto* bytes = static_cast<const unsigned char*>(data);
+    unsigned long done = 0;
+    while (done < size) {
+        const ssize_t written = write(writer->fd, bytes + done, size - done);
+        if (written < 0 && errno == EINTR) continue;
+        if (written <= 0) {
+            writer->failed = true;
+            return 0;
+        }
+        done += static_cast<unsigned long>(written);
+    }
+    return 1;
+}
+
+jstring NewStringOrNull(JNIEnv* env, const std::vector<jchar>& chars) {
+    return chars.empty() ? nullptr : env->NewString(chars.data(), static_cast<jsize>(chars.size()));
+}
+
+// The annotation at [index] as a NativeAnnotation in top-left points.
+jobject ReadAnnotation(JNIEnv* env, NativeDocument* document, FPDF_PAGE page, FPDF_ANNOTATION annotation, int index) {
+    const int subtype = FPDFAnnot_GetSubtype(annotation);
+    const std::vector<jchar> name = StringValue(annotation, "NM");
+    const std::vector<jchar> contents = StringValue(annotation, "Contents");
+    const bool hasAppearance =
+            FPDFAnnot_GetAP(annotation, FPDF_ANNOT_APPEARANCEMODE_NORMAL, nullptr, 0) > sizeof(FPDF_WCHAR);
+    // FPDFAnnot_GetColor fails while an appearance stream exists. A reader's
+    // document never draws our annotations and is never saved, so dropping
+    // their appearance stream there costs nothing.
+    if (document->hideOwn && IsOwn(name)) {
+        FPDFAnnot_SetAP(annotation, FPDF_ANNOT_APPEARANCEMODE_NORMAL, nullptr);
+    }
+    unsigned int r = 0, g = 0, b = 0, a = 255;
+    if (!FPDFAnnot_GetColor(annotation, FPDFANNOT_COLORTYPE_Color, &r, &g, &b, &a)) {
+        r = g = b = 0;
+        a = 255;
+    }
+    const auto color = static_cast<jint>((a << 24) | (r << 16) | (g << 8) | b);
+    float radiusX = 0, radiusY = 0, width = 1;
+    if (!FPDFAnnot_GetBorder(annotation, &radiusX, &radiusY, &width)) width = 1;
+
+    jfloat rect[4] = {0, 0, 0, 0};
+    FS_RECTF pageRect{};
+    if (FPDFAnnot_GetRect(annotation, &pageRect)) {
+        float x1, y1, x2, y2;
+        PageToTopLeft(page, pageRect.left, pageRect.top, &x1, &y1);
+        PageToTopLeft(page, pageRect.right, pageRect.bottom, &x2, &y2);
+        rect[0] = std::min(x1, x2);
+        rect[1] = std::min(y1, y2);
+        rect[2] = std::max(x1, x2);
+        rect[3] = std::max(y1, y2);
+    }
+
+    std::vector<jfloat> points;
+    std::vector<jint> pathSizes;
+    auto addPoint = [&](float x, float y) {
+        float topLeftX, topLeftY;
+        PageToTopLeft(page, x, y, &topLeftX, &topLeftY);
+        points.push_back(topLeftX);
+        points.push_back(topLeftY);
+    };
+    if (subtype == FPDF_ANNOT_INK) {
+        const unsigned long paths = FPDFAnnot_GetInkListCount(annotation);
+        for (unsigned long path = 0; path < paths; ++path) {
+            const unsigned long count = FPDFAnnot_GetInkListPath(annotation, path, nullptr, 0);
+            std::vector<FS_POINTF> pathPoints(count);
+            FPDFAnnot_GetInkListPath(annotation, path, pathPoints.data(), count);
+            for (const FS_POINTF& point : pathPoints) addPoint(point.x, point.y);
+            pathSizes.push_back(static_cast<jint>(count));
+        }
+    } else if (subtype >= FPDF_ANNOT_HIGHLIGHT && subtype <= FPDF_ANNOT_STRIKEOUT) {
+        const size_t quads = FPDFAnnot_CountAttachmentPoints(annotation);
+        for (size_t quad = 0; quad < quads; ++quad) {
+            FS_QUADPOINTSF q{};
+            if (!FPDFAnnot_GetAttachmentPoints(annotation, quad, &q)) continue;
+            addPoint(q.x1, q.y1);
+            addPoint(q.x2, q.y2);
+            addPoint(q.x3, q.y3);
+            addPoint(q.x4, q.y4);
+        }
+    }
+
+    jstring id = NewStringOrNull(env, name);
+    jstring text = NewStringOrNull(env, contents);
+    jfloatArray rectArray = env->NewFloatArray(4);
+    jfloatArray pointArray = env->NewFloatArray(static_cast<jsize>(points.size()));
+    jintArray sizeArray = env->NewIntArray(static_cast<jsize>(pathSizes.size()));
+    jobject result = nullptr;
+    if (rectArray && pointArray && sizeArray) {
+        env->SetFloatArrayRegion(rectArray, 0, 4, rect);
+        env->SetFloatArrayRegion(pointArray, 0, static_cast<jsize>(points.size()), points.data());
+        env->SetIntArrayRegion(sizeArray, 0, static_cast<jsize>(pathSizes.size()), pathSizes.data());
+        result = env->NewObject(g_annotationClass, g_annotationConstructor, subtype, index, id, text, color,
+                                width, rectArray, pointArray, sizeArray, hasAppearance ? JNI_TRUE : JNI_FALSE);
+    }
+    if (id) env->DeleteLocalRef(id);
+    if (text) env->DeleteLocalRef(text);
+    if (rectArray) env->DeleteLocalRef(rectArray);
+    if (pointArray) env->DeleteLocalRef(pointArray);
+    if (sizeArray) env->DeleteLocalRef(sizeArray);
+    return result;
+}
+
 }  // namespace
 
 extern "C" {
@@ -153,7 +430,14 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void*) {
     g_pageTextClass = static_cast<jclass>(env->NewGlobalRef(local));
     env->DeleteLocalRef(local);
     g_pageTextConstructor = env->GetMethodID(g_pageTextClass, "<init>", "(Ljava/lang/String;[F)V");
-    return g_pageTextConstructor ? JNI_VERSION_1_6 : JNI_ERR;
+    if (!g_pageTextConstructor) return JNI_ERR;
+    local = env->FindClass("com/mustafakoceerr/tilepdf/core/pdf/NativeAnnotation");
+    if (!local) return JNI_ERR;
+    g_annotationClass = static_cast<jclass>(env->NewGlobalRef(local));
+    env->DeleteLocalRef(local);
+    g_annotationConstructor = env->GetMethodID(
+            g_annotationClass, "<init>", "(IILjava/lang/String;Ljava/lang/String;IF[F[F[IZ)V");
+    return g_annotationConstructor ? JNI_VERSION_1_6 : JNI_ERR;
 }
 
 JNIEXPORT void JNICALL
@@ -169,13 +453,14 @@ Java_com_mustafakoceerr_tilepdf_core_pdf_PdfiumNative_nativeInit(JNIEnv*, jclass
 // handle is a pointer and may be negative as a jlong: arm64 tags heap pointers.
 JNIEXPORT jlong JNICALL
 Java_com_mustafakoceerr_tilepdf_core_pdf_PdfiumNative_nativeOpen(
-        JNIEnv* env, jclass, jint fd, jlong size, jstring password, jintArray error) {
+        JNIEnv* env, jclass, jint fd, jlong size, jstring password, jboolean hideOwn, jintArray error) {
     const char* passwordChars = nullptr;
     if (password) {
         passwordChars = env->GetStringUTFChars(password, nullptr);
         if (!passwordChars) return 0;  // OutOfMemoryError is pending.
     }
     auto* native = new NativeDocument();
+    native->hideOwn = hideOwn == JNI_TRUE;
     native->access.m_FileLen = static_cast<unsigned long>(size);
     native->access.m_GetBlock = ReadBlock;
     native->access.m_Param = reinterpret_cast<void*>(static_cast<intptr_t>(fd));
@@ -433,6 +718,246 @@ Java_com_mustafakoceerr_tilepdf_core_pdf_PdfiumNative_nativePageToTopLeft(
     if (!result) return nullptr;  // OutOfMemoryError is pending.
     env->SetFloatArrayRegion(result, 0, count, values.data());
     return result;
+}
+
+// Every annotation on page [index] as NativeAnnotation (an element is null if
+// it couldn't be read), or null if the page can't be loaded.
+JNIEXPORT jobjectArray JNICALL
+Java_com_mustafakoceerr_tilepdf_core_pdf_PdfiumNative_nativePageAnnotations(
+        JNIEnv* env, jclass, jlong handle, jint index) {
+    NativeDocument* native = FromHandle(handle);
+    FPDF_PAGE page = native->Page(index);
+    if (!page) return nullptr;
+    const int count = std::max(FPDFPage_GetAnnotCount(page), 0);
+    jobjectArray result = env->NewObjectArray(count, g_annotationClass, nullptr);
+    if (!result) return nullptr;  // OutOfMemoryError is pending.
+    for (int i = 0; i < count; ++i) {
+        Annotation annotation(FPDFPage_GetAnnot(page, i));
+        if (!annotation.handle) continue;
+        jobject element = ReadAnnotation(env, native, page, annotation.handle, i);
+        if (!element) {
+            if (env->ExceptionCheck()) return nullptr;
+            continue;
+        }
+        env->SetObjectArrayElement(result, i, element);
+        env->DeleteLocalRef(element);
+    }
+    return result;
+}
+
+// Hides or shows the foreign annotation with [key] on page [index], in memory.
+JNIEXPORT jboolean JNICALL
+Java_com_mustafakoceerr_tilepdf_core_pdf_PdfiumNative_nativeSetForeignHidden(
+        JNIEnv* env, jclass, jlong handle, jint index, jstring key, jboolean hidden) {
+    FPDF_PAGE page = FromHandle(handle)->Page(index);
+    if (!page) return JNI_FALSE;
+    const std::vector<jchar> wanted = Chars(env, key);
+    const int count = FPDFPage_GetAnnotCount(page);
+    for (int i = 0; i < count; ++i) {
+        Annotation annotation(FPDFPage_GetAnnot(page, i));
+        if (!annotation.handle || IsOwn(StringValue(annotation.handle, "NM")) ||
+            !MatchesKey(annotation.handle, i, wanted)) {
+            continue;
+        }
+        const int flags = FPDFAnnot_GetFlags(annotation.handle);
+        FPDFAnnot_SetFlags(annotation.handle,
+                           hidden ? flags | FPDF_ANNOT_FLAG_HIDDEN : flags & ~FPDF_ANNOT_FLAG_HIDDEN);
+        return JNI_TRUE;
+    }
+    return JNI_FALSE;
+}
+
+JNIEXPORT jint JNICALL
+Java_com_mustafakoceerr_tilepdf_core_pdf_PdfiumNative_nativeAnnotationCount(JNIEnv*, jclass, jlong handle, jint index) {
+    FPDF_PAGE page = FromHandle(handle)->Page(index);
+    return page ? FPDFPage_GetAnnotCount(page) : -1;
+}
+
+// /NM of every annotation TilePDF made on page [index]; null if the page can't load.
+JNIEXPORT jobjectArray JNICALL
+Java_com_mustafakoceerr_tilepdf_core_pdf_PdfiumNative_nativeOwnAnnotationIds(
+        JNIEnv* env, jclass, jlong handle, jint index) {
+    FPDF_PAGE page = FromHandle(handle)->Page(index);
+    if (!page) return nullptr;
+    std::vector<std::vector<jchar>> ids;
+    const int count = FPDFPage_GetAnnotCount(page);
+    for (int i = 0; i < count; ++i) {
+        Annotation annotation(FPDFPage_GetAnnot(page, i));
+        if (!annotation.handle) continue;
+        std::vector<jchar> name = StringValue(annotation.handle, "NM");
+        if (IsOwn(name)) ids.push_back(std::move(name));
+    }
+    return NewStringArray(env, ids);
+}
+
+// Keys of the deletable foreign annotations on page [index]: /NM, or "#index".
+JNIEXPORT jobjectArray JNICALL
+Java_com_mustafakoceerr_tilepdf_core_pdf_PdfiumNative_nativeForeignKeys(
+        JNIEnv* env, jclass, jlong handle, jint index) {
+    FPDF_PAGE page = FromHandle(handle)->Page(index);
+    if (!page) return nullptr;
+    std::vector<std::vector<jchar>> keys;
+    const int count = FPDFPage_GetAnnotCount(page);
+    for (int i = 0; i < count; ++i) {
+        Annotation annotation(FPDFPage_GetAnnot(page, i));
+        if (!annotation.handle || !IsDeletable(FPDFAnnot_GetSubtype(annotation.handle))) continue;
+        std::vector<jchar> name = StringValue(annotation.handle, "NM");
+        if (IsOwn(name)) continue;
+        if (name.empty()) {
+            const std::string byIndex = "#" + std::to_string(i);
+            name.assign(byIndex.begin(), byIndex.end());
+        }
+        keys.push_back(std::move(name));
+    }
+    return NewStringArray(env, keys);
+}
+
+// Removes our annotations [ownIds] and the foreign ones with [foreignKeys]
+// from page [index], each with its popup. Every target is found before any
+// is removed, so "#index" keys refer to the page as it was.
+JNIEXPORT jboolean JNICALL
+Java_com_mustafakoceerr_tilepdf_core_pdf_PdfiumNative_nativeRemoveAnnotations(
+        JNIEnv* env, jclass, jlong handle, jint index, jobjectArray ownIds, jobjectArray foreignKeys) {
+    FPDF_PAGE page = FromHandle(handle)->Page(index);
+    if (!page) return JNI_FALSE;
+    const auto own = StringList(env, ownIds);
+    const auto foreign = StringList(env, foreignKeys);
+    std::set<int> targets;
+    const int count = FPDFPage_GetAnnotCount(page);
+    for (int i = 0; i < count; ++i) {
+        Annotation annotation(FPDFPage_GetAnnot(page, i));
+        if (!annotation.handle) continue;
+        const std::vector<jchar> name = StringValue(annotation.handle, "NM");
+        bool hit;
+        if (IsOwn(name)) {
+            hit = std::find(own.begin(), own.end(), name) != own.end();
+        } else {
+            hit = IsDeletable(FPDFAnnot_GetSubtype(annotation.handle)) &&
+                  std::any_of(foreign.begin(), foreign.end(),
+                              [&](const std::vector<jchar>& key) { return MatchesKey(annotation.handle, i, key); });
+        }
+        if (!hit) continue;
+        targets.insert(i);
+        Annotation popup(FPDFAnnot_GetLinkedAnnot(annotation.handle, "Popup"));
+        if (popup.handle) {
+            const int popupIndex = FPDFPage_GetAnnotIndex(page, popup.handle);
+            if (popupIndex >= 0) targets.insert(popupIndex);
+        }
+    }
+    for (auto it = targets.rbegin(); it != targets.rend(); ++it) {
+        if (!FPDFPage_RemoveAnnot(page, *it)) return JNI_FALSE;
+    }
+    return JNI_TRUE;
+}
+
+// Adds a highlight, underline or strikeout. [quads] holds 8 floats per line:
+// its top-left, top-right, bottom-left and bottom-right corners in top-left points.
+JNIEXPORT jboolean JNICALL
+Java_com_mustafakoceerr_tilepdf_core_pdf_PdfiumNative_nativeAddMarkup(
+        JNIEnv* env, jclass, jlong handle, jint index, jint subtype, jint color, jfloatArray quads, jstring id,
+        jstring contents) {
+    FPDF_PAGE page = FromHandle(handle)->Page(index);
+    if (!page) return JNI_FALSE;
+    const jsize length = env->GetArrayLength(quads);
+    if (length == 0 || length % 8 != 0) return JNI_FALSE;
+    std::vector<jfloat> values(static_cast<size_t>(length));
+    env->GetFloatArrayRegion(quads, 0, length, values.data());
+    Annotation annotation(FPDFPage_CreateAnnot(page, subtype));
+    if (!annotation.handle) return JNI_FALSE;
+    Bounds bounds;
+    for (jsize quad = 0; quad < length; quad += 8) {
+        FS_POINTF corners[4];
+        for (int corner = 0; corner < 4; ++corner) {
+            corners[corner] = ToPage(page, values[static_cast<size_t>(quad + corner * 2)],
+                                     values[static_cast<size_t>(quad + corner * 2 + 1)]);
+            bounds.Add(corners[corner].x, corners[corner].y);
+        }
+        const FS_QUADPOINTSF points{corners[0].x, corners[0].y, corners[1].x, corners[1].y,
+                                    corners[2].x, corners[2].y, corners[3].x, corners[3].y};
+        if (!FPDFAnnot_AppendAttachmentPoints(annotation.handle, &points)) return JNI_FALSE;
+    }
+    const FS_RECTF rect = bounds.Rect(0);
+    return FPDFAnnot_SetRect(annotation.handle, &rect) && Describe(env, annotation.handle, color, id, contents)
+               ? JNI_TRUE : JNI_FALSE;
+}
+
+// Adds a pen annotation: [points] holds every path's top-left points in turn,
+// [pathSizes] the number of points in each.
+JNIEXPORT jboolean JNICALL
+Java_com_mustafakoceerr_tilepdf_core_pdf_PdfiumNative_nativeAddInk(
+        JNIEnv* env, jclass, jlong handle, jint index, jint color, jfloat width, jfloatArray points,
+        jintArray pathSizes, jstring id) {
+    FPDF_PAGE page = FromHandle(handle)->Page(index);
+    if (!page) return JNI_FALSE;
+    const jsize length = env->GetArrayLength(points);
+    const jsize paths = env->GetArrayLength(pathSizes);
+    std::vector<jfloat> values(static_cast<size_t>(length));
+    std::vector<jint> sizes(static_cast<size_t>(paths));
+    env->GetFloatArrayRegion(points, 0, length, values.data());
+    env->GetIntArrayRegion(pathSizes, 0, paths, sizes.data());
+    Annotation annotation(FPDFPage_CreateAnnot(page, FPDF_ANNOT_INK));
+    if (!annotation.handle) return JNI_FALSE;
+    Bounds bounds;
+    size_t offset = 0;
+    for (jint size : sizes) {
+        if (size <= 0 || (offset + static_cast<size_t>(size)) * 2 > values.size()) return JNI_FALSE;
+        std::vector<FS_POINTF> path;
+        for (jint i = 0; i < size; ++i, ++offset) {
+            path.push_back(ToPage(page, values[offset * 2], values[offset * 2 + 1]));
+            bounds.Add(path.back().x, path.back().y);
+        }
+        if (FPDFAnnot_AddInkStroke(annotation.handle, path.data(), path.size()) < 0) return JNI_FALSE;
+    }
+    if (bounds.left > bounds.right) return JNI_FALSE;
+    const FS_RECTF rect = bounds.Rect(width);
+    return FPDFAnnot_SetBorder(annotation.handle, 0, 0, width) && FPDFAnnot_SetRect(annotation.handle, &rect) &&
+                   Describe(env, annotation.handle, color, id, nullptr)
+               ? JNI_TRUE : JNI_FALSE;
+}
+
+// Adds a sticky note whose icon has its top-left corner at (x, y). The icon
+// is 20 pt square, the size PDFium gives a note when it draws its appearance.
+JNIEXPORT jboolean JNICALL
+Java_com_mustafakoceerr_tilepdf_core_pdf_PdfiumNative_nativeAddNote(
+        JNIEnv* env, jclass, jlong handle, jint index, jint color, jfloat x, jfloat y, jstring id, jstring contents) {
+    FPDF_PAGE page = FromHandle(handle)->Page(index);
+    if (!page) return JNI_FALSE;
+    Annotation annotation(FPDFPage_CreateAnnot(page, FPDF_ANNOT_TEXT));
+    if (!annotation.handle) return JNI_FALSE;
+    Bounds bounds;
+    const FS_POINTF topLeft = ToPage(page, x, y);
+    const FS_POINTF bottomRight = ToPage(page, x + kNoteIconSize, y + kNoteIconSize);
+    bounds.Add(topLeft.x, topLeft.y);
+    bounds.Add(bottomRight.x, bottomRight.y);
+    const FS_RECTF rect = bounds.Rect(0);
+    return FPDFAnnot_SetRect(annotation.handle, &rect) && Describe(env, annotation.handle, color, id, contents)
+               ? JNI_TRUE : JNI_FALSE;
+}
+
+// Renders page [index] once with annotations, which makes PDFium write an
+// appearance stream for every annotation that lacks one, so other viewers
+// can draw what TilePDF added.
+JNIEXPORT void JNICALL
+Java_com_mustafakoceerr_tilepdf_core_pdf_PdfiumNative_nativeGenerateAppearances(
+        JNIEnv*, jclass, jlong handle, jint index) {
+    FPDF_PAGE page = FromHandle(handle)->Page(index);
+    if (!page) return;
+    FPDF_BITMAP bitmap = FPDFBitmap_Create(1, 1, 0);
+    if (!bitmap) return;
+    FPDF_RenderPageBitmap(bitmap, page, 0, 0, 1, 1, 0, FPDF_ANNOT);
+    FPDFBitmap_Destroy(bitmap);
+}
+
+// Writes the document with its changes appended after the original bytes.
+JNIEXPORT jboolean JNICALL
+Java_com_mustafakoceerr_tilepdf_core_pdf_PdfiumNative_nativeSaveIncremental(
+        JNIEnv*, jclass, jlong handle, jint fd) {
+    FdWriter writer;
+    writer.version = 1;
+    writer.WriteBlock = WriteBlock;
+    writer.fd = fd;
+    const bool saved = FPDF_SaveAsCopy(FromHandle(handle)->document, &writer, FPDF_INCREMENTAL);
+    return saved && !writer.failed ? JNI_TRUE : JNI_FALSE;
 }
 
 }  // extern "C"

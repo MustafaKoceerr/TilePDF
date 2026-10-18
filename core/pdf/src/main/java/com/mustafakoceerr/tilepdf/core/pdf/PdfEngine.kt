@@ -11,4 +11,10 @@ interface PdfEngine {
      * @throws PdfCorruptException if the file isn't a readable PDF.
      */
     suspend fun open(uri: Uri, password: String? = null): PdfDocument
+
+    /**
+     * Opens [uri] to change its annotations and save a copy, with the same
+     * exceptions as [open]. The returned document draws nothing.
+     */
+    suspend fun openForEditing(uri: Uri, password: String? = null): EditablePdfDocument
 }

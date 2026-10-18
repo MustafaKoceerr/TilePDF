@@ -21,9 +21,11 @@ internal object PdfiumNative {
      * Opens the PDF readable through [fd] (which must stay open until the
      * document is closed). Returns a non-zero handle, or 0 with PDFium's error
      * code in `error[0]`. Handles may be negative: arm64 tags heap pointers.
+     * With [hideOwn], TilePDF's annotations are hidden as pages load; such a
+     * document must never be saved.
      */
     @JvmStatic
-    external fun nativeOpen(fd: Int, size: Long, password: String?, error: IntArray): Long
+    external fun nativeOpen(fd: Int, size: Long, password: String?, hideOwn: Boolean, error: IntArray): Long
 
     @JvmStatic
     external fun nativeCloseDocument(document: Long)
@@ -93,6 +95,59 @@ internal object PdfiumNative {
     /** The URI of the link at top-left ([x], [y]) on page [index], or null. */
     @JvmStatic
     external fun nativeLinkUriAt(document: Long, index: Int, x: Float, y: Float): String?
+
+    /**
+     * Every annotation on page [index] (null elements couldn't be read), or
+     * null if the page can't be loaded.
+     */
+    @JvmStatic
+    external fun nativePageAnnotations(document: Long, index: Int): Array<NativeAnnotation?>?
+
+    /** Hides or shows the foreign annotation with [key] in memory; false if there is none. */
+    @JvmStatic
+    external fun nativeSetForeignHidden(document: Long, index: Int, key: String, hidden: Boolean): Boolean
+
+    @JvmStatic
+    external fun nativeAnnotationCount(document: Long, index: Int): Int
+
+    /** `/NM` of TilePDF's annotations on page [index]; null if the page can't load. */
+    @JvmStatic
+    external fun nativeOwnAnnotationIds(document: Long, index: Int): Array<String>?
+
+    /** Keys (`/NM` or `#index`) of deletable foreign annotations; null if the page can't load. */
+    @JvmStatic
+    external fun nativeForeignKeys(document: Long, index: Int): Array<String>?
+
+    /**
+     * Removes TilePDF's annotations [ownIds] and the foreign ones with
+     * [foreignKeys] from page [index], each with its popup.
+     */
+    @JvmStatic
+    external fun nativeRemoveAnnotations(document: Long, index: Int, ownIds: Array<String>, foreignKeys: Array<String>): Boolean
+
+    /** [quads]: 8 top-left floats per line rect (TL, TR, BL, BR corners). */
+    @JvmStatic
+    external fun nativeAddMarkup(
+        document: Long, index: Int, subtype: Int, color: Int, quads: FloatArray, id: String, contents: String,
+    ): Boolean
+
+    /** [points]: every path's top-left points in turn; [pathSizes]: points per path. */
+    @JvmStatic
+    external fun nativeAddInk(
+        document: Long, index: Int, color: Int, width: Float, points: FloatArray, pathSizes: IntArray, id: String,
+    ): Boolean
+
+    /** A note whose 20 pt icon has its top-left corner at ([x], [y]). */
+    @JvmStatic
+    external fun nativeAddNote(document: Long, index: Int, color: Int, x: Float, y: Float, id: String, contents: String): Boolean
+
+    /** Renders page [index] once so PDFium writes missing appearance streams. */
+    @JvmStatic
+    external fun nativeGenerateAppearances(document: Long, index: Int)
+
+    /** Writes the original bytes plus the changes to [fd]. */
+    @JvmStatic
+    external fun nativeSaveIncremental(document: Long, fd: Int): Boolean
 
     /** PDFium's `FPDF_ERR_PASSWORD`. */
     const val ERROR_PASSWORD = 4

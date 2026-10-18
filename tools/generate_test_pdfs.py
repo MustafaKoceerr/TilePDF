@@ -17,6 +17,10 @@ Writes to core/testing/src/main/assets/:
                  javascript: URI; links.
 - outline.pdf    12 pages with an outline covering XYZ, Fit, named and GoTo
                  destinations and UTF-16 Turkish titles; table of contents.
+- annotated.pdf  2 pages. Page 1: a foreign highlight (/NM acrobat-1) with a
+                 popup, a foreign square without /NM, and a TilePDF ink
+                 annotation (/NM tilepdf-fixture-ink), each with an
+                 appearance stream. Page 2 has /Rotate 90; annotations.
 """
 
 import hashlib
@@ -243,9 +247,44 @@ def links():
     write_pdf(objects, 12, "links.pdf")
 
 
+def form(bbox, content, resources=""):
+    """A form XObject, as used for annotation appearance streams."""
+    return (f"<< /Type /XObject /Subtype /Form /BBox [{bbox}]{resources} /Length {len(content)} >>\n"
+            f"stream\n{content}\nendstream")
+
+
+def annotated():
+    # Annotation order on page 1 matters: the square has no /NM, so its key is
+    # its index, #2 (highlight, popup, square, ink).
+    page = ("<< /Type /Page /Parent 13 0 R /MediaBox [0 0 595 842] "
+            "/Resources << /Font << /F1 1 0 R >> >> /Contents {content} 0 R{extra} >>")
+    objects = [
+        FONT,
+        stream("BT /F1 18 Tf 72 742 Td (Highlighted words) Tj ET"),
+        page.format(content=2, extra=" /Annots [6 0 R 7 0 R 8 0 R 9 0 R]"),
+        stream("BT /F1 18 Tf 72 742 Td (Rotated) Tj ET"),
+        page.format(content=4, extra=" /Rotate 90"),
+        "<< /Type /Annot /Subtype /Highlight /NM (acrobat-1) /Contents (Foreign note) /F 4 /C [1 1 0] "
+        "/QuadPoints [72 760 260 760 72 736 260 736] /Rect [72 736 260 760] /Popup 7 0 R /AP << /N 10 0 R >> >>",
+        "<< /Type /Annot /Subtype /Popup /Parent 6 0 R /Rect [300 700 500 800] /Open false >>",
+        "<< /Type /Annot /Subtype /Square /F 4 /C [0 0 1] /BS << /W 2 >> /Rect [300 300 400 400] "
+        "/AP << /N 11 0 R >> >>",
+        "<< /Type /Annot /Subtype /Ink /NM (tilepdf-fixture-ink) /F 4 /C [1 0 0] /Border [0 0 2] "
+        "/InkList [[100 500 200 500 200 400]] /Rect [99 399 201 501] /AP << /N 12 0 R >> >>",
+        form("72 736 260 760", "/GS gs 1 1 0 rg 72 736 188 24 re f",
+             " /Resources << /ExtGState << /GS << /BM /Multiply >> >> >>"),
+        form("300 300 400 400", "0 0 1 RG 2 w 301 301 98 98 re S"),
+        form("99 399 201 501", "1 0 0 RG 2 w 1 J 1 j 100 500 m 200 500 l 200 400 l S"),
+        "<< /Type /Pages /Kids [3 0 R 5 0 R] /Count 2 >>",
+        "<< /Type /Catalog /Pages 13 0 R >>",
+    ]
+    write_pdf(objects, 14, "annotated.pdf")
+
+
 if __name__ == "__main__":
     sample()
     text_dense()
     outline()
     encrypted()
     links()
+    annotated()

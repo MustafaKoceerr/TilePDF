@@ -100,6 +100,17 @@ extracts text with per-character boxes and reads the table of contents. Every
 call goes through the single `@PdfDispatcher`, because PDFium's state is global
 to the process.
 
+Annotations are read and written by PDFium as well. TilePDF's own carry
+`/NM tilepdf-<uuid>` and are never edited in place: a change replaces one with
+a new id, so saving reduces to a diff of id sets (`annotationChanges`). The
+reader's document hides TilePDF's annotations in memory, because the reader
+draws them itself, and can hide a deleted foreign one until it is saved.
+`PdfEngine.openForEditing` returns an `EditablePdfDocument`, which hides
+nothing. It removes annotations (any markup annotation, together with its
+popup), adds highlights, underlines, strikeouts, ink and notes, lets PDFium
+write their appearance streams, and saves incrementally: the original bytes
+followed by the changes.
+
 The prebuilt libraries come from
 [bblanchon/pdfium-binaries](https://github.com/bblanchon/pdfium-binaries) for
 arm64-v8a, armeabi-v7a, x86_64 and x86. The `tilepdf.pdfium` convention plugin
@@ -205,7 +216,8 @@ the one PDF thread.
                                        # text search and selection, coordinate
                                        # mapping, table-of-contents lookup
 ./gradlew connectedDebugAndroidTest    # device: PDFium open/render/text/
-                                       # outline, tiles, pool, Room migration
+                                       # outline/annotations, tiles, pool,
+                                       # Room migration
 ```
 
 Instrumented tests to note:
@@ -220,6 +232,11 @@ Instrumented tests to note:
   reference).
 - **Character boxes land at known positions** in the generated sample PDF,
   and encrypted, truncated and invalid files fail with typed errors.
+- **Annotations round-trip** through an incremental save (also on a page with
+  `/Rotate 90`), keep other apps' annotations, take a deleted annotation's popup
+  along, and come back with appearance streams that a viewer hiding nothing
+  draws. Android's `PdfRenderer` draws no annotations, so it can't serve as
+  that viewer.
 
 Run instrumented tests one device at a time (`ANDROID_SERIAL=<serial>`): with
 several devices in parallel, AGP 9.4 sometimes reports passing tests as
