@@ -35,6 +35,9 @@ class SaveAsCopyUseCaseTest {
         override suspend fun readingPosition(uri: String): ReadingPosition? = error("unused")
         override suspend fun saveReadingPosition(uri: String, position: ReadingPosition) = error("unused")
         override suspend fun setFavorite(uri: String, favorite: Boolean) = error("unused")
+        override suspend fun documentView(uri: String) = com.mustafakoceerr.tilepdf.model.DocumentView()
+        override suspend fun setRotation(uri: String, rotation: Int) = Unit
+        override suspend fun setCropMargins(uri: String, cropMargins: Boolean) = Unit
         override suspend fun remove(uri: String) {
             events += "remove $uri"
         }

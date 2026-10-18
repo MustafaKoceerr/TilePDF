@@ -137,6 +137,45 @@ class TilePdfDatabaseMigrationTest {
     }
 
     @Test
+    fun migrate5To6KeepsLibraryAndShowsPagesAsBefore() {
+        helper.createDatabase(DB_NAME, 5).use { db ->
+            db.execSQL(
+                "INSERT INTO documents (uri, displayName, pageCount, lastPage, " +
+                    "pageOffsetFraction, zoom, panFraction, addedAt, lastOpenedAt, favorite) " +
+                    "VALUES ('content://book', 'Book.pdf', 300, 41, 0.5, 2.0, 0.25, 1, 2, 1)"
+            )
+        }
+
+        // Validates the migrated schema against the exported 6.json.
+        helper.runMigrationsAndValidate(DB_NAME, 6, true).close()
+
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val database = Room.databaseBuilder(context, TilePdfDatabase::class.java, DB_NAME).build()
+        val document = runBlocking { database.documentDao().get("content://book") }
+        database.close()
+
+        assertEquals(41, document!!.lastPage)
+        assertEquals(true, document.favorite)
+        assertEquals(0, document.rotation)
+        assertEquals(false, document.cropMargins)
+    }
+
+    @Test
+    fun viewSettingsAreStored() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val database = Room.inMemoryDatabaseBuilder(context, TilePdfDatabase::class.java).build()
+        val document = runBlocking {
+            database.documentDao().recordOpened("content://book", "Book.pdf", pageCount = 3, now = 1)
+            database.documentDao().setRotation("content://book", 270)
+            database.documentDao().setCropMargins("content://book", true)
+            database.documentDao().get("content://book")
+        }
+        database.close()
+        assertEquals(270, document!!.rotation)
+        assertEquals(true, document.cropMargins)
+    }
+
+    @Test
     fun setFavoriteIsStored() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val database = Room.inMemoryDatabaseBuilder(context, TilePdfDatabase::class.java).build()

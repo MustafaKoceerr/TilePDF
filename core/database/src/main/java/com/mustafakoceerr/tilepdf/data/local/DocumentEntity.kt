@@ -3,6 +3,7 @@ package com.mustafakoceerr.tilepdf.data.local
 import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import com.mustafakoceerr.tilepdf.model.DocumentView
 import com.mustafakoceerr.tilepdf.model.LibraryDocument
 import com.mustafakoceerr.tilepdf.model.ReadingPosition
 
@@ -20,6 +21,10 @@ data class DocumentEntity(
     val lastOpenedAt: Long,
     /** Added in schema 5. */
     @ColumnInfo(defaultValue = "0") val favorite: Boolean = false,
+    /** Added in schema 6: pages turned clockwise, in degrees. */
+    @ColumnInfo(defaultValue = "0") val rotation: Int = 0,
+    /** Added in schema 6. */
+    @ColumnInfo(defaultValue = "0") val cropMargins: Boolean = false,
 )
 
 fun DocumentEntity.asExternalModel() = LibraryDocument(
@@ -31,3 +36,5 @@ fun DocumentEntity.asExternalModel() = LibraryDocument(
     addedAt = addedAt,
     favorite = favorite,
 )
+
+fun DocumentEntity.view() = DocumentView(rotation = rotation, cropMargins = cropMargins)

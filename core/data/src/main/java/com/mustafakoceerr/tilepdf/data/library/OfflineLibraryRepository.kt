@@ -2,6 +2,8 @@ package com.mustafakoceerr.tilepdf.data.library
 
 import com.mustafakoceerr.tilepdf.data.local.DocumentDao
 import com.mustafakoceerr.tilepdf.data.local.asExternalModel
+import com.mustafakoceerr.tilepdf.data.local.view
+import com.mustafakoceerr.tilepdf.model.DocumentView
 import com.mustafakoceerr.tilepdf.model.LibraryDocument
 import com.mustafakoceerr.tilepdf.model.ReadingPosition
 import kotlinx.coroutines.flow.Flow
@@ -33,6 +35,12 @@ class OfflineLibraryRepository @Inject constructor(
         )
 
     override suspend fun setFavorite(uri: String, favorite: Boolean) = dao.setFavorite(uri, favorite)
+
+    override suspend fun documentView(uri: String): DocumentView = dao.get(uri)?.view() ?: DocumentView()
+
+    override suspend fun setRotation(uri: String, rotation: Int) = dao.setRotation(uri, rotation)
+
+    override suspend fun setCropMargins(uri: String, cropMargins: Boolean) = dao.setCropMargins(uri, cropMargins)
 
     override suspend fun remove(uri: String) = dao.delete(uri)
 }
