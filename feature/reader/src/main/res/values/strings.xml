@@ -13,6 +13,7 @@
     <string name="reader_theme_sepia">Sepia</string>
     <string name="reader_keep_screen_on">Keep screen on</string>
     <string name="reader_volume_keys">Turn pages with volume keys</string>
+    <string name="reader_two_page_spreads">Two pages side by side on wide screens</string>
     <string name="reader_search">Search</string>
     <string name="reader_search_hint">Search document</string>
     <string name="reader_search_close">Close search</string>

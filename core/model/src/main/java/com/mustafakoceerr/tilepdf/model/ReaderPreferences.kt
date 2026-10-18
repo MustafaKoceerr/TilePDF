@@ -13,6 +13,8 @@ data class ReaderPreferences(
     val keepScreenOn: Boolean = false,
     /** Volume down turns to the next page, volume up to the previous one. */
     val volumeKeysTurnPages: Boolean = false,
+    /** In horizontal layout on a wide screen, two pages side by side like a book. */
+    val twoPageSpreads: Boolean = true,
     /** ARGB colour of new highlights, underlines and strikeouts. */
     val markupColor: Int = 0xFFFFEB3B.toInt(),
     /** ARGB colour of new pen strokes. */

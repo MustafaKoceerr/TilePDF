@@ -36,6 +36,7 @@ internal fun ReaderSettingsSheet(
     onKeepScreenOnChange: (Boolean) -> Unit,
     onVolumeKeysChange: (Boolean) -> Unit,
     onDismiss: () -> Unit,
+    onTwoPageSpreadsChange: (Boolean) -> Unit = {},
 ) {
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(
@@ -58,6 +59,10 @@ internal fun ReaderSettingsSheet(
             )
             SwitchRow(R.string.reader_keep_screen_on, preferences.keepScreenOn, onKeepScreenOnChange)
             SwitchRow(R.string.reader_volume_keys, preferences.volumeKeysTurnPages, onVolumeKeysChange)
+            // Spreads are a horizontal-layout thing.
+            if (preferences.readingMode == ReadingMode.Horizontal) {
+                SwitchRow(R.string.reader_two_page_spreads, preferences.twoPageSpreads, onTwoPageSpreadsChange)
+            }
         }
     }
 }

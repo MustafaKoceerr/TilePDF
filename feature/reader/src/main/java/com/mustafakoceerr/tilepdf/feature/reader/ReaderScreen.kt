@@ -68,6 +68,10 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.mustafakoceerr.tilepdf.feature.reader.components.showsSpreads
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
@@ -165,6 +169,7 @@ fun ReaderScreen(
         onReadingModeSelected = viewModel::onReadingModeSelected,
         onKeepScreenOnChange = viewModel::onKeepScreenOnChange,
         onVolumeKeysChange = viewModel::onVolumeKeysChange,
+        onTwoPageSpreadsChange = viewModel::onTwoPageSpreadsChange,
         onRotate = viewModel::onRotate,
         onCropMarginsChange = viewModel::onCropMarginsChange,
         annotationActions = AnnotationActions(
@@ -273,6 +278,7 @@ internal fun ReaderScreen(
     onReadingModeSelected: (ReadingMode) -> Unit = {},
     onKeepScreenOnChange: (Boolean) -> Unit = {},
     onVolumeKeysChange: (Boolean) -> Unit = {},
+    onTwoPageSpreadsChange: (Boolean) -> Unit = {},
     onRotate: () -> Unit = {},
     onCropMarginsChange: (Boolean) -> Unit = {},
     annotationActions: AnnotationActions = AnnotationActions.None,
@@ -574,6 +580,7 @@ internal fun ReaderScreen(
                 onReadingModeSelected = onReadingModeSelected,
                 onKeepScreenOnChange = onKeepScreenOnChange,
                 onVolumeKeysChange = onVolumeKeysChange,
+                onTwoPageSpreadsChange = onTwoPageSpreadsChange,
                 onDismiss = { settingsOpen = false },
             )
         }
@@ -622,6 +629,13 @@ private fun ReaderPages(
     } else {
         null
     }
+    // From the space the pages have, not the device: a side panel or split screen counts.
+    var spreadSpace by remember { mutableStateOf(IntSize.Zero) }
+    val density = LocalDensity.current
+    val twoPageSpreads = with(density) {
+        showsSpreads(ready.preferences.twoPageSpreads, spreadSpace.width.toDp().value, spreadSpace.height.toDp().value)
+    }
+    Box(Modifier.fillMaxSize().onSizeChanged { spreadSpace = it })
     when (ready.preferences.readingMode) {
         ReadingMode.Vertical -> PdfPageList(
             pageSizes = ready.pageSizes,
@@ -648,6 +662,7 @@ private fun ReaderPages(
         ReadingMode.Horizontal -> PdfPagePager(
             pageSizes = ready.pageSizes,
             pageTransforms = ready.pageTransforms,
+            twoPageSpreads = twoPageSpreads,
             pageImages = ready.pageImages,
             initialPage = ready.initialPosition.pageIndex,
             pageTheme = ready.preferences.pageTheme,

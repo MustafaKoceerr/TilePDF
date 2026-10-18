@@ -12,6 +12,7 @@
     <string name="reader_theme_sepia">Sepya</string>
     <string name="reader_keep_screen_on">Ekranı açık tut</string>
     <string name="reader_volume_keys">Ses tuşlarıyla sayfa çevir</string>
+    <string name="reader_two_page_spreads">Geniş ekranda iki sayfa yan yana</string>
     <string name="reader_search">Ara</string>
     <string name="reader_search_hint">Belgede ara</string>
     <string name="reader_search_close">Aramayı kapat</string>

@@ -538,6 +538,10 @@ class ReaderViewModel @Inject constructor(
         viewModelScope.launch { preferencesRepository.setVolumeKeysTurnPages(enabled) }
     }
 
+    fun onTwoPageSpreadsChange(enabled: Boolean) {
+        viewModelScope.launch { preferencesRepository.setTwoPageSpreads(enabled) }
+    }
+
     /** Marks up the selected text and clears the selection. */
     fun onMarkup(kind: MarkupKind) {
         val selected = selection.value?.toUiState() ?: return
