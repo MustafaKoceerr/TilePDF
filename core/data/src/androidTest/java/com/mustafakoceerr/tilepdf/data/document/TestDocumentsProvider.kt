@@ -37,7 +37,7 @@ class TestDocumentsProvider : ContentProvider() {
     override fun query(uri: Uri, projection: Array<out String>?, selection: String?, args: Array<out String>?, sort: String?): Cursor =
         MatrixCursor(arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE)).apply {
             val name = uri.lastPathSegment!!
-            addRow(arrayOf(name, if (uri.pathSegments.first() == "sized") materialize(name).length() else null))
+            addRow(arrayOf<Any?>(name, if (uri.pathSegments.first() == "sized") materialize(name).length() else null))
         }
 
     override fun getType(uri: Uri) = "application/pdf"

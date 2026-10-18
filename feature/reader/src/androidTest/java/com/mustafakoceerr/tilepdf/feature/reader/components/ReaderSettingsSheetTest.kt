@@ -35,6 +35,7 @@ class ReaderSettingsSheetTest {
             onPageThemeSelected = { theme = it },
             onReadingModeSelected = { mode = it },
             onKeepScreenOnChange = { keepScreenOn = it },
+            onVolumeKeysChange = {},
             onDismiss = {},
         )
     }

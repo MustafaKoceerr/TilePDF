@@ -220,7 +220,8 @@ class ReaderViewModel @Inject constructor(
                 loadOutline(opened.document)
                 currentPage.value = opened.position.pageIndex
                 observeBookmarks(opened)
-                saveThumbnail(opened)
+                // A password-protected document's first page isn't kept unencrypted.
+                if (password == null) saveThumbnail(opened)
                 DocumentState.Opened(
                     opened = opened,
                     pageImages = TiledPageImageSource(opened.document, pageRenderer, viewModelScope),
