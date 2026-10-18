@@ -11,6 +11,8 @@ import com.mustafakoceerr.tilepdf.core.text.TextSelection
 import com.mustafakoceerr.tilepdf.core.render.ThumbnailSource
 import com.mustafakoceerr.tilepdf.core.render.TiledPageImageSource
 import com.mustafakoceerr.tilepdf.core.geometry.PdfPoint
+import com.mustafakoceerr.tilepdf.data.document.SharedDocuments
+import com.mustafakoceerr.tilepdf.data.thumbnail.ThumbnailStore
 import com.mustafakoceerr.tilepdf.data.annotation.AnnotationRepository
 import com.mustafakoceerr.tilepdf.data.annotation.AnnotationSaveScheduler
 import com.mustafakoceerr.tilepdf.data.annotation.SaveResult
@@ -73,6 +75,9 @@ import javax.inject.Inject
 private const val SAVE_POSITION_DEBOUNCE_MS = 500L
 private const val SEARCH_DEBOUNCE_MS = 300L
 
+/** Twice the library's 40 dp row picture at most densities, still small as a PNG. */
+private const val THUMBNAIL_WIDTH_PX = 240
+
 @HiltViewModel
 class ReaderViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
@@ -86,6 +91,8 @@ class ReaderViewModel @Inject constructor(
     private val saveScheduler: AnnotationSaveScheduler,
     private val sessionPasswords: SessionPasswords,
     private val saveAsCopy: SaveAsCopyUseCase,
+    private val sharedDocuments: SharedDocuments,
+    private val thumbnailStore: ThumbnailStore,
     @param:ApplicationScope private val applicationScope: CoroutineScope,
 ) : ViewModel() {
 
@@ -109,6 +116,8 @@ class ReaderViewModel @Inject constructor(
 
     /** The outcome of "Kopya olarak kaydet", until the screen has acted on it. */
     private val saveCopyResult = MutableStateFlow<SaveCopyResult?>(null)
+    private val handOff = MutableStateFlow<HandOff?>(null)
+    private var handOffJob: Job? = null
     private var openJob: Job? = null
 
     private val documentState = MutableStateFlow<DocumentState>(DocumentState.Loading)
@@ -123,6 +132,12 @@ class ReaderViewModel @Inject constructor(
     private var position: ReadingPosition? = null
     private val selection = MutableStateFlow<Selection?>(null)
     private val linkTargets = MutableStateFlow(LinkTargets())
+
+    /**
+     * Where the last jump started. Kept across a reopen after a save: the
+     * pages are the same, and the reader is still where the jump took them.
+     */
+    private val jumpHistory = MutableStateFlow(JumpHistory())
     private val currentPage = MutableStateFlow(0)
     private val fullScreen = MutableStateFlow(false)
 
@@ -143,11 +158,12 @@ class ReaderViewModel @Inject constructor(
         preferencesRepository.preferences,
         combine(searchState, toc, ::Pair),
         combine(selection, linkTargets, currentPage, fullScreen, startPosition, ::PageState),
-        combine(annotations, editing, saveCopyResult, ::Triple),
+        combine(annotations, editing, combine(saveCopyResult, handOff, ::Pair), jumpHistory, ::Outputs),
     ) { document, preferences, searchAndToc, pageState, annotationUi ->
         val (search, toc) = searchAndToc
         val (selection, links, page, fullScreen, start) = pageState
-        val (annotations, editing, copyResult) = annotationUi
+        val (annotations, editing, results, history) = annotationUi
+        val (copyResult, handOff) = results
         when (document) {
             DocumentState.Loading -> ReaderUiState.Loading
             is DocumentState.Failed -> ReaderUiState.Error(document.reason)
@@ -163,6 +179,7 @@ class ReaderViewModel @Inject constructor(
                 toc = toc,
                 selection = selection?.toUiState(),
                 jump = links.jump,
+                backToPage = history.origin?.pageIndex,
                 externalLink = links.externalLink,
                 currentPage = page,
                 isCurrentPageBookmarked = toc.bookmarks.any { it.pageIndex == page },
@@ -170,6 +187,7 @@ class ReaderViewModel @Inject constructor(
                 annotations = annotations,
                 editing = editing,
                 saveCopyResult = copyResult,
+                handOff = handOff,
             )
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ReaderUiState.Loading)
@@ -202,6 +220,8 @@ class ReaderViewModel @Inject constructor(
                 loadOutline(opened.document)
                 currentPage.value = opened.position.pageIndex
                 observeBookmarks(opened)
+                // A password-protected document's first page isn't kept unencrypted.
+                if (password == null) saveThumbnail(opened)
                 DocumentState.Opened(
                     opened = opened,
                     pageImages = TiledPageImageSource(opened.document, pageRenderer, viewModelScope),
@@ -215,6 +235,14 @@ class ReaderViewModel @Inject constructor(
                     is OpenFailure.Failed -> DocumentState.Failed(failure.reason)
                 }
             }
+        }
+    }
+
+    /** The library's picture of the first page; redrawn on every open, so it follows changes to the file. */
+    private fun saveThumbnail(opened: OpenedDocument) = viewModelScope.launch {
+        // The document may close while this runs; the library then keeps the old picture.
+        runCatchingCancellable {
+            thumbnailStore.save(opened.uri, pageRenderer.renderPagePng(opened.document, 0, THUMBNAIL_WIDTH_PX))
         }
     }
 
@@ -283,6 +311,27 @@ class ReaderViewModel @Inject constructor(
         saveCopyResult.value = null
     }
 
+    /** Exports the annotated document for the share sheet. */
+    fun onShare() = handOff { uri, opened -> HandOff.Share(uri, opened.displayName) }
+
+    /** Exports the annotated document for the system print dialog. */
+    fun onPrint() = handOff { uri, opened -> HandOff.Print(uri, opened.displayName, opened.document.pageCount) }
+
+    fun onHandOffHandled() {
+        handOff.value = null
+    }
+
+    private fun handOff(make: (uri: String, OpenedDocument) -> HandOff) {
+        val opened = (documentState.value as? DocumentState.Opened)?.opened ?: return
+        // A second tap while exporting would rewrite the file being exported.
+        if (handOffJob?.isActive == true) return
+        handOffJob = viewModelScope.launch {
+            controller.value?.flush()
+            val shared = sharedDocuments.export(opened.uri, opened.displayName)
+            handOff.value = shared?.let { make(it, opened) } ?: HandOff.Failed
+        }
+    }
+
     /** Tries the background save again after it failed. */
     fun onRetrySave() {
         controller.value?.requestSave()
@@ -315,7 +364,7 @@ class ReaderViewModel @Inject constructor(
         viewModelScope.launch {
             val link = runCatchingCancellable { document.linkAt(pageIndex, x, y) }.getOrNull()
             when (val action = linkAction(link, document.pageCount)) {
-                is LinkAction.Jump -> linkTargets.update { it.copy(jump = action.jump) }
+                is LinkAction.Jump -> onJump(action.jump)
                 is LinkAction.Open -> linkTargets.update { it.copy(externalLink = action.uri) }
                 LinkAction.Ignore -> Unit
                 LinkAction.NoLink -> toggleFullScreen()
@@ -349,6 +398,22 @@ class ReaderViewModel @Inject constructor(
             .collect { bookmarks -> toc.update { it.copy(bookmarks = bookmarks) } }
     }
 
+    /** Moves to [jump] from contents, bookmarks, a link or a page number; the start is remembered. */
+    fun onJump(jump: PageJump) {
+        val from = position ?: ReadingPosition(pageIndex = currentPage.value)
+        jumpHistory.update { it.jumped(from, jump.pageIndex) }
+        linkTargets.update { it.copy(jump = jump) }
+    }
+
+    /** Back to where the last jump started. */
+    fun onJumpBack() {
+        val origin = jumpHistory.value.origin ?: return
+        val sizes = openedDocument()?.pageSizes ?: return
+        val page = origin.pageIndex.coerceIn(0, sizes.lastIndex)
+        jumpHistory.value = JumpHistory()
+        linkTargets.update { it.copy(jump = PageJump(page, origin.pageOffsetFraction * sizes[page].heightPt)) }
+    }
+
     fun onJumpHandled() = linkTargets.update { it.copy(jump = null) }
 
     fun onExternalLinkHandled() = linkTargets.update { it.copy(externalLink = null) }
@@ -357,6 +422,7 @@ class ReaderViewModel @Inject constructor(
         this.position = position
         currentPage.value = position.pageIndex
         positionUpdates.tryEmit(position)
+        jumpHistory.update { it.scrolledTo(position.pageIndex) }
         // A side panel stays open while reading; its highlight follows along.
         if (toc.value.isOpen) toc.update { it.copy(currentIndex = currentOutlineIndex(it.entries, position)) }
     }
@@ -394,6 +460,10 @@ class ReaderViewModel @Inject constructor(
 
     fun onKeepScreenOnChange(enabled: Boolean) {
         viewModelScope.launch { preferencesRepository.setKeepScreenOn(enabled) }
+    }
+
+    fun onVolumeKeysChange(enabled: Boolean) {
+        viewModelScope.launch { preferencesRepository.setVolumeKeysTurnPages(enabled) }
     }
 
     /** Marks up the selected text and clears the selection. */
@@ -625,6 +695,13 @@ class ReaderViewModel @Inject constructor(
         val currentPage: Int,
         val fullScreen: Boolean,
         val startPosition: ReadingPosition?,
+    )
+
+    private data class Outputs(
+        val annotations: AnnotationsUiState,
+        val editing: AnnotationEditing,
+        val results: Pair<SaveCopyResult?, HandOff?>,
+        val jumpHistory: JumpHistory,
     )
 
     /** Where a tapped link leads, until the screen has acted on it. */

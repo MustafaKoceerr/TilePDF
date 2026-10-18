@@ -73,6 +73,16 @@
         </activity>
 
         <!-- WorkManager is set up by TilePdfApp, so its Hilt workers get injected. -->
+        <!-- Shares and prints exported documents; only the cache folder they're written to. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.files"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
         <provider
             android:name="androidx.startup.InitializationProvider"
             android:authorities="${applicationId}.androidx-startup"

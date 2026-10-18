@@ -23,7 +23,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -56,7 +55,6 @@ import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.launch
 
 /** Wait for a pinch or pan to settle before asking for tiles. */
 private const val TILE_REQUEST_DEBOUNCE_MS = 80L
@@ -77,6 +75,8 @@ internal fun PdfPagePager(
     onPageChanged: (Int) -> Unit,
     goToPageOpen: Boolean,
     onGoToPageOpenChange: (Boolean) -> Unit,
+    /** A page number was entered; the jump comes back as [pageJump]. */
+    onGoToPage: (pageIndex: Int) -> Unit,
     pageJump: PageJump?,
     onPageJumpHandled: () -> Unit,
     onTapPage: (pageIndex: Int, x: Float, y: Float) -> Unit,
@@ -191,13 +191,12 @@ internal fun PdfPagePager(
         )
 
         if (goToPageOpen) {
-            val scope = rememberCoroutineScope()
             GoToPageDialog(
                 pageCount = pageSizes.size,
                 currentPage = pagerState.currentPage,
                 onGoToPage = { pageIndex ->
                     onGoToPageOpenChange(false)
-                    scope.launch { pagerState.scrollToPage(pageIndex) }
+                    onGoToPage(pageIndex)
                 },
                 onDismiss = { onGoToPageOpenChange(false) },
             )

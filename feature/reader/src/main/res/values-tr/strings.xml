@@ -11,6 +11,7 @@
     <string name="reader_theme_night">Gece</string>
     <string name="reader_theme_sepia">Sepya</string>
     <string name="reader_keep_screen_on">Ekranı açık tut</string>
+    <string name="reader_volume_keys">Ses tuşlarıyla sayfa çevir</string>
     <string name="reader_search">Ara</string>
     <string name="reader_search_hint">Belgede ara</string>
     <string name="reader_search_close">Aramayı kapat</string>
@@ -20,6 +21,7 @@
     <string name="reader_fast_scroll">Hızlı kaydırma</string>
     <string name="reader_go_to_page">Sayfaya git</string>
     <string name="reader_go_to_page_range">1 ile %1$d arasında bir sayfa</string>
+    <string name="reader_jump_back">%1$d. sayfaya dön</string>
     <string name="reader_go_to_page_confirm">Git</string>
     <string name="reader_toc">İçindekiler</string>
     <string name="reader_more_options">Diğer seçenekler</string>
@@ -63,6 +65,10 @@
     <string name="annotation_kind_other">Açıklama</string>
     <string name="annotation_page">Sayfa %1$d</string>
     <string name="reader_save_copy">Kopya olarak kaydet</string>
+    <string name="reader_share">Paylaş</string>
+    <string name="reader_print">Yazdır</string>
+    <string name="reader_hand_off_failed">Belge hazırlanamadı.</string>
+    <string name="reader_no_app_for_share">Bu belgeyi alabilecek uygulama yok</string>
     <string name="save_error_no_permission">Açıklamalar bu dosyaya kaydedilemiyor.</string>
     <string name="save_error_file_changed">Dosya başka bir uygulamada değişti; açıklamalar kopyaya kaydedilebilir.</string>
     <string name="save_error_failed">Açıklamalar kaydedilemedi.</string>

@@ -36,6 +36,8 @@ sealed interface ReaderUiState {
         val selection: SelectionUiState?,
         /** A jump the page list should make, e.g. after tapping a link. */
         val jump: PageJump? = null,
+        /** The page the last jump left; offered as a way back while reading near its target. */
+        val backToPage: Int? = null,
         /** A web or mail link to hand to another app. */
         val externalLink: String? = null,
         /** The page at the top of the screen. */
@@ -48,6 +50,8 @@ sealed interface ReaderUiState {
         val editing: AnnotationEditing = AnnotationEditing(),
         /** "Kopya olarak kaydet" finished; the screen opens the copy or says it failed. */
         val saveCopyResult: SaveCopyResult? = null,
+        /** A document ready for "Paylaş" or "Yazdır"; the screen hands it over. */
+        val handOff: HandOff? = null,
     ) : ReaderUiState
 }
 
@@ -64,6 +68,13 @@ enum class ReaderError {
 sealed interface SaveCopyResult {
     data class Saved(val uri: String) : SaveCopyResult
     data object Failed : SaveCopyResult
+}
+
+/** The document, annotations included, exported for another app at [uri]. */
+sealed interface HandOff {
+    data class Share(val uri: String, val title: String) : HandOff
+    data class Print(val uri: String, val title: String, val pageCount: Int) : HandOff
+    data object Failed : HandOff
 }
 
 data class TocUiState(

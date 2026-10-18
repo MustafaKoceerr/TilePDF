@@ -14,7 +14,6 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
@@ -30,7 +29,6 @@ import com.mustafakoceerr.tilepdf.model.Annotation
 import com.mustafakoceerr.tilepdf.model.PageTheme
 import com.mustafakoceerr.tilepdf.model.ReadingPosition
 import com.mustafakoceerr.tilepdf.model.SearchMatch
-import kotlinx.coroutines.launch
 
 /** Space between pages and around the list, before zoom. */
 internal val PAGE_GAP = 8.dp
@@ -47,6 +45,8 @@ internal fun PdfPageList(
     onPositionChanged: (ReadingPosition) -> Unit,
     goToPageOpen: Boolean,
     onGoToPageOpenChange: (Boolean) -> Unit,
+    /** A page number was entered; the jump comes back as [pageJump]. */
+    onGoToPage: (pageIndex: Int) -> Unit,
     pageJump: PageJump?,
     onPageJumpHandled: () -> Unit,
     onTapPage: (pageIndex: Int, x: Float, y: Float) -> Unit,
@@ -167,13 +167,12 @@ internal fun PdfPageList(
         )
 
         if (goToPageOpen) {
-            val scope = rememberCoroutineScope()
             GoToPageDialog(
                 pageCount = pageSizes.size,
                 currentPage = listState.layoutInfo.centerPage() ?: 0,
                 onGoToPage = { pageIndex ->
                     onGoToPageOpenChange(false)
-                    scope.launch { listState.scrollToItem(pageIndex) }
+                    onGoToPage(pageIndex)
                 },
                 onDismiss = { onGoToPageOpenChange(false) },
             )

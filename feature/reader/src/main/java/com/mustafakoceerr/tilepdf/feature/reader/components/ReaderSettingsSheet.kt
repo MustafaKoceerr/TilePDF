@@ -34,6 +34,7 @@ internal fun ReaderSettingsSheet(
     onPageThemeSelected: (PageTheme) -> Unit,
     onReadingModeSelected: (ReadingMode) -> Unit,
     onKeepScreenOnChange: (Boolean) -> Unit,
+    onVolumeKeysChange: (Boolean) -> Unit,
     onDismiss: () -> Unit,
 ) {
     ModalBottomSheet(onDismissRequest = onDismiss) {
@@ -55,25 +56,27 @@ internal fun ReaderSettingsSheet(
                 label = PageTheme::labelRes,
                 onSelect = onPageThemeSelected,
             )
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .toggleable(
-                        value = preferences.keepScreenOn,
-                        role = Role.Switch,
-                        onValueChange = onKeepScreenOnChange,
-                    ),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = stringResource(R.string.reader_keep_screen_on),
-                    style = MaterialTheme.typography.bodyLarge,
-                    modifier = Modifier.weight(1f),
-                )
-                // The row handles the toggle, so the whole line is one target.
-                Switch(checked = preferences.keepScreenOn, onCheckedChange = null)
-            }
+            SwitchRow(R.string.reader_keep_screen_on, preferences.keepScreenOn, onKeepScreenOnChange)
+            SwitchRow(R.string.reader_volume_keys, preferences.volumeKeysTurnPages, onVolumeKeysChange)
         }
+    }
+}
+
+@Composable
+private fun SwitchRow(@StringRes title: Int, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .toggleable(value = checked, role = Role.Switch, onValueChange = onCheckedChange),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = stringResource(title),
+            style = MaterialTheme.typography.bodyLarge,
+            modifier = Modifier.weight(1f),
+        )
+        // The row handles the toggle, so the whole line is one target.
+        Switch(checked = checked, onCheckedChange = null)
     }
 }
 

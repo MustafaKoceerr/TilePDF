@@ -2,8 +2,11 @@ package com.mustafakoceerr.tilepdf.feature.reader
 
 import android.content.ActivityNotFoundException
 import android.content.ClipData
+import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.print.PrintManager
+import android.view.KeyEvent
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalActivity
@@ -34,6 +37,7 @@ import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -41,6 +45,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ElevatedAssistChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -83,6 +88,7 @@ import androidx.core.net.toUri
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.mustafakoceerr.tilepdf.core.common.KeyEventHost
 import com.mustafakoceerr.tilepdf.core.designsystem.TilePdfIcons
 import com.mustafakoceerr.tilepdf.core.geometry.PdfPoint
 import com.mustafakoceerr.tilepdf.feature.reader.annotation.AnnotationMenuDialog
@@ -146,12 +152,15 @@ fun ReaderScreen(
         onRetryOpen = viewModel::onRetryOpen,
         onTapPage = viewModel::onTap,
         onTapOutsidePage = viewModel::onTapOutsidePage,
+        onJump = viewModel::onJump,
+        onJumpBack = viewModel::onJumpBack,
         onJumpHandled = viewModel::onJumpHandled,
         onExternalLinkHandled = viewModel::onExternalLinkHandled,
         onToggleBookmark = viewModel::onToggleBookmark,
         onPageThemeSelected = viewModel::onPageThemeSelected,
         onReadingModeSelected = viewModel::onReadingModeSelected,
         onKeepScreenOnChange = viewModel::onKeepScreenOnChange,
+        onVolumeKeysChange = viewModel::onVolumeKeysChange,
         annotationActions = AnnotationActions(
             onMarkup = viewModel::onMarkup,
             onMenuDismissed = viewModel::onAnnotationMenuDismissed,
@@ -172,6 +181,9 @@ fun ReaderScreen(
             onSaveCopy = viewModel::onSaveCopy,
             onSaveCopyResultHandled = viewModel::onSaveCopyResultHandled,
             onRetrySave = viewModel::onRetrySave,
+            onShare = viewModel::onShare,
+            onPrint = viewModel::onPrint,
+            onHandOffHandled = viewModel::onHandOffHandled,
         ),
         onOpenDocument = onOpenDocument,
     )
@@ -207,6 +219,9 @@ internal class AnnotationActions(
     val onSaveCopy: (target: String) -> Unit = {},
     val onSaveCopyResultHandled: () -> Unit = {},
     val onRetrySave: () -> Unit = {},
+    val onShare: () -> Unit = {},
+    val onPrint: () -> Unit = {},
+    val onHandOffHandled: () -> Unit = {},
 ) {
     companion object {
         val None = AnnotationActions({}, {}, {}, {}, {}, {}, {}, {}, {})
@@ -243,12 +258,15 @@ internal fun ReaderScreen(
     onRetryOpen: () -> Unit = {},
     onTapPage: (pageIndex: Int, x: Float, y: Float) -> Unit = { _, _, _ -> },
     onTapOutsidePage: () -> Unit = {},
+    onJump: (PageJump) -> Unit = {},
+    onJumpBack: () -> Unit = {},
     onJumpHandled: () -> Unit = {},
     onExternalLinkHandled: () -> Unit = {},
     onToggleBookmark: () -> Unit = {},
     onPageThemeSelected: (PageTheme) -> Unit = {},
     onReadingModeSelected: (ReadingMode) -> Unit = {},
     onKeepScreenOnChange: (Boolean) -> Unit = {},
+    onVolumeKeysChange: (Boolean) -> Unit = {},
     annotationActions: AnnotationActions = AnnotationActions.None,
     onOpenDocument: (uri: String) -> Unit = {},
 ) {
@@ -258,9 +276,13 @@ internal fun ReaderScreen(
     }
     val saveCopy = { ready?.let { saveCopyLauncher.launch(copyName(it.title)) } }
     SaveCopyResultEffect(ready?.saveCopyResult, onOpenDocument, annotationActions.onSaveCopyResultHandled)
+    HandOffEffect(ready?.handOff, annotationActions.onHandOffHandled)
     val search = ready?.search
     val selection = ready?.selection
     val copySelection = rememberCopyAction(selection?.text, onCopied = onClearSelection)
+    // Before the others: clearing a selection or closing search comes first.
+    val canJumpBack = ready?.backToPage != null && !ready.editing.annotating
+    BackHandler(enabled = canJumpBack, onBack = onJumpBack)
     BackHandler(enabled = selection != null, onBack = onClearSelection)
     var goToPageOpen by rememberSaveable { mutableStateOf(false) }
     var pagesOpen by rememberSaveable { mutableStateOf(false) }
@@ -283,6 +305,13 @@ internal fun ReaderScreen(
     }
     BackHandler(enabled = search?.isActive == true, onBack = searchActions.onClose)
     KeepScreenOnEffect(ready?.preferences?.keepScreenOn == true)
+    // Page turns aren't jumps: no way back is offered for them.
+    VolumeKeyPagingEffect(
+        enabled = ready?.preferences?.volumeKeysTurnPages == true,
+        currentPage = ready?.currentPage ?: 0,
+        pageCount = ready?.pageSizes?.size ?: 0,
+        onTurn = { pageJump = PageJump(it) },
+    )
 
     // A TalkBack user can't find bars hidden by a tap, so they stay.
     val fullScreen = ready?.isFullScreen == true && !rememberTouchExplorationEnabled()
@@ -351,6 +380,8 @@ internal fun ReaderScreen(
                             onGoToPage = { goToPageOpen = true },
                             onOpenSettings = { settingsOpen = true },
                             onSaveCopy = { saveCopy() },
+                            onShare = annotationActions.onShare,
+                            onPrint = annotationActions.onPrint,
                         )
                     }
                 },
@@ -370,11 +401,11 @@ internal fun ReaderScreen(
                     outline = ready.toc.entries,
                     currentIndex = ready.toc.currentIndex,
                     bookmarks = ready.toc.bookmarks,
-                    onSelect = { entry -> pageJump = PageJump(entry.pageIndex, entry.topPt) },
-                    onSelectPage = { page -> pageJump = PageJump(page) },
+                    onSelect = { entry -> onJump(PageJump(entry.pageIndex, entry.topPt)) },
+                    onSelectPage = { page -> onJump(PageJump(page)) },
                     onClose = onCloseToc,
                     annotations = remember(ready.annotations) { annotationListItems(ready.annotations.own, ready.annotations.foreign) },
-                    onSelectAnnotation = { item -> pageJump = PageJump(item.pageIndex, item.topPt) },
+                    onSelectAnnotation = { item -> onJump(PageJump(item.pageIndex, item.topPt)) },
                     onDeleteAnnotation = annotationActions.onDelete,
                 )
             }
@@ -406,6 +437,7 @@ internal fun ReaderScreen(
                                 ready = uiState,
                                 goToPageOpen = goToPageOpen,
                                 onGoToPageOpenChange = { goToPageOpen = it },
+                                onGoToPage = { onJump(PageJump(it)) },
                                 pageJump = pageJump,
                                 onPageJumpHandled = { pageJump = null },
                                 onPositionChanged = onPositionChanged,
@@ -423,7 +455,15 @@ internal fun ReaderScreen(
                         }
                     }
                 }
-                Column(Modifier.align(Alignment.BottomCenter)) {
+                Column(Modifier.align(Alignment.BottomCenter), horizontalAlignment = Alignment.CenterHorizontally) {
+                    val backToPage = ready?.backToPage
+                    if (backToPage != null && canJumpBack && selection == null) {
+                        JumpBackChip(
+                            pageNumber = backToPage + 1,
+                            onClick = onJumpBack,
+                            modifier = Modifier.navigationBarsPadding(),
+                        )
+                    }
                     if (selection != null) {
                         SelectionMarkupBar(enabled = ready.annotations.ready, onMarkup = annotationActions.onMarkup)
                     }
@@ -475,17 +515,17 @@ internal fun ReaderScreen(
                 bookmarks = ready.toc.bookmarks,
                 onSelect = { entry ->
                     onCloseToc()
-                    pageJump = PageJump(entry.pageIndex, entry.topPt)
+                    onJump(PageJump(entry.pageIndex, entry.topPt))
                 },
                 onSelectPage = { page ->
                     onCloseToc()
-                    pageJump = PageJump(page)
+                    onJump(PageJump(page))
                 },
                 onDismiss = onCloseToc,
                 annotations = remember(ready.annotations) { annotationListItems(ready.annotations.own, ready.annotations.foreign) },
                 onSelectAnnotation = { item ->
                     onCloseToc()
-                    pageJump = PageJump(item.pageIndex, item.topPt)
+                    onJump(PageJump(item.pageIndex, item.topPt))
                 },
                 onDeleteAnnotation = annotationActions.onDelete,
             )
@@ -522,6 +562,7 @@ internal fun ReaderScreen(
                 onPageThemeSelected = onPageThemeSelected,
                 onReadingModeSelected = onReadingModeSelected,
                 onKeepScreenOnChange = onKeepScreenOnChange,
+                onVolumeKeysChange = onVolumeKeysChange,
                 onDismiss = { settingsOpen = false },
             )
         }
@@ -530,7 +571,7 @@ internal fun ReaderScreen(
                 ready = ready,
                 onSelect = { page ->
                     pagesOpen = false
-                    pageJump = PageJump(page)
+                    onJump(PageJump(page))
                 },
                 onDismiss = { pagesOpen = false },
             )
@@ -544,6 +585,7 @@ private fun ReaderPages(
     ready: ReaderUiState.Ready,
     goToPageOpen: Boolean,
     onGoToPageOpenChange: (Boolean) -> Unit,
+    onGoToPage: (pageIndex: Int) -> Unit,
     pageJump: PageJump?,
     onPageJumpHandled: () -> Unit,
     onPositionChanged: (ReadingPosition) -> Unit,
@@ -580,6 +622,7 @@ private fun ReaderPages(
             onPositionChanged = onPositionChanged,
             goToPageOpen = goToPageOpen,
             onGoToPageOpenChange = onGoToPageOpenChange,
+            onGoToPage = onGoToPage,
             pageJump = pageJump,
             onPageJumpHandled = onPageJumpHandled,
             onTapPage = onTapPage,
@@ -600,6 +643,7 @@ private fun ReaderPages(
             onPageChanged = { onPositionChanged(ReadingPosition(pageIndex = it)) },
             goToPageOpen = goToPageOpen,
             onGoToPageOpenChange = onGoToPageOpenChange,
+            onGoToPage = onGoToPage,
             pageJump = pageJump,
             onPageJumpHandled = onPageJumpHandled,
             onTapPage = onTapPage,
@@ -700,6 +744,44 @@ private fun SaveCopyResultEffect(result: SaveCopyResult?, onOpenDocument: (Strin
     }
 }
 
+private const val PDF_MIME_TYPE = "application/pdf"
+
+/** Opens the share sheet or the print dialog for an exported document; then forgets it. */
+@Composable
+private fun HandOffEffect(handOff: HandOff?, onHandled: () -> Unit) {
+    val context = LocalContext.current
+    LaunchedEffect(handOff) {
+        when (handOff) {
+            null -> return@LaunchedEffect
+            is HandOff.Share -> share(context, handOff)
+            is HandOff.Print -> print(context, handOff)
+            HandOff.Failed -> Toast.makeText(context, R.string.reader_hand_off_failed, Toast.LENGTH_LONG).show()
+        }
+        onHandled()
+    }
+}
+
+private fun share(context: Context, share: HandOff.Share) {
+    val uri = share.uri.toUri()
+    val send = Intent(Intent.ACTION_SEND)
+        .setType(PDF_MIME_TYPE)
+        .putExtra(Intent.EXTRA_STREAM, uri)
+        .putExtra(Intent.EXTRA_TITLE, share.title)
+        .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        // The chooser previews the file; the receiver gets read access only.
+        .apply { clipData = ClipData.newRawUri(share.title, uri) }
+    try {
+        context.startActivity(Intent.createChooser(send, null))
+    } catch (_: ActivityNotFoundException) {
+        Toast.makeText(context, R.string.reader_no_app_for_share, Toast.LENGTH_SHORT).show()
+    }
+}
+
+private fun print(context: Context, print: HandOff.Print) {
+    val printManager = context.getSystemService(PrintManager::class.java) ?: return
+    printManager.print(print.title, PdfPrintAdapter(context.applicationContext, print.uri.toUri(), print.title, print.pageCount), null)
+}
+
 /** "report.pdf" → "report (açıklamalı).pdf", the name offered for a copy. */
 private fun copyName(title: String) = "${title.removeSuffix(".pdf").removeSuffix(".PDF")} (açıklamalı).pdf"
 
@@ -734,6 +816,25 @@ private fun SystemBarsEffect(hidden: Boolean) {
 }
 
 /** Stops the screen from timing out while [enabled] and the reader is shown. */
+/** While [enabled], volume keys turn pages instead of changing the volume. */
+@Composable
+private fun VolumeKeyPagingEffect(enabled: Boolean, currentPage: Int, pageCount: Int, onTurn: (Int) -> Unit) {
+    val host = LocalActivity.current as? KeyEventHost ?: return
+    val page by rememberUpdatedState(currentPage)
+    val turn by rememberUpdatedState(onTurn)
+    DisposableEffect(host, enabled, pageCount) {
+        if (enabled && pageCount > 0) {
+            host.setKeyHandler { event ->
+                val target = pageForVolumeKey(event.keyCode, page, pageCount) ?: return@setKeyHandler false
+                // Both down and up are taken; held down, it keeps turning.
+                if (event.action == KeyEvent.ACTION_DOWN && target != page) turn(target)
+                true
+            }
+        }
+        onDispose { host.setKeyHandler(null) }
+    }
+}
+
 @Composable
 private fun KeepScreenOnEffect(enabled: Boolean) {
     val view = LocalView.current
@@ -769,6 +870,17 @@ private fun rememberCopyAction(text: String?, onCopied: () -> Unit): () -> Unit 
     }
 }
 
+/** "12. sayfaya dön": back to where the last jump started. */
+@Composable
+private fun JumpBackChip(pageNumber: Int, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    ElevatedAssistChip(
+        onClick = onClick,
+        label = { Text(stringResource(R.string.reader_jump_back, pageNumber)) },
+        leadingIcon = { Icon(painterResource(TilePdfIcons.ArrowBack), contentDescription = null) },
+        modifier = modifier.padding(bottom = 16.dp),
+    )
+}
+
 /** Less frequent actions, so the title keeps its room in the top bar. */
 @Composable
 private fun OverflowMenu(
@@ -779,6 +891,8 @@ private fun OverflowMenu(
     onGoToPage: () -> Unit,
     onOpenSettings: () -> Unit,
     onSaveCopy: () -> Unit,
+    onShare: () -> Unit,
+    onPrint: () -> Unit,
 ) {
     Box {
         IconButton(onClick = { onExpandedChange(true) }) {
@@ -809,6 +923,22 @@ private fun OverflowMenu(
                 onClick = {
                     onExpandedChange(false)
                     onGoToPage()
+                },
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.reader_share)) },
+                leadingIcon = { Icon(painterResource(TilePdfIcons.Share), contentDescription = null) },
+                onClick = {
+                    onExpandedChange(false)
+                    onShare()
+                },
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.reader_print)) },
+                leadingIcon = { Icon(painterResource(TilePdfIcons.Print), contentDescription = null) },
+                onClick = {
+                    onExpandedChange(false)
+                    onPrint()
                 },
             )
             DropdownMenuItem(

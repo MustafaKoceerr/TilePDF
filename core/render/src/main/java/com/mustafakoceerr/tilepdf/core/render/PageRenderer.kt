@@ -8,6 +8,7 @@ import com.mustafakoceerr.tilepdf.core.pdf.PdfDocument
 import com.mustafakoceerr.tilepdf.di.IoDispatcher
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
+import java.io.ByteArrayOutputStream
 import javax.inject.Inject
 
 /** Renders whole pages or single tiles of a page into bitmaps. */
@@ -22,6 +23,18 @@ class PageRenderer @Inject constructor(
         val bitmap = whiteBitmap(targetWidthPx, pageSize.heightForWidth(targetWidthPx))
         document.render(pageIndex, bitmap, Matrix().apply { setScale(scale, scale) })
         return bitmap
+    }
+
+    /** The whole page as a PNG [targetWidthPx] wide, e.g. for the library. */
+    suspend fun renderPagePng(document: PdfDocument, pageIndex: Int, targetWidthPx: Int): ByteArray {
+        val bitmap = renderPage(document, pageIndex, targetWidthPx)
+        return withContext(ioDispatcher) {
+            try {
+                ByteArrayOutputStream().also { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }.toByteArray()
+            } finally {
+                bitmap.recycle()
+            }
+        }
     }
 
     /**

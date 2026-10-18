@@ -37,6 +37,11 @@ minSdk 29
 - Bookmarks per document, listed next to the table of contents and removed
   with the library entry
 - Page grid: every page as a thumbnail, tap one to jump there
+- After a jump (contents, bookmark, link, page grid or page number), a chip
+  and system Back return to where it started
+- Share and print the document with its annotations, even when the file
+  itself can't be saved to
+- Library rows show each document's first page
 - Text selection: long-press a word, drag Material-style handles, copy or
   select all from the system text toolbar
 - Vertical scrolling or horizontal single pages (swipe; each page fits the
@@ -330,7 +335,6 @@ rerunning it reproduces them byte for byte.
 ## Known limitations
 
 - Scanned (image-only) PDFs have no text, so search finds nothing (no OCR).
-- Library entries have no page thumbnails.
 
 ## Out of scope, on purpose
 

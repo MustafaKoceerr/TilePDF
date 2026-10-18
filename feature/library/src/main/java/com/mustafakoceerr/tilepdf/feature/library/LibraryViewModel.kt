@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.mustafakoceerr.tilepdf.data.document.DocumentRepository
 import com.mustafakoceerr.tilepdf.data.library.LibraryRepository
 import com.mustafakoceerr.tilepdf.data.preferences.LibraryPreferencesRepository
+import com.mustafakoceerr.tilepdf.data.thumbnail.ThumbnailStore
 import com.mustafakoceerr.tilepdf.di.ApplicationScope
 import com.mustafakoceerr.tilepdf.model.LibrarySort
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -23,6 +24,7 @@ class LibraryViewModel @Inject constructor(
     private val libraryRepository: LibraryRepository,
     private val documentRepository: DocumentRepository,
     private val libraryPreferences: LibraryPreferencesRepository,
+    private val thumbnails: ThumbnailStore,
     @param:ApplicationScope private val applicationScope: CoroutineScope,
 ) : ViewModel() {
 
@@ -40,8 +42,10 @@ class LibraryViewModel @Inject constructor(
         pendingRemoval,
     ) { documents, sort, (query, searching, filter), pending ->
         val accessible = documentRepository.accessibleUris()
+        val rows = libraryRows(documents, accessible, query, filter, sort, hidden = setOfNotNull(pending))
+        val pictures = thumbnails.find(rows.map { it.document.uri })
         LibraryUiState.Success(
-            items = libraryRows(documents, accessible, query, filter, sort, hidden = setOfNotNull(pending)),
+            items = rows.map { it.copy(thumbnail = pictures[it.document.uri]) },
             query = query,
             searching = searching,
             filter = filter,
@@ -109,6 +113,7 @@ class LibraryViewModel @Inject constructor(
             libraryRepository.remove(uri)
             // A private copy belongs to the library entry; the user's file stays.
             documentRepository.forget(uri)
+            thumbnails.delete(uri)
             pendingRemoval.update { if (it == uri) null else it }
         }
     }

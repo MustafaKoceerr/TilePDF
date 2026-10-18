@@ -11,6 +11,7 @@ object TilePdfIcons {
     @DrawableRes val Close = R.drawable.ic_close
     @DrawableRes val DarkMode = R.drawable.ic_dark_mode
     @DrawableRes val Delete = R.drawable.ic_delete
+    @DrawableRes val Document = R.drawable.ic_document
     @DrawableRes val Edit = R.drawable.ic_edit
     @DrawableRes val ErrorOutline = R.drawable.ic_error_outline
     @DrawableRes val Grid = R.drawable.ic_grid
@@ -18,8 +19,10 @@ object TilePdfIcons {
     @DrawableRes val KeyboardArrowDown = R.drawable.ic_keyboard_arrow_down
     @DrawableRes val KeyboardArrowUp = R.drawable.ic_keyboard_arrow_up
     @DrawableRes val MoreVert = R.drawable.ic_more_vert
+    @DrawableRes val Print = R.drawable.ic_print
     @DrawableRes val Redo = R.drawable.ic_redo
     @DrawableRes val Search = R.drawable.ic_search
+    @DrawableRes val Share = R.drawable.ic_share
     @DrawableRes val Sort = R.drawable.ic_sort
     @DrawableRes val Star = R.drawable.ic_star
     @DrawableRes val StarBorder = R.drawable.ic_star_border

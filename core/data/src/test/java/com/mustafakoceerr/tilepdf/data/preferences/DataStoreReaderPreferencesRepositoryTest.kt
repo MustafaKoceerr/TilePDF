@@ -53,6 +53,19 @@ class DataStoreReaderPreferencesRepositoryTest {
     }
 
     @Test
+    fun volumeKeysTurnPagesIsOffByDefault() = runTest {
+        val repository = DataStoreReaderPreferencesRepository(dataStore())
+        assertEquals(false, repository.preferences.first().volumeKeysTurnPages)
+    }
+
+    @Test
+    fun setVolumeKeysTurnPagesIsRead() = runTest {
+        val repository = DataStoreReaderPreferencesRepository(dataStore())
+        repository.setVolumeKeysTurnPages(true)
+        assertEquals(true, repository.preferences.first().volumeKeysTurnPages)
+    }
+
+    @Test
     fun legacyNightModeReadsAsNight() = runTest {
         // Written by versions that only had a night mode switch.
         val dataStore = dataStore()

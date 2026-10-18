@@ -4,6 +4,7 @@ import com.mustafakoceerr.tilepdf.core.pdf.PdfDocument
 import com.mustafakoceerr.tilepdf.data.document.DocumentRepository
 import com.mustafakoceerr.tilepdf.data.library.LibraryRepository
 import com.mustafakoceerr.tilepdf.data.preferences.LibraryPreferencesRepository
+import com.mustafakoceerr.tilepdf.data.thumbnail.ThumbnailStore
 import com.mustafakoceerr.tilepdf.model.LibraryDocument
 import com.mustafakoceerr.tilepdf.model.LibrarySort
 import com.mustafakoceerr.tilepdf.model.ReadingPosition
@@ -25,11 +26,17 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.TemporaryFolder
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class LibraryViewModelTest {
 
+    @get:Rule
+    val tmp = TemporaryFolder()
+
+    private val thumbnails by lazy { ThumbnailStore(tmp.root, Dispatchers.Unconfined) }
     private val documents = Documents()
     private val library = Library(
         listOf(
@@ -50,7 +57,7 @@ class LibraryViewModelTest {
         LibraryDocument(if (name.startsWith("file://")) name else "content://$name", name, 10, ReadingPosition(), opened, opened, favorite)
 
     private fun TestScope.viewModel() =
-        LibraryViewModel(library, documents, preferences, CoroutineScope(UnconfinedTestDispatcher(testScheduler)))
+        LibraryViewModel(library, documents, preferences, thumbnails, CoroutineScope(UnconfinedTestDispatcher(testScheduler)))
 
     /** Keeps the state flow collected, as the screen does. */
     private fun TestScope.collected(viewModel: LibraryViewModel) =
@@ -153,6 +160,24 @@ class LibraryViewModelTest {
         viewModel.onRemove("content://Kalem.pdf")
         viewModel.commitPendingRemoval()
         assertEquals(listOf("content://Kalem.pdf"), library.removed)
+    }
+
+    @Test
+    fun removingDeletesThumbnail() = runTest {
+        thumbnails.save("content://Kalem.pdf", byteArrayOf(1))
+        val viewModel = viewModel().also { collected(it) }
+        viewModel.onRemove("content://Kalem.pdf")
+        viewModel.onRemoveConfirmed()
+        assertEquals(emptySet<String>(), thumbnails.find(listOf("content://Kalem.pdf")).keys)
+    }
+
+    @Test
+    fun itemsCarryTheirThumbnail() = runTest {
+        thumbnails.save("content://Kalem.pdf", byteArrayOf(1))
+        val viewModel = viewModel().also { collected(it) }
+        val items = viewModel.success().items.associate { it.document.displayName to it.thumbnail }
+        assertEquals(thumbnails.find(listOf("content://Kalem.pdf"))["content://Kalem.pdf"], items["Kalem.pdf"])
+        assertNull(items["Sözleşme.pdf"])
     }
 
     @Test
