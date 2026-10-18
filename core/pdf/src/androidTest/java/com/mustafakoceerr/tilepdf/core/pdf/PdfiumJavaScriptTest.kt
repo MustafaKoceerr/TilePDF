@@ -1,10 +1,14 @@
 package com.mustafakoceerr.tilepdf.core.pdf
 
+import android.graphics.Color
+import android.graphics.Matrix
+import androidx.core.graphics.createBitmap
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.mustafakoceerr.tilepdf.testing.TestAssets
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -66,6 +70,20 @@ class PdfiumJavaScriptTest {
             val fields = document.allFormFields().associate { it.name to it.value }
             assertEquals("5", fields["total"])
             assertEquals("", fields["age"])
+        }
+    }
+
+    @Test
+    fun totalIsDrawnWithTwoDecimals(): Unit = runBlocking {
+        pdfium.open(TestAssets.uri("calc.pdf")).use { document ->
+            document.setScriptHost(RecordingHost())
+            document.fill(mapOf("a" to "2", "b" to "3"))
+
+            // "total" is at top-left 72, 198 to 200, 222; "5" alone is about 7 pt wide, "5.00" about 23.
+            val bitmap = createBitmap(595, 842).apply { eraseColor(Color.WHITE) }
+            document.render(0, bitmap, Matrix())
+            val inked = (72 until 200).filter { x -> (198 until 222).any { y -> Color.red(bitmap.getPixel(x, y)) < 0x80 } }
+            assertTrue("ink from ${inked.firstOrNull()} to ${inked.lastOrNull()}", inked.last() - inked.first() > 15)
         }
     }
 }

@@ -72,6 +72,7 @@ import com.mustafakoceerr.tilepdf.feature.reader.components.FormFieldDialog
 import com.mustafakoceerr.tilepdf.feature.reader.components.NoTextChip
 import com.mustafakoceerr.tilepdf.feature.reader.components.RecognitionProgressBar
 import com.mustafakoceerr.tilepdf.feature.reader.components.RecognizeTextDialog
+import com.mustafakoceerr.tilepdf.feature.reader.components.ScriptDialogView
 import com.mustafakoceerr.tilepdf.feature.reader.components.SignatureHint
 import com.mustafakoceerr.tilepdf.feature.reader.components.SignaturePadDialog
 import com.mustafakoceerr.tilepdf.feature.reader.components.showsSpreads
@@ -180,6 +181,7 @@ fun ReaderScreen(
         onRotate = viewModel::onRotate,
         onFormValueSubmitted = viewModel::onFormValueSubmitted,
         onAddSignature = viewModel::onAddSignature,
+        onScriptAnswer = viewModel::onScriptAnswer,
         recognitionActions = RecognitionActions(
             onRequest = viewModel::onRecognizeTextRequested,
             onRecognize = viewModel::onRecognizeText,
@@ -301,6 +303,7 @@ internal fun ReaderScreen(
     onRotate: () -> Unit = {},
     onFormValueSubmitted: (String) -> Unit = {},
     onAddSignature: () -> Unit = {},
+    onScriptAnswer: (ScriptAnswer) -> Unit = {},
     recognitionActions: RecognitionActions = RecognitionActions.None,
     onSignatureDrawn: (List<List<PdfPoint>>) -> Unit = {},
     onSignatureCancelled: () -> Unit = {},
@@ -317,6 +320,10 @@ internal fun ReaderScreen(
     SaveCopyResultEffect(ready?.saveCopyResult, onOpenDocument, annotationActions.onSaveCopyResultHandled)
     HandOffEffect(ready?.handOff, annotationActions.onHandOffHandled)
     RecognitionResultEffect(ready?.recognition?.result, recognitionActions.onResultShown)
+    ready?.scriptDialog?.let { dialog ->
+        // A new dialog starts afresh, even with the same text.
+        key(dialog) { ScriptDialogView(dialog, onAnswer = onScriptAnswer) }
+    }
     if (ready?.recognition?.choosing == true) {
         RecognizeTextDialog(onRecognize = recognitionActions.onRecognize, onDismiss = recognitionActions.onDismissChoice)
     }

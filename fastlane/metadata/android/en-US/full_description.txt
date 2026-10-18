@@ -16,7 +16,7 @@ MARK UP, FILL IN AND SIGN
 • Highlight, underline or strike out text
 • Draw with a pen in several colors and widths, and erase strokes
 • Add sticky notes
-• Fill in PDF forms: text fields, check boxes, radio buttons and lists
+• Fill in PDF forms: text fields, check boxes, radio buttons and lists; totals calculate themselves
 • Sign with your finger; your signature is kept for next time
 • Recognise text on scanned pages to search and copy it, right on your phone
 • Undo and redo

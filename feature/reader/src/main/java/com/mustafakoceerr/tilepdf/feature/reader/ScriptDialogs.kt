@@ -6,6 +6,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.util.concurrent.CompletableFuture
 
+/** The English title PDFium gives an alert without one; the reader words its own. */
+private const val PDFIUM_ALERT_TITLE = "Alert"
+
 /** A dialog a form script asked for. */
 sealed interface ScriptDialog {
     /** [buttons] is a [FormScriptHost] `BUTTONS_*` value. */
@@ -40,7 +43,7 @@ internal class ScriptDialogs(
     private var closed = false
 
     override fun alert(message: String, title: String, buttons: Int, icon: Int): Int =
-        (ask(ScriptDialog.Alert(message, title, buttons)) as? ScriptAnswer.Button)?.code
+        (ask(ScriptDialog.Alert(message, title.takeUnless { it == PDFIUM_ALERT_TITLE }.orEmpty(), buttons)) as? ScriptAnswer.Button)?.code
             ?: FormScriptHost.defaultAlertAnswer(buttons)
 
     override fun response(question: String, title: String, default: String, label: String, password: Boolean): String? =

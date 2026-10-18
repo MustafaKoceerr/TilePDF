@@ -1416,14 +1416,15 @@ Java_com_mustafakoceerr_tilepdf_core_pdf_PdfiumNative_nativeHasRecognizedText(JN
     return JNI_FALSE;
 }
 
-// Lets [host] answer the document's form scripts, or none with null. The
-// first host also runs the document's open action, as a reader opening it.
+// Lets [host] answer the document's form scripts, or none with null. With
+// [openAction], the document's open action runs then, once.
 JNIEXPORT void JNICALL
-Java_com_mustafakoceerr_tilepdf_core_pdf_PdfiumNative_nativeSetScriptHost(JNIEnv* env, jclass, jlong handle, jobject host) {
+Java_com_mustafakoceerr_tilepdf_core_pdf_PdfiumNative_nativeSetScriptHost(
+        JNIEnv* env, jclass, jlong handle, jobject host, jboolean openAction) {
     NativeDocument* document = FromHandle(handle);
     if (document->scriptHost) env->DeleteGlobalRef(document->scriptHost);
     document->scriptHost = host ? env->NewGlobalRef(host) : nullptr;
-    if (host && document->form && !document->openActionDone) {
+    if (openAction == JNI_TRUE && document->form && !document->openActionDone) {
         document->openActionDone = true;
         FORM_DoDocumentOpenAction(document->form);
     }

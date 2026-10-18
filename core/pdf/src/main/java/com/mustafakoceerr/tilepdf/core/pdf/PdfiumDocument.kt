@@ -184,7 +184,8 @@ class PdfiumDocument internal constructor(
         }
     }
 
-    override suspend fun setScriptHost(host: FormScriptHost?) = withDocument { PdfiumNative.nativeSetScriptHost(it, host) }
+    override suspend fun setScriptHost(host: FormScriptHost?, openAction: Boolean) =
+        withDocument { PdfiumNative.nativeSetScriptHost(it, host, openAction) }
 
     override suspend fun hasRecognizedText(pageIndex: Int): Boolean =
         withDocument(pageIndex) { PdfiumNative.nativeHasRecognizedText(it, pageIndex) }

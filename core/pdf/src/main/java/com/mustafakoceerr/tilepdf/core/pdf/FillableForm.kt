@@ -19,8 +19,12 @@ interface FillableForm {
      */
     suspend fun applyFormEdits(edits: List<FormEdit>): Boolean = edits.isEmpty()
 
-    /** Lets [host] answer the form's scripts; without one they get default answers. */
-    suspend fun setScriptHost(host: FormScriptHost?) = Unit
+    /**
+     * Lets [host] answer the form's scripts; without one they get default
+     * answers. With [openAction], the document's open action runs, as when
+     * a reader first opens it.
+     */
+    suspend fun setScriptHost(host: FormScriptHost?, openAction: Boolean = false) = Unit
 }
 
 /**

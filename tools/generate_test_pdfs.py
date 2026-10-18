@@ -339,7 +339,7 @@ def calc():
         "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
         "<< /Type /Catalog /Pages 4 0 R /AcroForm 6 0 R >>",
         "<< /Fields [7 0 R 8 0 R 9 0 R 10 0 R] /CO [9 0 R] /DR << /Font << /Helv 1 0 R >> >> "
-        "/DA (/Helv 12 Tf 0 g) /NeedAppearances true >>",
+        "/DA (/Helv 12 Tf 0 g) >>",
         f"<< {widget} /FT /Tx /T (a) /Rect [72 700 200 724] >>",
         f"<< {widget} /FT /Tx /T (b) /Rect [72 660 200 684] >>",
         f"<< {widget} /FT /Tx /T (total) /Ff 1 /Rect [72 620 200 644] "

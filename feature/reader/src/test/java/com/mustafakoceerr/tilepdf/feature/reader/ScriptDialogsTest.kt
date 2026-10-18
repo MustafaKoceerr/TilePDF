@@ -76,4 +76,13 @@ class ScriptDialogsTest {
         assertEquals(1, printed.size)
         assertEquals(listOf(3), pages)
     }
+
+    @Test
+    fun pdfiumsOwnAlertTitleIsLeftForTheReaderToWord() {
+        val result = asking { dialogs.alert("Too old", "Alert", FormScriptHost.BUTTONS_OK, 0) }
+
+        assertEquals(ScriptDialog.Alert("Too old", "", FormScriptHost.BUTTONS_OK), dialogs.dialog.value)
+        dialogs.answer(ScriptAnswer.Button(FormScriptHost.RETURN_OK))
+        result.get(5, TimeUnit.SECONDS)
+    }
 }

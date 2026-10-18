@@ -181,10 +181,10 @@ internal object PdfiumNative {
 
     /**
      * Lets [host] answer the document's form scripts (null: default answers).
-     * The first host also runs the document's open action.
+     * With [openAction], the document's open action runs then, once.
      */
     @JvmStatic
-    external fun nativeSetScriptHost(document: Long, host: FormScriptHost?)
+    external fun nativeSetScriptHost(document: Long, host: FormScriptHost?, openAction: Boolean)
 
     /** Whether page [index] has text TilePDF recognised. */
     @JvmStatic
