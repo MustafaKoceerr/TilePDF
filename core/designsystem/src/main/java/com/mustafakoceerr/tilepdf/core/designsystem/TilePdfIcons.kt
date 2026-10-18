@@ -18,8 +18,10 @@ object TilePdfIcons {
     @DrawableRes val KeyboardArrowDown = R.drawable.ic_keyboard_arrow_down
     @DrawableRes val KeyboardArrowUp = R.drawable.ic_keyboard_arrow_up
     @DrawableRes val MoreVert = R.drawable.ic_more_vert
+    @DrawableRes val Print = R.drawable.ic_print
     @DrawableRes val Redo = R.drawable.ic_redo
     @DrawableRes val Search = R.drawable.ic_search
+    @DrawableRes val Share = R.drawable.ic_share
     @DrawableRes val Sort = R.drawable.ic_sort
     @DrawableRes val Star = R.drawable.ic_star
     @DrawableRes val StarBorder = R.drawable.ic_star_border

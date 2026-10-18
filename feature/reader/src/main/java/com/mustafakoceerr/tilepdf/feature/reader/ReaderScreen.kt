@@ -2,8 +2,10 @@ package com.mustafakoceerr.tilepdf.feature.reader
 
 import android.content.ActivityNotFoundException
 import android.content.ClipData
+import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.print.PrintManager
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalActivity
@@ -172,6 +174,9 @@ fun ReaderScreen(
             onSaveCopy = viewModel::onSaveCopy,
             onSaveCopyResultHandled = viewModel::onSaveCopyResultHandled,
             onRetrySave = viewModel::onRetrySave,
+            onShare = viewModel::onShare,
+            onPrint = viewModel::onPrint,
+            onHandOffHandled = viewModel::onHandOffHandled,
         ),
         onOpenDocument = onOpenDocument,
     )
@@ -207,6 +212,9 @@ internal class AnnotationActions(
     val onSaveCopy: (target: String) -> Unit = {},
     val onSaveCopyResultHandled: () -> Unit = {},
     val onRetrySave: () -> Unit = {},
+    val onShare: () -> Unit = {},
+    val onPrint: () -> Unit = {},
+    val onHandOffHandled: () -> Unit = {},
 ) {
     companion object {
         val None = AnnotationActions({}, {}, {}, {}, {}, {}, {}, {}, {})
@@ -258,6 +266,7 @@ internal fun ReaderScreen(
     }
     val saveCopy = { ready?.let { saveCopyLauncher.launch(copyName(it.title)) } }
     SaveCopyResultEffect(ready?.saveCopyResult, onOpenDocument, annotationActions.onSaveCopyResultHandled)
+    HandOffEffect(ready?.handOff, annotationActions.onHandOffHandled)
     val search = ready?.search
     val selection = ready?.selection
     val copySelection = rememberCopyAction(selection?.text, onCopied = onClearSelection)
@@ -351,6 +360,8 @@ internal fun ReaderScreen(
                             onGoToPage = { goToPageOpen = true },
                             onOpenSettings = { settingsOpen = true },
                             onSaveCopy = { saveCopy() },
+                            onShare = annotationActions.onShare,
+                            onPrint = annotationActions.onPrint,
                         )
                     }
                 },
@@ -700,6 +711,44 @@ private fun SaveCopyResultEffect(result: SaveCopyResult?, onOpenDocument: (Strin
     }
 }
 
+private const val PDF_MIME_TYPE = "application/pdf"
+
+/** Opens the share sheet or the print dialog for an exported document; then forgets it. */
+@Composable
+private fun HandOffEffect(handOff: HandOff?, onHandled: () -> Unit) {
+    val context = LocalContext.current
+    LaunchedEffect(handOff) {
+        when (handOff) {
+            null -> return@LaunchedEffect
+            is HandOff.Share -> share(context, handOff)
+            is HandOff.Print -> print(context, handOff)
+            HandOff.Failed -> Toast.makeText(context, R.string.reader_hand_off_failed, Toast.LENGTH_LONG).show()
+        }
+        onHandled()
+    }
+}
+
+private fun share(context: Context, share: HandOff.Share) {
+    val uri = share.uri.toUri()
+    val send = Intent(Intent.ACTION_SEND)
+        .setType(PDF_MIME_TYPE)
+        .putExtra(Intent.EXTRA_STREAM, uri)
+        .putExtra(Intent.EXTRA_TITLE, share.title)
+        .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        // The chooser previews the file; the receiver gets read access only.
+        .apply { clipData = ClipData.newRawUri(share.title, uri) }
+    try {
+        context.startActivity(Intent.createChooser(send, null))
+    } catch (_: ActivityNotFoundException) {
+        Toast.makeText(context, R.string.reader_no_app_for_share, Toast.LENGTH_SHORT).show()
+    }
+}
+
+private fun print(context: Context, print: HandOff.Print) {
+    val printManager = context.getSystemService(PrintManager::class.java) ?: return
+    printManager.print(print.title, PdfPrintAdapter(context.applicationContext, print.uri.toUri(), print.title, print.pageCount), null)
+}
+
 /** "report.pdf" → "report (açıklamalı).pdf", the name offered for a copy. */
 private fun copyName(title: String) = "${title.removeSuffix(".pdf").removeSuffix(".PDF")} (açıklamalı).pdf"
 
@@ -779,6 +828,8 @@ private fun OverflowMenu(
     onGoToPage: () -> Unit,
     onOpenSettings: () -> Unit,
     onSaveCopy: () -> Unit,
+    onShare: () -> Unit,
+    onPrint: () -> Unit,
 ) {
     Box {
         IconButton(onClick = { onExpandedChange(true) }) {
@@ -809,6 +860,22 @@ private fun OverflowMenu(
                 onClick = {
                     onExpandedChange(false)
                     onGoToPage()
+                },
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.reader_share)) },
+                leadingIcon = { Icon(painterResource(TilePdfIcons.Share), contentDescription = null) },
+                onClick = {
+                    onExpandedChange(false)
+                    onShare()
+                },
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.reader_print)) },
+                leadingIcon = { Icon(painterResource(TilePdfIcons.Print), contentDescription = null) },
+                onClick = {
+                    onExpandedChange(false)
+                    onPrint()
                 },
             )
             DropdownMenuItem(

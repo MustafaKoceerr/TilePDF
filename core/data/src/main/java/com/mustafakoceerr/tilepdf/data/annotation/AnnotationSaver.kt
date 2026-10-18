@@ -32,6 +32,16 @@ interface AnnotationSaving {
     suspend fun saveCopy(uri: String, target: String): SaveResult
 }
 
+/** Hands a document out with its annotations, without saving into it. */
+interface DocumentExporting {
+
+    /**
+     * Writes [uri] with its current draft into the new file [target]; the
+     * draft stays where it is. False, and no [target], when that fails.
+     */
+    suspend fun export(uri: String, target: File): Boolean
+}
+
 /**
  * The safe save: write a temp file with PDFium, reopen it to check it holds
  * exactly the draft, and only then overwrite the document. The document is
@@ -41,7 +51,7 @@ class AnnotationSaver @Inject constructor(
     private val repository: AnnotationRepository,
     private val files: AnnotationFiles,
     private val passwords: SessionPasswords,
-) : AnnotationSaving {
+) : AnnotationSaving, DocumentExporting {
 
     override suspend fun save(uri: String): SaveResult {
         val draft = repository.observe(uri).first()
@@ -63,12 +73,7 @@ class AnnotationSaver @Inject constructor(
 
     override suspend fun saveCopy(uri: String, target: String): SaveResult {
         val draft = repository.observe(uri).first() ?: return SaveResult.NothingToSave
-        // "#index" keys only hold for the file version the draft is based on.
-        val removed = if (files.stampOrUnknown(uri) == draft.base) {
-            draft.removedForeign
-        } else {
-            draft.removedForeign.filterNot { it.key.startsWith("#") }.toSet()
-        }
+        val removed = removalsFor(uri, draft)
         return when (val outcome = write(uri, draft, removed, target)) {
             is Outcome.Written -> {
                 repository.moveTo(uri, target, draft, outcome.stamp)
@@ -79,6 +84,37 @@ class AnnotationSaver @Inject constructor(
             Outcome.Unchanged -> error("A copy is always written")
         }
     }
+
+    override suspend fun export(uri: String, target: File): Boolean {
+        val draft = repository.observe(uri).first()
+        val removed = draft?.let { removalsFor(uri, it) }.orEmpty()
+        val password = passwords.get(uri)
+        val written = try {
+            files.openForEditing(uri, password).use { document ->
+                if (draft != null) document.write(draft.annotations, removed)
+                document.saveIncremental(target)
+            }
+            draft == null || holdsExactly(target, password, draft, removed)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: PdfPasswordException) {
+            false
+        } catch (_: IOException) {
+            false
+        } catch (_: SecurityException) {
+            false
+        }
+        if (!written) target.delete()
+        return written
+    }
+
+    /** "#index" keys only hold for the file version the draft is based on. */
+    private suspend fun removalsFor(uri: String, draft: AnnotationDraft): Set<ForeignRef> =
+        if (files.stampOrUnknown(uri) == draft.base) {
+            draft.removedForeign
+        } else {
+            draft.removedForeign.filterNot { it.key.startsWith("#") }.toSet()
+        }
 
     private suspend fun failed(uri: String, error: SaveError): SaveResult {
         repository.markFailed(uri, error)

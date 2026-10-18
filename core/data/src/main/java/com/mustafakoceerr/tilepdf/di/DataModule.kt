@@ -5,6 +5,7 @@ import com.mustafakoceerr.tilepdf.data.annotation.AnnotationRepository
 import com.mustafakoceerr.tilepdf.data.annotation.AnnotationSaveScheduler
 import com.mustafakoceerr.tilepdf.data.annotation.AnnotationSaver
 import com.mustafakoceerr.tilepdf.data.annotation.AnnotationSaving
+import com.mustafakoceerr.tilepdf.data.annotation.DocumentExporting
 import com.mustafakoceerr.tilepdf.data.annotation.FileStamps
 import com.mustafakoceerr.tilepdf.data.annotation.OfflineAnnotationRepository
 import com.mustafakoceerr.tilepdf.data.annotation.SafAnnotationFiles
@@ -40,6 +41,9 @@ interface DataModule {
 
     @Binds
     fun bindsAnnotationSaving(impl: AnnotationSaver): AnnotationSaving
+
+    @Binds
+    fun bindsDocumentExporting(impl: AnnotationSaver): DocumentExporting
 
     @Binds
     fun bindsAnnotationSaveScheduler(impl: WorkManagerAnnotationSaveScheduler): AnnotationSaveScheduler

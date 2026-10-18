@@ -11,6 +11,7 @@ import com.mustafakoceerr.tilepdf.core.text.TextSelection
 import com.mustafakoceerr.tilepdf.core.render.ThumbnailSource
 import com.mustafakoceerr.tilepdf.core.render.TiledPageImageSource
 import com.mustafakoceerr.tilepdf.core.geometry.PdfPoint
+import com.mustafakoceerr.tilepdf.data.document.SharedDocuments
 import com.mustafakoceerr.tilepdf.data.annotation.AnnotationRepository
 import com.mustafakoceerr.tilepdf.data.annotation.AnnotationSaveScheduler
 import com.mustafakoceerr.tilepdf.data.annotation.SaveResult
@@ -86,6 +87,7 @@ class ReaderViewModel @Inject constructor(
     private val saveScheduler: AnnotationSaveScheduler,
     private val sessionPasswords: SessionPasswords,
     private val saveAsCopy: SaveAsCopyUseCase,
+    private val sharedDocuments: SharedDocuments,
     @param:ApplicationScope private val applicationScope: CoroutineScope,
 ) : ViewModel() {
 
@@ -109,6 +111,8 @@ class ReaderViewModel @Inject constructor(
 
     /** The outcome of "Kopya olarak kaydet", until the screen has acted on it. */
     private val saveCopyResult = MutableStateFlow<SaveCopyResult?>(null)
+    private val handOff = MutableStateFlow<HandOff?>(null)
+    private var handOffJob: Job? = null
     private var openJob: Job? = null
 
     private val documentState = MutableStateFlow<DocumentState>(DocumentState.Loading)
@@ -143,11 +147,12 @@ class ReaderViewModel @Inject constructor(
         preferencesRepository.preferences,
         combine(searchState, toc, ::Pair),
         combine(selection, linkTargets, currentPage, fullScreen, startPosition, ::PageState),
-        combine(annotations, editing, saveCopyResult, ::Triple),
+        combine(annotations, editing, combine(saveCopyResult, handOff, ::Pair), ::Triple),
     ) { document, preferences, searchAndToc, pageState, annotationUi ->
         val (search, toc) = searchAndToc
         val (selection, links, page, fullScreen, start) = pageState
-        val (annotations, editing, copyResult) = annotationUi
+        val (annotations, editing, results) = annotationUi
+        val (copyResult, handOff) = results
         when (document) {
             DocumentState.Loading -> ReaderUiState.Loading
             is DocumentState.Failed -> ReaderUiState.Error(document.reason)
@@ -170,6 +175,7 @@ class ReaderViewModel @Inject constructor(
                 annotations = annotations,
                 editing = editing,
                 saveCopyResult = copyResult,
+                handOff = handOff,
             )
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ReaderUiState.Loading)
@@ -281,6 +287,27 @@ class ReaderViewModel @Inject constructor(
 
     fun onSaveCopyResultHandled() {
         saveCopyResult.value = null
+    }
+
+    /** Exports the annotated document for the share sheet. */
+    fun onShare() = handOff { uri, opened -> HandOff.Share(uri, opened.displayName) }
+
+    /** Exports the annotated document for the system print dialog. */
+    fun onPrint() = handOff { uri, opened -> HandOff.Print(uri, opened.displayName, opened.document.pageCount) }
+
+    fun onHandOffHandled() {
+        handOff.value = null
+    }
+
+    private fun handOff(make: (uri: String, OpenedDocument) -> HandOff) {
+        val opened = (documentState.value as? DocumentState.Opened)?.opened ?: return
+        // A second tap while exporting would rewrite the file being exported.
+        if (handOffJob?.isActive == true) return
+        handOffJob = viewModelScope.launch {
+            controller.value?.flush()
+            val shared = sharedDocuments.export(opened.uri, opened.displayName)
+            handOff.value = shared?.let { make(it, opened) } ?: HandOff.Failed
+        }
     }
 
     /** Tries the background save again after it failed. */

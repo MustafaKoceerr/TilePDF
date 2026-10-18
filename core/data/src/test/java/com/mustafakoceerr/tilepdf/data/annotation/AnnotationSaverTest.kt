@@ -204,4 +204,50 @@ class AnnotationSaverTest {
         assertNull(draft(uri)!!.saveError)
         assertNull(draft(copy))
     }
+
+    @Test
+    fun exportWritesDraftWithoutMovingIt() = runTest {
+        givenDraft(listOf(note("tilepdf-a")))
+        val target = tmp.newFile("shared.pdf")
+
+        assertTrue(saver.export(uri, target))
+
+        assertEquals(emptyList<String>(), files.replaced)
+        val exported = files.openForReading(target, null).annotations(0).own.map { it.id }
+        assertEquals(listOf("tilepdf-a"), exported)
+        assertTrue(draft()!!.dirty)
+    }
+
+    @Test
+    fun exportWithoutDraftCopiesDocument() = runTest {
+        files.pdfs[uri] = FakePdf()
+        val target = tmp.newFile("shared.pdf")
+
+        assertTrue(saver.export(uri, target))
+
+        assertTrue(target.length() > 0)
+    }
+
+    @Test
+    fun failedExportLeavesNoFile() = runTest {
+        givenDraft(listOf(note("tilepdf-a")))
+        files.loseOnSave = "tilepdf-a"
+        val target = tmp.newFile("shared.pdf")
+
+        assertFalse(saver.export(uri, target))
+
+        assertFalse(target.exists())
+    }
+
+    @Test
+    fun exportNeedsPassword() = runTest {
+        givenDraft(listOf(note("tilepdf-a")))
+        files.passwords[uri] = "pw"
+        val target = tmp.newFile("shared.pdf")
+
+        assertFalse(saver.export(uri, target))
+
+        passwords.remember(uri, "pw")
+        assertTrue(saver.export(uri, target))
+    }
 }

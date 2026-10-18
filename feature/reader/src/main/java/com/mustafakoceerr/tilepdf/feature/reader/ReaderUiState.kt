@@ -48,6 +48,8 @@ sealed interface ReaderUiState {
         val editing: AnnotationEditing = AnnotationEditing(),
         /** "Kopya olarak kaydet" finished; the screen opens the copy or says it failed. */
         val saveCopyResult: SaveCopyResult? = null,
+        /** A document ready for "Paylaş" or "Yazdır"; the screen hands it over. */
+        val handOff: HandOff? = null,
     ) : ReaderUiState
 }
 
@@ -64,6 +66,13 @@ enum class ReaderError {
 sealed interface SaveCopyResult {
     data class Saved(val uri: String) : SaveCopyResult
     data object Failed : SaveCopyResult
+}
+
+/** The document, annotations included, exported for another app at [uri]. */
+sealed interface HandOff {
+    data class Share(val uri: String, val title: String) : HandOff
+    data class Print(val uri: String, val title: String, val pageCount: Int) : HandOff
+    data object Failed : HandOff
 }
 
 data class TocUiState(
