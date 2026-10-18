@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.print.PrintManager
+import android.view.KeyEvent
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalActivity
@@ -87,6 +88,7 @@ import androidx.core.net.toUri
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.mustafakoceerr.tilepdf.core.common.KeyEventHost
 import com.mustafakoceerr.tilepdf.core.designsystem.TilePdfIcons
 import com.mustafakoceerr.tilepdf.core.geometry.PdfPoint
 import com.mustafakoceerr.tilepdf.feature.reader.annotation.AnnotationMenuDialog
@@ -158,6 +160,7 @@ fun ReaderScreen(
         onPageThemeSelected = viewModel::onPageThemeSelected,
         onReadingModeSelected = viewModel::onReadingModeSelected,
         onKeepScreenOnChange = viewModel::onKeepScreenOnChange,
+        onVolumeKeysChange = viewModel::onVolumeKeysChange,
         annotationActions = AnnotationActions(
             onMarkup = viewModel::onMarkup,
             onMenuDismissed = viewModel::onAnnotationMenuDismissed,
@@ -263,6 +266,7 @@ internal fun ReaderScreen(
     onPageThemeSelected: (PageTheme) -> Unit = {},
     onReadingModeSelected: (ReadingMode) -> Unit = {},
     onKeepScreenOnChange: (Boolean) -> Unit = {},
+    onVolumeKeysChange: (Boolean) -> Unit = {},
     annotationActions: AnnotationActions = AnnotationActions.None,
     onOpenDocument: (uri: String) -> Unit = {},
 ) {
@@ -301,6 +305,13 @@ internal fun ReaderScreen(
     }
     BackHandler(enabled = search?.isActive == true, onBack = searchActions.onClose)
     KeepScreenOnEffect(ready?.preferences?.keepScreenOn == true)
+    // Page turns aren't jumps: no way back is offered for them.
+    VolumeKeyPagingEffect(
+        enabled = ready?.preferences?.volumeKeysTurnPages == true,
+        currentPage = ready?.currentPage ?: 0,
+        pageCount = ready?.pageSizes?.size ?: 0,
+        onTurn = { pageJump = PageJump(it) },
+    )
 
     // A TalkBack user can't find bars hidden by a tap, so they stay.
     val fullScreen = ready?.isFullScreen == true && !rememberTouchExplorationEnabled()
@@ -551,6 +562,7 @@ internal fun ReaderScreen(
                 onPageThemeSelected = onPageThemeSelected,
                 onReadingModeSelected = onReadingModeSelected,
                 onKeepScreenOnChange = onKeepScreenOnChange,
+                onVolumeKeysChange = onVolumeKeysChange,
                 onDismiss = { settingsOpen = false },
             )
         }
@@ -804,6 +816,25 @@ private fun SystemBarsEffect(hidden: Boolean) {
 }
 
 /** Stops the screen from timing out while [enabled] and the reader is shown. */
+/** While [enabled], volume keys turn pages instead of changing the volume. */
+@Composable
+private fun VolumeKeyPagingEffect(enabled: Boolean, currentPage: Int, pageCount: Int, onTurn: (Int) -> Unit) {
+    val host = LocalActivity.current as? KeyEventHost ?: return
+    val page by rememberUpdatedState(currentPage)
+    val turn by rememberUpdatedState(onTurn)
+    DisposableEffect(host, enabled, pageCount) {
+        if (enabled && pageCount > 0) {
+            host.setKeyHandler { event ->
+                val target = pageForVolumeKey(event.keyCode, page, pageCount) ?: return@setKeyHandler false
+                // Both down and up are taken; held down, it keeps turning.
+                if (event.action == KeyEvent.ACTION_DOWN && target != page) turn(target)
+                true
+            }
+        }
+        onDispose { host.setKeyHandler(null) }
+    }
+}
+
 @Composable
 private fun KeepScreenOnEffect(enabled: Boolean) {
     val view = LocalView.current

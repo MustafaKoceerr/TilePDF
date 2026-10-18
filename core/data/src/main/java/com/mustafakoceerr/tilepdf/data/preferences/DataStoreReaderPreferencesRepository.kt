@@ -26,6 +26,7 @@ class DataStoreReaderPreferencesRepository @Inject constructor(
                 ?: if (prefs[LEGACY_NIGHT_MODE] == true) PageTheme.Night else defaults.pageTheme,
             readingMode = prefs[READING_MODE]?.let { enumOrNull<ReadingMode>(it) } ?: defaults.readingMode,
             keepScreenOn = prefs[KEEP_SCREEN_ON] ?: defaults.keepScreenOn,
+            volumeKeysTurnPages = prefs[VOLUME_KEYS_TURN_PAGES] ?: defaults.volumeKeysTurnPages,
             markupColor = prefs[MARKUP_COLOR] ?: defaults.markupColor,
             penColor = prefs[PEN_COLOR] ?: defaults.penColor,
             penWidthPt = prefs[PEN_WIDTH] ?: defaults.penWidthPt,
@@ -47,6 +48,10 @@ class DataStoreReaderPreferencesRepository @Inject constructor(
         dataStore.edit { it[KEEP_SCREEN_ON] = enabled }
     }
 
+    override suspend fun setVolumeKeysTurnPages(enabled: Boolean) {
+        dataStore.edit { it[VOLUME_KEYS_TURN_PAGES] = enabled }
+    }
+
     override suspend fun setMarkupColor(color: Int) {
         dataStore.edit { it[MARKUP_COLOR] = color }
     }
@@ -63,6 +68,7 @@ class DataStoreReaderPreferencesRepository @Inject constructor(
         val PAGE_THEME = stringPreferencesKey("page_theme")
         val READING_MODE = stringPreferencesKey("reading_mode")
         val KEEP_SCREEN_ON = booleanPreferencesKey("keep_screen_on")
+        val VOLUME_KEYS_TURN_PAGES = booleanPreferencesKey("volume_keys_turn_pages")
         val LEGACY_NIGHT_MODE = booleanPreferencesKey("night_mode")
         val MARKUP_COLOR = intPreferencesKey("markup_color")
         val PEN_COLOR = intPreferencesKey("pen_color")
