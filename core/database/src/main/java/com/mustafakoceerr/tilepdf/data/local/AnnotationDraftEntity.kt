@@ -1,12 +1,13 @@
 package com.mustafakoceerr.tilepdf.data.local
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.PrimaryKey
 
 /**
  * A document's annotation draft; removed with its library entry. The
- * annotation and foreign-ref columns are JSON written by core:data.
+ * annotation, foreign-ref and form-value columns are JSON written by core:data.
  */
 @Entity(
     tableName = "annotation_drafts",
@@ -30,4 +31,6 @@ data class AnnotationDraftEntity(
     /** `SaveError` name of the last failed save, if any. */
     val saveError: String?,
     val updatedAt: Long,
+    /** Added in schema 7: pending form values, a JSON object of field name to value. */
+    @ColumnInfo(defaultValue = "{}") val formValues: String = "{}",
 )

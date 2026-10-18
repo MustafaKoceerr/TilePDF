@@ -51,6 +51,10 @@ internal object AnnotationCodec {
     fun decodeRefs(text: String): Set<ForeignRef> =
         json.decodeFromString<List<RefJson>>(text).mapTo(LinkedHashSet()) { ForeignRef(it.page, it.key) }
 
+    fun encodeFormValues(values: Map<String, String>): String = json.encodeToString(values)
+
+    fun decodeFormValues(text: String): Map<String, String> = json.decodeFromString(text)
+
     private fun Annotation.toJson(): JsonElement {
         val (type, body) = when (this) {
             is TextMarkup -> "markup" to json.encodeToJsonElement(
