@@ -13,6 +13,10 @@ device.
   system**.
 - The developer **does not collect, store or share** any personal data or
   usage information.
+- **Signing with a certificate** happens on your device, with a
+  certificate from Android's own certificate store. TilePDF keeps no key,
+  password or certificate name; a .p12/.pfx file is opened by Android's own
+  installer.
 - **Text recognition** on scanned pages runs on your device with Google ML
   Kit's built-in model. Your pages are never sent anywhere. ML Kit is made
   to report usage statistics to Google, but without internet access it
