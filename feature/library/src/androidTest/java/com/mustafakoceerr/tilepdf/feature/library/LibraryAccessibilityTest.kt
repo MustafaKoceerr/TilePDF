@@ -52,12 +52,4 @@ class LibraryAccessibilityTest {
         compose.setContent { TilePDFTheme { LibraryScreen(LibraryUiState.Success(emptyList()), LibraryActions()) } }
         compose.onRoot().tryPerformAccessibilityChecks()
     }
-
-    @Test
-    fun languageDialogPasses() {
-        compose.setContent { TilePDFTheme { LibraryScreen(LibraryUiState.Success(items), LibraryActions()) } }
-        compose.onNodeWithContentDescription(text(R.string.library_more)).performClick()
-        compose.onNodeWithText(text(R.string.library_language)).performClick()
-        compose.onNodeWithText(text(R.string.language_system)).tryPerformAccessibilityChecks()
-    }
 }

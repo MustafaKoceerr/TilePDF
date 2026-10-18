@@ -15,6 +15,7 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
+            android:theme="@style/Theme.TilePDF.Starting"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -39,16 +40,6 @@
                 <data android:mimeType="application/pdf" />
             </intent-filter>
         </activity>
-
-        <!-- Keeps the in-app language on Android 12 and older; 13+ stores it itself. -->
-        <service
-            android:name="androidx.appcompat.app.AppLocalesMetadataHolderService"
-            android:enabled="false"
-            android:exported="false">
-            <meta-data
-                android:name="autoStoreLocales"
-                android:value="true" />
-        </service>
 
         <!-- WorkManager is set up by TilePdfApp, so its Hilt workers get injected. -->
         <provider

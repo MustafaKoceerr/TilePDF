@@ -35,9 +35,14 @@ dependencies {
     implementation(projects.core.domain)
     implementation(projects.feature.library)
     implementation(projects.feature.reader)
+    implementation(projects.feature.settings)
 
     implementation(libs.androidx.activity.compose)
+    // MainActivity is an AppCompatActivity: the language library needs one below Android 13.
     implementation(libs.androidx.appcompat)
+    implementation(libs.androidx.core.splashscreen)
+    implementation(libs.theme.manager.hilt)
+    implementation(libs.language.manager.hilt)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.navigation.compose)

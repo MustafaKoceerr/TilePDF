@@ -10,6 +10,8 @@ import com.mustafakoceerr.tilepdf.feature.library.navigation.libraryScreen
 import com.mustafakoceerr.tilepdf.feature.reader.navigation.ReaderRoute
 import com.mustafakoceerr.tilepdf.feature.reader.navigation.navigateToReader
 import com.mustafakoceerr.tilepdf.feature.reader.navigation.readerScreen
+import com.mustafakoceerr.tilepdf.feature.settings.navigation.navigateToSettings
+import com.mustafakoceerr.tilepdf.feature.settings.navigation.settingsScreen
 
 /**
  * @param openDocument a PDF another app sent, opened in the reader once;
@@ -36,7 +38,11 @@ fun TilePdfNavHost(
         startDestination = LibraryRoute,
         modifier = modifier,
     ) {
-        libraryScreen(onOpenDocument = navController::navigateToReader)
+        libraryScreen(
+            onOpenDocument = navController::navigateToReader,
+            onOpenSettings = navController::navigateToSettings,
+        )
+        settingsScreen(onBack = navController::popBackStack)
         readerScreen(
             onBack = navController::popBackStack,
             onOpenDocument = { uri ->

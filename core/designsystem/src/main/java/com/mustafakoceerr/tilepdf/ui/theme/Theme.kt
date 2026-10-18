@@ -1,14 +1,10 @@
 package com.mustafakoceerr.tilepdf.ui.theme
 
-import android.os.Build
-import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.platform.LocalContext
+import com.mustafakoceerr.thememanager.ThemeSettings
+import com.mustafakoceerr.thememanager.compose.ManagedTheme
 
 private val DarkColorScheme = darkColorScheme(
     primary = Purple80,
@@ -32,26 +28,21 @@ private val LightColorScheme = lightColorScheme(
     */
 )
 
+/**
+ * The app theme in the user's choice of light, dark or system, with Material
+ * You colours when they turned it on (Android 12+); the default follows the
+ * system with TilePDF's own colours, which is also what previews show.
+ */
 @Composable
 fun TilePDFTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
-    // Dynamic color is available on Android 12+
-    dynamicColor: Boolean = true,
-    content: @Composable () -> Unit
+    settings: ThemeSettings = ThemeSettings(),
+    content: @Composable () -> Unit,
 ) {
-    val colorScheme = when {
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val context = LocalContext.current
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        }
-
-        darkTheme -> DarkColorScheme
-        else -> LightColorScheme
-    }
-
-    MaterialTheme(
-        colorScheme = colorScheme,
+    ManagedTheme(
+        settings = settings,
+        lightColorScheme = LightColorScheme,
+        darkColorScheme = DarkColorScheme,
         typography = Typography,
-        content = content
+        content = content,
     )
 }

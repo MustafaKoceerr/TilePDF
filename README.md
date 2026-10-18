@@ -58,8 +58,13 @@ minSdk 29
   and 480 dp tall) contents, bookmarks and annotations open in a panel
   beside the pages that stays open while reading; a phone in landscape
   keeps the bottom sheet. The library flows into columns on wide screens
-- English and Turkish: follows the device, or pick a language in the
-  library's menu (also in Android 13+ app settings)
+- Settings (library menu): theme (system, light or dark, with optional
+  Material You colours on Android 12+) and language (English or Turkish,
+  following the device by default; also in Android 13+ app settings). Both
+  come from the developer's own libraries,
+  [compose-theme-manager](https://github.com/MustafaKoceerr/compose-theme-manager) and
+  [compose-language-manager](https://github.com/MustafaKoceerr/compose-language-manager),
+  served by JitPack
 - Accessible: every control has its own TalkBack label (colours by name,
   widths in points) and a 48 dp touch target, checked with the
   Accessibility Test Framework in UI tests; layouts hold at 200% font size
