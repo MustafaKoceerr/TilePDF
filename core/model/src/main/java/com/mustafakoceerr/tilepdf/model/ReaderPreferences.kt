@@ -11,4 +11,9 @@ data class ReaderPreferences(
     val pageTheme: PageTheme = PageTheme.Light,
     val readingMode: ReadingMode = ReadingMode.Vertical,
     val keepScreenOn: Boolean = false,
+    /** ARGB colour of new highlights, underlines and strikeouts. */
+    val markupColor: Int = 0xFFFFEB3B.toInt(),
+    /** ARGB colour of new pen strokes. */
+    val penColor: Int = 0xFFE53935.toInt(),
+    val penWidthPt: Float = 2f,
 )

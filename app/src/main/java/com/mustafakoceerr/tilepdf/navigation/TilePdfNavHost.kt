@@ -37,6 +37,12 @@ fun TilePdfNavHost(
         modifier = modifier,
     ) {
         libraryScreen(onOpenDocument = navController::navigateToReader)
-        readerScreen(onBack = navController::popBackStack)
+        readerScreen(
+            onBack = navController::popBackStack,
+            onOpenDocument = { uri ->
+                navController.popBackStack<ReaderRoute>(inclusive = true)
+                navController.navigateToReader(uri)
+            },
+        )
     }
 }

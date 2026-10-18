@@ -77,4 +77,24 @@ class DataStoreReaderPreferencesRepositoryTest {
         val repository = DataStoreReaderPreferencesRepository(dataStore)
         assertEquals(PageTheme.Light, repository.preferences.first().pageTheme)
     }
+
+    @Test
+    fun annotationDefaults() = runTest {
+        val preferences = DataStoreReaderPreferencesRepository(dataStore()).preferences.first()
+        assertEquals(0xFFFFEB3B.toInt(), preferences.markupColor)
+        assertEquals(0xFFE53935.toInt(), preferences.penColor)
+        assertEquals(2f, preferences.penWidthPt)
+    }
+
+    @Test
+    fun annotationSettingsAreRead() = runTest {
+        val repository = DataStoreReaderPreferencesRepository(dataStore())
+        repository.setMarkupColor(0xFF66BB6A.toInt())
+        repository.setPenColor(0xFF212121.toInt())
+        repository.setPenWidth(4f)
+        val preferences = repository.preferences.first()
+        assertEquals(0xFF66BB6A.toInt(), preferences.markupColor)
+        assertEquals(0xFF212121.toInt(), preferences.penColor)
+        assertEquals(4f, preferences.penWidthPt)
+    }
 }

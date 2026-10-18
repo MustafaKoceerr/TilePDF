@@ -4,6 +4,8 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.floatPreferencesKey
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.mustafakoceerr.tilepdf.model.PageTheme
 import com.mustafakoceerr.tilepdf.model.ReaderPreferences
@@ -24,6 +26,9 @@ class DataStoreReaderPreferencesRepository @Inject constructor(
                 ?: if (prefs[LEGACY_NIGHT_MODE] == true) PageTheme.Night else defaults.pageTheme,
             readingMode = prefs[READING_MODE]?.let { enumOrNull<ReadingMode>(it) } ?: defaults.readingMode,
             keepScreenOn = prefs[KEEP_SCREEN_ON] ?: defaults.keepScreenOn,
+            markupColor = prefs[MARKUP_COLOR] ?: defaults.markupColor,
+            penColor = prefs[PEN_COLOR] ?: defaults.penColor,
+            penWidthPt = prefs[PEN_WIDTH] ?: defaults.penWidthPt,
         )
     }
 
@@ -42,11 +47,26 @@ class DataStoreReaderPreferencesRepository @Inject constructor(
         dataStore.edit { it[KEEP_SCREEN_ON] = enabled }
     }
 
+    override suspend fun setMarkupColor(color: Int) {
+        dataStore.edit { it[MARKUP_COLOR] = color }
+    }
+
+    override suspend fun setPenColor(color: Int) {
+        dataStore.edit { it[PEN_COLOR] = color }
+    }
+
+    override suspend fun setPenWidth(widthPt: Float) {
+        dataStore.edit { it[PEN_WIDTH] = widthPt }
+    }
+
     private companion object {
         val PAGE_THEME = stringPreferencesKey("page_theme")
         val READING_MODE = stringPreferencesKey("reading_mode")
         val KEEP_SCREEN_ON = booleanPreferencesKey("keep_screen_on")
         val LEGACY_NIGHT_MODE = booleanPreferencesKey("night_mode")
+        val MARKUP_COLOR = intPreferencesKey("markup_color")
+        val PEN_COLOR = intPreferencesKey("pen_color")
+        val PEN_WIDTH = floatPreferencesKey("pen_width")
 
         /** A value written by a newer version reads as the default. */
         inline fun <reified T : Enum<T>> enumOrNull(name: String): T? =

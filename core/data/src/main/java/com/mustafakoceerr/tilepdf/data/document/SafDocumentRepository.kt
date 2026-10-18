@@ -68,7 +68,15 @@ class SafDocumentRepository @Inject constructor(
             descriptor.close()
             uri
         } else {
-            copy(parsed, ParcelFileDescriptor.AutoCloseInputStream(descriptor))
+            // Opened before: the copy may hold annotations saved since, which a
+            // fresh copy of the source would lose. It's the document now.
+            val existing = File(copiesDir, copyName(parsed)).takeIf { it.length() > 0 }
+            if (existing != null) {
+                descriptor.close()
+                Uri.fromFile(existing).toString()
+            } else {
+                copy(parsed, ParcelFileDescriptor.AutoCloseInputStream(descriptor))
+            }
         }
     }
 

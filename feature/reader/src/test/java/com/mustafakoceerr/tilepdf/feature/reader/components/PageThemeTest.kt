@@ -3,6 +3,7 @@ package com.mustafakoceerr.tilepdf.feature.reader.components
 import androidx.compose.ui.graphics.ColorMatrix
 import com.mustafakoceerr.tilepdf.model.PageTheme
 import org.junit.Assert.assertArrayEquals
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
@@ -35,5 +36,16 @@ class PageThemeTest {
     @Test
     fun sepiaKeepsBlackBlack() {
         assertArrayEquals(floatArrayOf(0f, 0f, 0f), PageTheme.Sepia.colorMatrix()!!.apply(0, 0, 0), 0.5f)
+    }
+
+    @Test
+    fun lightRecolorIsIdentity() {
+        assertEquals(0x80FFEB3B.toInt(), PageTheme.Light.recolor(0x80FFEB3B.toInt()))
+    }
+
+    @Test
+    fun nightRecolorInvertsAndKeepsAlpha() {
+        assertEquals(0x80000000.toInt(), PageTheme.Night.recolor(0x80FFFFFF.toInt()))
+        assertEquals(0xFF00FFFF.toInt(), PageTheme.Night.recolor(0xFFFF0000.toInt()))
     }
 }

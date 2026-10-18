@@ -32,6 +32,17 @@ internal fun PageTheme.colorMatrix(): ColorMatrix? = when (this) {
 
 internal fun PageTheme.colorFilter(): ColorFilter? = colorMatrix()?.let(ColorFilter::colorMatrix)
 
+/** An ARGB [color] as this theme draws pages: what Compose-drawn annotations use. Alpha is kept. */
+internal fun PageTheme.recolor(color: Int): Int {
+    val m = colorMatrix()?.values ?: return color
+    val rgb = intArrayOf((color shr 16) and 0xFF, (color shr 8) and 0xFF, color and 0xFF)
+    val channels = IntArray(3) { row ->
+        (m[row * 5] * rgb[0] + m[row * 5 + 1] * rgb[1] + m[row * 5 + 2] * rgb[2] + m[row * 5 + 3] * 255 + m[row * 5 + 4])
+            .toInt().coerceIn(0, 255)
+    }
+    return (color and 0xFF000000.toInt()) or (channels[0] shl 16) or (channels[1] shl 8) or channels[2]
+}
+
 /** Shown under a page until its image arrives. */
 internal val PageTheme.paperColor: Color
     get() = when (this) {

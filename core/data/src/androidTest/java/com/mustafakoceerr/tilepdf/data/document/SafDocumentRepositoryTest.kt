@@ -55,6 +55,19 @@ class SafDocumentRepositoryTest {
     }
 
     @Test
+    fun reopeningTheSourceKeepsTheExistingCopy() = runBlocking {
+        val source = TestDocumentsProvider.uri("pipe", "sample.pdf")
+        val first = repository.prepare(source)
+        val file = File(first.toUri().path!!)
+        // Annotations were saved into the copy since; opening the source again must not lose them.
+        file.appendBytes("%annotated\n".toByteArray())
+        val annotated = file.readBytes()
+
+        assertEquals(first, repository.prepare(source))
+        assertArrayEquals(annotated, file.readBytes())
+    }
+
+    @Test
     fun privateCopyIsReturnedUnchanged() = runBlocking {
         val prepared = repository.prepare(TestDocumentsProvider.uri("pipe", "sample.pdf"))
         assertEquals(prepared, repository.prepare(prepared))

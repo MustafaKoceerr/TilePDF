@@ -190,6 +190,8 @@ fun Modifier.zoomable(
     listState: LazyListState,
     onTap: (Offset) -> Unit = {},
     onLongPress: (Offset) -> Unit = {},
+    /** Pen or eraser active: one finger draws, so it neither pans nor double-taps. */
+    drawing: Boolean = false,
 ): Modifier = this
     .clipToBounds()
     .onSizeChanged { zoomState.viewportWidth = it.width }
@@ -214,11 +216,11 @@ fun Modifier.zoomable(
             if (zoomed) listState.keepAnchor(zoomState.commit())
         }
     }
-    .pointerInput(zoomState) {
+    .pointerInput(zoomState, drawing) {
         // One detector for every tap kind: separate ones would compete, and
         // the first to see a tap would starve the others (e.g. double tap).
         detectTapGestures(
-            onDoubleTap = { focus ->
+            onDoubleTap = if (drawing) null else { focus ->
                 listState.keepAnchor(zoomState.zoomTo(zoomState.doubleTapTarget, focus))
             },
             onTap = { onTap(it) },
@@ -229,7 +231,7 @@ fun Modifier.zoomable(
         state = zoomState.draggableState,
         orientation = Orientation.Horizontal,
         // At 1x there is nothing to pan; leave horizontal drags alone.
-        enabled = zoomState.scale > 1f,
+        enabled = zoomState.scale > 1f && !drawing,
         onDragStopped = { velocity -> zoomState.fling(velocity) },
     )
     .graphicsLayer {

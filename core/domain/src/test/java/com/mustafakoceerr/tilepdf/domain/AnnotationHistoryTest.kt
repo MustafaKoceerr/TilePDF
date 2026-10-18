@@ -106,4 +106,22 @@ class AnnotationHistoryTest {
         assertFalse(history.canUndo)
         assertFalse(history.canRedo)
     }
+
+    @Test
+    fun removeAllIsOneStep() {
+        val history = AnnotationHistory(AnnotationState(listOf(note("a"), note("b"), note("c")), emptySet()))
+        history.removeAll(setOf("a", "c"), setOf(ForeignRef(1, "x")))
+        assertEquals(listOf("b"), history.ids())
+        assertEquals(setOf(ForeignRef(1, "x")), history.state.removedForeign)
+        history.undo()
+        assertEquals(listOf("a", "b", "c"), history.ids())
+        assertFalse(history.canUndo)
+    }
+
+    @Test
+    fun removeAllOfNothingRecordsNothing() {
+        val history = AnnotationHistory(AnnotationState(listOf(note("a")), emptySet()))
+        history.removeAll(setOf("missing"), emptySet())
+        assertFalse(history.canUndo)
+    }
 }

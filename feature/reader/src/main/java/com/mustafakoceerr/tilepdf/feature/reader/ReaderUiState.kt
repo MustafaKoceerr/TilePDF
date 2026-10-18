@@ -1,5 +1,7 @@
 package com.mustafakoceerr.tilepdf.feature.reader
 
+import com.mustafakoceerr.tilepdf.feature.reader.annotation.AnnotationEditing
+import com.mustafakoceerr.tilepdf.feature.reader.annotation.AnnotationsUiState
 import com.mustafakoceerr.tilepdf.feature.reader.components.PageJump
 import com.mustafakoceerr.tilepdf.model.Bookmark
 
@@ -42,10 +44,19 @@ sealed interface ReaderUiState {
         val isCurrentPageBookmarked: Boolean = false,
         /** Bars hidden; a tap on the page brings them back. */
         val isFullScreen: Boolean = false,
+        val annotations: AnnotationsUiState = AnnotationsUiState(),
+        val editing: AnnotationEditing = AnnotationEditing(),
+        /** "Kopya olarak kaydet" finished; the screen opens the copy or says it failed. */
+        val saveCopyResult: SaveCopyResult? = null,
     ) : ReaderUiState
 }
 
 enum class ReaderError { NotFound, Corrupt }
+
+sealed interface SaveCopyResult {
+    data class Saved(val uri: String) : SaveCopyResult
+    data object Failed : SaveCopyResult
+}
 
 data class TocUiState(
     /** Table of contents; empty until loaded, or if the PDF has none. */

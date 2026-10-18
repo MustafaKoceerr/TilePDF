@@ -14,8 +14,9 @@ fun NavController.navigateToReader(uri: String) = navigate(ReaderRoute(uri)) {
     launchSingleTop = true
 }
 
-fun NavGraphBuilder.readerScreen(onBack: () -> Unit) {
+/** [onOpenDocument] replaces the reader with another document, e.g. a saved copy. */
+fun NavGraphBuilder.readerScreen(onBack: () -> Unit, onOpenDocument: (uri: String) -> Unit) {
     composable<ReaderRoute> {
-        ReaderScreen(onBack = onBack)
+        ReaderScreen(onBack = onBack, onOpenDocument = onOpenDocument)
     }
 }

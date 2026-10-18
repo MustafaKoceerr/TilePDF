@@ -48,6 +48,8 @@ import com.mustafakoceerr.tilepdf.core.render.TileGrid
 import com.mustafakoceerr.tilepdf.core.render.tilesFor
 import com.mustafakoceerr.tilepdf.feature.reader.SelectionActions
 import com.mustafakoceerr.tilepdf.feature.reader.SelectionUiState
+import com.mustafakoceerr.tilepdf.feature.reader.annotation.PageDrawing
+import com.mustafakoceerr.tilepdf.model.Annotation
 import com.mustafakoceerr.tilepdf.model.PageTheme
 import com.mustafakoceerr.tilepdf.model.SearchMatch
 import kotlinx.coroutines.FlowPreview
@@ -84,6 +86,10 @@ internal fun PdfPagePager(
     selection: SelectionUiState?,
     selectionActions: SelectionActions,
     modifier: Modifier = Modifier,
+    /** TilePDF's annotations by page. */
+    annotations: Map<Int, List<Annotation>> = emptyMap(),
+    /** Each page's pen or eraser input; null when neither is active. */
+    drawingFor: ((pageIndex: Int) -> PageDrawing)? = null,
 ) {
     val matchesByPage = remember(matches) { matches.groupBy { it.pageIndex } }
 
@@ -129,7 +135,7 @@ internal fun PdfPagePager(
             state = pagerState,
             key = { it },
             beyondViewportPageCount = 0,
-            userScrollEnabled = zoom.scale == 1f,
+            userScrollEnabled = zoom.scale == 1f && drawingFor == null,
             modifier = Modifier.fillMaxSize(),
         ) { pageIndex ->
             val pageSize = pageSizes[pageIndex]
@@ -141,7 +147,7 @@ internal fun PdfPagePager(
             Box(
                 Modifier
                     .fillMaxSize()
-                    .pageGestures(pageZoom, pageIndex, pageSize, onTapPage, onTapOutsidePage, selectionActions),
+                    .pageGestures(pageZoom, pageIndex, pageSize, onTapPage, onTapOutsidePage, selectionActions, drawingFor != null),
             ) {
                 PdfPage(
                     pageIndex = pageIndex,
@@ -153,6 +159,8 @@ internal fun PdfPagePager(
                     currentMatch = currentMatch,
                     selection = selection?.takeIf { it.pageIndex == pageIndex },
                     selectionActions = selectionActions,
+                    annotations = annotations[pageIndex].orEmpty(),
+                    drawing = drawingFor?.invoke(pageIndex),
                     modifier = Modifier
                         .offset { IntOffset(fitted.left, fitted.top) }
                         .graphicsLayer {
@@ -209,6 +217,8 @@ private fun Modifier.pageGestures(
     onTapPage: (pageIndex: Int, x: Float, y: Float) -> Unit,
     onTapOutsidePage: () -> Unit,
     selectionActions: SelectionActions,
+    /** Pen or eraser active: one finger draws, so it neither pans nor double-taps. */
+    drawing: Boolean,
 ): Modifier {
     fun pdfPoint(position: Offset) = zoom.toPagePixels(position)?.let { (x, y) ->
         CoordinateMapper.toPdfPoints(x, y, pageSize, zoom.fitted.width.toFloat())
@@ -227,9 +237,9 @@ private fun Modifier.pageGestures(
                 } while (event.changes.fastAny { it.pressed })
             }
         }
-        .pointerInput(zoom, pageIndex) {
+        .pointerInput(zoom, pageIndex, drawing) {
             detectTapGestures(
-                onDoubleTap = zoom::doubleTap,
+                onDoubleTap = if (drawing) null else zoom::doubleTap,
                 onTap = { position ->
                     pdfPoint(position)?.let { (x, y) -> onTapPage(pageIndex, x, y) } ?: onTapOutsidePage()
                 },
@@ -239,8 +249,8 @@ private fun Modifier.pageGestures(
             )
         }
         // Zoomed, the pager doesn't swipe: one-finger drags pan instead.
-        .pointerInput(zoom, zoom.scale > 1f) {
-            if (zoom.scale <= 1f) return@pointerInput
+        .pointerInput(zoom, zoom.scale > 1f, drawing) {
+            if (zoom.scale <= 1f || drawing) return@pointerInput
             detectDragGestures { change, drag ->
                 change.consume()
                 zoom.panBy(drag)

@@ -42,6 +42,12 @@ minSdk 29
 - Light, night (colour inversion) and sepia pages, recoloured without
   re-rendering
 - Keep screen on while reading
+- Annotations, saved into the PDF itself so other apps show them:
+  highlight, underline or strike out selected text; draw with a pen
+  (colours, three widths) and erase whole strokes; sticky notes; undo and
+  redo. Any markup annotation, also one made by another app, can be tapped
+  and deleted. Every annotation is listed next to the table of contents. A
+  file that can't be written is offered as an annotated copy
 - Tap a page to hide the top bar and system bars for full-screen reading;
   the pages don't move
 - Reopens a document exactly where you left it: page, offset within the page,

@@ -13,6 +13,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
@@ -41,6 +42,13 @@ import com.mustafakoceerr.tilepdf.core.render.RenderedTile
 import com.mustafakoceerr.tilepdf.core.render.Tile
 import com.mustafakoceerr.tilepdf.feature.reader.SelectionActions
 import com.mustafakoceerr.tilepdf.feature.reader.SelectionUiState
+import com.mustafakoceerr.tilepdf.core.geometry.PdfPoint
+import com.mustafakoceerr.tilepdf.feature.reader.annotation.Erased
+import com.mustafakoceerr.tilepdf.feature.reader.annotation.PageDrawing
+import com.mustafakoceerr.tilepdf.feature.reader.annotation.drawAnnotations
+import com.mustafakoceerr.tilepdf.feature.reader.annotation.drawLiveStroke
+import com.mustafakoceerr.tilepdf.feature.reader.annotation.drawingInput
+import com.mustafakoceerr.tilepdf.model.Annotation
 import com.mustafakoceerr.tilepdf.model.PageTheme
 import com.mustafakoceerr.tilepdf.model.SearchMatch
 import kotlin.math.roundToInt
@@ -64,13 +72,27 @@ internal fun PdfPage(
     selection: SelectionUiState?,
     selectionActions: SelectionActions,
     modifier: Modifier = Modifier,
+    /** TilePDF's annotations on this page; PDFium draws everyone else's. */
+    annotations: List<Annotation> = emptyList(),
+    /** Set while the pen or eraser is active: one-finger drags draw or erase. */
+    drawing: PageDrawing? = null,
 ) {
+    // The stroke being drawn and the strokes being erased stay here until the
+    // finger lifts, so drawing redraws this page only, never the screen.
+    var liveStroke by remember { mutableStateOf<List<PdfPoint>>(emptyList()) }
+    var pendingErase by remember { mutableStateOf(Erased.None) }
+    // Cleared once the finished stroke arrives as an annotation: no gap in between.
+    LaunchedEffect(annotations) { liveStroke = emptyList() }
+    val currentDrawing by rememberUpdatedState(drawing)
+    val currentAnnotations by rememberUpdatedState(annotations)
+    // Bumped when the page's content changed and must be rendered again.
+    val version = pageImages.version(pageIndex)
     // Seed from the cache so pages scrolled back into view don't flash blank.
-    var draft by remember(pageIndex, draftWidthPx) {
+    var draft by remember(pageIndex, draftWidthPx, version) {
         mutableStateOf(pageImages.cachedDraft(pageIndex, draftWidthPx))
     }
     // Cancelled automatically when the item leaves the composition.
-    LaunchedEffect(pageIndex, draftWidthPx) {
+    LaunchedEffect(pageIndex, draftWidthPx, version) {
         if (draft == null) draft = pageImages.loadDraft(pageIndex, draftWidthPx)
     }
     val colorFilter = remember(pageTheme) { pageTheme.colorFilter() }
@@ -83,7 +105,25 @@ internal fun PdfPage(
             .fillMaxWidth()
             .aspectRatio(pageSize.aspectRatio)
             .onSizeChanged { pageWidthPx = it.width.toFloat() }
-            .onGloballyPositioned { coordinates = it },
+            .onGloballyPositioned { coordinates = it }
+            .then(
+                if (drawing == null) {
+                    Modifier
+                } else {
+                    Modifier.drawingInput(
+                        tool = drawing.tool,
+                        pageIndex = pageIndex,
+                        drawing = { currentDrawing ?: drawing },
+                        own = { currentAnnotations },
+                        toPoint = { position ->
+                            val (x, y) = CoordinateMapper.toPdfPoints(position.x, position.y, pageSize, pageWidthPx)
+                            PdfPoint(x, y)
+                        },
+                        onLiveStroke = { liveStroke = it },
+                        onLiveErase = { pendingErase = it },
+                    )
+                },
+            ),
     ) {
         Box(
             modifier = Modifier
@@ -97,6 +137,16 @@ internal fun PdfPage(
                     matches.forEach { match ->
                         val color = if (match == currentMatch) CurrentHighlightColor else HighlightColor
                         match.rects.forEach { drawHighlight(it, pageSize, color) }
+                    }
+                    val erasing = pendingErase.ids
+                    drawAnnotations(
+                        if (erasing.isEmpty()) annotations else annotations.filterNot { it.id in erasing },
+                        pageSize,
+                        pageTheme,
+                    )
+                    val pen = drawing
+                    if (pen != null && liveStroke.isNotEmpty()) {
+                        drawLiveStroke(liveStroke, pen.penColor, pen.penWidthPt, pageSize, pageTheme)
                     }
                     selection?.rects?.forEach { drawHighlight(it, pageSize, SelectionColor) }
                 },

@@ -10,23 +10,44 @@ import com.mustafakoceerr.tilepdf.core.render.PageRenderer
 import com.mustafakoceerr.tilepdf.core.text.TextSelection
 import com.mustafakoceerr.tilepdf.core.render.ThumbnailSource
 import com.mustafakoceerr.tilepdf.core.render.TiledPageImageSource
+import com.mustafakoceerr.tilepdf.core.geometry.PdfPoint
+import com.mustafakoceerr.tilepdf.data.annotation.AnnotationRepository
+import com.mustafakoceerr.tilepdf.data.annotation.AnnotationSaveScheduler
+import com.mustafakoceerr.tilepdf.data.annotation.SaveResult
+import com.mustafakoceerr.tilepdf.data.annotation.SessionPasswords
 import com.mustafakoceerr.tilepdf.data.bookmark.BookmarkRepository
 import com.mustafakoceerr.tilepdf.data.library.LibraryRepository
 import com.mustafakoceerr.tilepdf.data.preferences.ReaderPreferencesRepository
 import com.mustafakoceerr.tilepdf.data.text.DocumentTextRepository
 import com.mustafakoceerr.tilepdf.di.ApplicationScope
 import com.mustafakoceerr.tilepdf.domain.OpenDocumentUseCase
+import com.mustafakoceerr.tilepdf.domain.SaveAsCopyUseCase
 import com.mustafakoceerr.tilepdf.domain.OutlineLocator
 import com.mustafakoceerr.tilepdf.domain.OpenedDocument
+import com.mustafakoceerr.tilepdf.feature.reader.annotation.AnnotationController
+import com.mustafakoceerr.tilepdf.feature.reader.annotation.AnnotationEditing
+import com.mustafakoceerr.tilepdf.feature.reader.annotation.AnnotationTarget
+import com.mustafakoceerr.tilepdf.feature.reader.annotation.AnnotationTool
+import com.mustafakoceerr.tilepdf.feature.reader.annotation.AnnotationsUiState
+import com.mustafakoceerr.tilepdf.feature.reader.annotation.Erased
+import com.mustafakoceerr.tilepdf.feature.reader.annotation.NoteEditor
+import com.mustafakoceerr.tilepdf.feature.reader.annotation.annotationAt
+import com.mustafakoceerr.tilepdf.feature.reader.annotation.markupFor
 import com.mustafakoceerr.tilepdf.feature.reader.components.PageJump
 import com.mustafakoceerr.tilepdf.feature.reader.navigation.ReaderRoute
+import com.mustafakoceerr.tilepdf.model.Ink
+import com.mustafakoceerr.tilepdf.model.MarkupKind
+import com.mustafakoceerr.tilepdf.model.Note
 import com.mustafakoceerr.tilepdf.model.PageText
 import com.mustafakoceerr.tilepdf.model.PageTheme
 import com.mustafakoceerr.tilepdf.model.ReadingMode
 import com.mustafakoceerr.tilepdf.model.ReadingPosition
+import com.mustafakoceerr.tilepdf.model.newAnnotationId
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -40,9 +61,12 @@ import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 private const val SAVE_POSITION_DEBOUNCE_MS = 500L
@@ -57,10 +81,33 @@ class ReaderViewModel @Inject constructor(
     private val libraryRepository: LibraryRepository,
     private val preferencesRepository: ReaderPreferencesRepository,
     private val documentTextRepository: DocumentTextRepository,
+    private val annotationRepository: AnnotationRepository,
+    private val saveScheduler: AnnotationSaveScheduler,
+    private val sessionPasswords: SessionPasswords,
+    private val saveAsCopy: SaveAsCopyUseCase,
     @param:ApplicationScope private val applicationScope: CoroutineScope,
 ) : ViewModel() {
 
     private val uri = savedStateHandle.toRoute<ReaderRoute>().uri
+
+    /**
+     * What to open: the route's URI at first, then the URI it was opened as,
+     * possibly a private copy. Reopening a copy must not copy its source again.
+     */
+    private var documentUri = uri
+
+    /**
+     * A document replaced by a reopen. Closed only once its successor is open,
+     * when its pages have long left the screen: a render still running on it
+     * must not find it closed.
+     */
+    private var retiring: OpenedDocument? = null
+
+    /** Reopens the document when a save wrote a new version; one per controller. */
+    private var fileSavedJob: Job? = null
+
+    /** The outcome of "Kopya olarak kaydet", until the screen has acted on it. */
+    private val saveCopyResult = MutableStateFlow<SaveCopyResult?>(null)
     private var openJob: Job? = null
 
     private val documentState = MutableStateFlow<DocumentState>(DocumentState.Loading)
@@ -83,14 +130,23 @@ class ReaderViewModel @Inject constructor(
     private var selectionJob: Job? = null
     private val positionUpdates = MutableSharedFlow<ReadingPosition>(extraBufferCapacity = 1)
 
+    /** The open document's annotations; replaced when the document is (re)opened. */
+    private val controller = MutableStateFlow<AnnotationController?>(null)
+    private val editing = MutableStateFlow(AnnotationEditing())
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private val annotations = controller.flatMapLatest { it?.state ?: flowOf(AnnotationsUiState()) }
+
     val uiState: StateFlow<ReaderUiState> = combine(
         documentState,
         preferencesRepository.preferences,
-        searchState,
-        toc,
+        combine(searchState, toc, ::Pair),
         combine(selection, linkTargets, currentPage, fullScreen, startPosition, ::PageState),
-    ) { document, preferences, search, toc, pageState ->
+        combine(annotations, editing, saveCopyResult, ::Triple),
+    ) { document, preferences, searchAndToc, pageState, annotationUi ->
+        val (search, toc) = searchAndToc
         val (selection, links, page, fullScreen, start) = pageState
+        val (annotations, editing, copyResult) = annotationUi
         when (document) {
             DocumentState.Loading -> ReaderUiState.Loading
             is DocumentState.Failed -> ReaderUiState.Error(document.reason)
@@ -110,6 +166,9 @@ class ReaderViewModel @Inject constructor(
                 currentPage = page,
                 isCurrentPageBookmarked = toc.bookmarks.any { it.pageIndex == page },
                 isFullScreen = fullScreen,
+                annotations = annotations,
+                editing = editing,
+                saveCopyResult = copyResult,
             )
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ReaderUiState.Loading)
@@ -128,7 +187,14 @@ class ReaderViewModel @Inject constructor(
         documentState.value = DocumentState.Loading
         openJob = viewModelScope.launch {
             documentState.value = try {
-                val opened = openDocument(uri, password)
+                val opened = try {
+                    openDocument(documentUri, password)
+                } finally {
+                    retireReplacedDocument()
+                }
+                documentUri = opened.uri
+                // Kept in memory so a background save can reopen the file.
+                if (password != null) sessionPasswords.remember(opened.uri, password)
                 loadOutline(opened.document)
                 currentPage.value = opened.position.pageIndex
                 observeBookmarks(opened)
@@ -136,7 +202,7 @@ class ReaderViewModel @Inject constructor(
                     opened = opened,
                     pageImages = TiledPageImageSource(opened.document, pageRenderer, viewModelScope),
                     thumbnails = ThumbnailSource(opened.document, pageRenderer),
-                )
+                ).also(::startAnnotations)
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
                 when (val failure = openFailureFor(e) ?: throw e) {
@@ -147,14 +213,98 @@ class ReaderViewModel @Inject constructor(
         }
     }
 
+    private fun startAnnotations(state: DocumentState.Opened) {
+        controller.value?.close()
+        val opened = state.opened
+        val created = AnnotationController(opened.uri, annotationRepository, saveScheduler, applicationScope) { ref, hidden ->
+            // The document may close while this runs; then there's nothing left to redraw.
+            runCatchingCancellable {
+                opened.document.setForeignHidden(ref.pageIndex, ref.key, hidden)
+                withContext(Dispatchers.Main) {
+                    state.pageImages.invalidate(ref.pageIndex)
+                    state.thumbnails.invalidate(ref.pageIndex)
+                }
+            }
+        }
+        controller.value = created
+        viewModelScope.launch {
+            // Unreadable annotations leave editing off rather than the document closed.
+            runCatchingCancellable { created.prepare(opened.document) }
+        }
+        fileSavedJob?.cancel()
+        fileSavedJob = viewModelScope.launch {
+            created.fileSaved.collect { reopenAfterSave(state) }
+        }
+    }
+
+    private fun retireReplacedDocument() {
+        val old = retiring ?: return
+        retiring = null
+        old.document.close()
+        applicationScope.launch { documentTextRepository.release(old.document) }
+    }
+
     /**
-     * A tap at top-left point ([x], [y]) on [pageIndex]: clears a selection
-     * if there is one, otherwise follows a link there.
+     * A save wrote a new version of the file, so the open document is the old
+     * one: reopen at the same place. Positions of other apps' annotations may
+     * have shifted, and the undo history ends here.
+     */
+    private fun reopenAfterSave(old: DocumentState.Opened) {
+        if (documentState.value !== old) return
+        startPosition.value = position ?: old.opened.position
+        // Pending tile renders of the old version stop here.
+        old.pageImages.requestTiles(emptyList())
+        retiring = old.opened
+        open(sessionPasswords.get(old.opened.uri))
+    }
+
+    /** The screen went to the background: save what's unsaved. */
+    fun onStop() {
+        controller.value?.requestSave()
+    }
+
+    /** Writes the annotated document into [target], a file the user picked, and opens it. */
+    fun onSaveCopy(target: String) {
+        val opened = (documentState.value as? DocumentState.Opened)?.opened ?: return
+        val controller = controller.value ?: return
+        viewModelScope.launch {
+            controller.flush()
+            val result = saveAsCopy(opened.uri, target, opened.displayName, opened.document.pageCount)
+            saveCopyResult.value = if (result is SaveResult.Saved) SaveCopyResult.Saved(result.uri) else SaveCopyResult.Failed
+        }
+    }
+
+    fun onSaveCopyResultHandled() {
+        saveCopyResult.value = null
+    }
+
+    /** Tries the background save again after it failed. */
+    fun onRetrySave() {
+        controller.value?.requestSave()
+    }
+
+    /**
+     * A tap at top-left point ([x], [y]) on [pageIndex]: clears a selection,
+     * places a note, opens a tapped annotation's menu, follows a link, or
+     * toggles full screen, in that order. Pen and eraser handle their own taps.
      */
     fun onTap(pageIndex: Int, x: Float, y: Float) {
         if (selection.value != null) {
             selection.value = null
             return
+        }
+        val tools = editing.value
+        if (tools.drawing) return
+        val annotations = controller.value?.state?.value
+        if (tools.annotating && tools.tool == AnnotationTool.Note) {
+            if (annotations?.ready == true) editing.update { it.copy(noteEditor = NoteEditor(pageIndex, PdfPoint(x, y), null)) }
+            return
+        }
+        if (annotations?.ready == true) {
+            annotationAt(annotations.own, annotations.foreign, pageIndex, PdfPoint(x, y))?.let { target ->
+                editing.update { it.copy(menu = target) }
+                return
+            }
         }
         val document = openedDocument() ?: return
         viewModelScope.launch {
@@ -242,8 +392,104 @@ class ReaderViewModel @Inject constructor(
         viewModelScope.launch { preferencesRepository.setKeepScreenOn(enabled) }
     }
 
+    /** Marks up the selected text and clears the selection. */
+    fun onMarkup(kind: MarkupKind) {
+        val selected = selection.value?.toUiState() ?: return
+        val controller = controller.value?.takeIf { it.state.value.ready } ?: return
+        selection.value = null
+        viewModelScope.launch {
+            controller.add(markupFor(selected, kind, preferencesRepository.preferences.first().markupColor))
+        }
+    }
+
+    fun onAnnotationMenuDismissed() = editing.update { it.copy(menu = null) }
+
+    /** Deletes TilePDF's annotation or hides another app's until the next save. */
+    fun onDeleteAnnotation(target: AnnotationTarget) {
+        val controller = controller.value ?: return
+        when (target) {
+            is AnnotationTarget.Own -> controller.remove(target.annotation.id)
+            is AnnotationTarget.Foreign -> controller.removeForeign(target.annotation.ref)
+        }
+        editing.update { it.copy(menu = null) }
+    }
+
+    fun onEditNote(note: Note) = editing.update { it.copy(menu = null, noteEditor = NoteEditor(note.pageIndex, note.at, note)) }
+
+    /** Saves the note being written; blank text adds nothing, or deletes the note being edited. */
+    fun onNoteSubmitted(text: String) {
+        val editor = editing.value.noteEditor ?: return
+        val controller = controller.value ?: return
+        editing.update { it.copy(noteEditor = null) }
+        val edited = editor.editing
+        when {
+            edited != null && text.isBlank() -> controller.remove(edited.id)
+            edited != null -> controller.replace(edited.id, edited.copy(id = newAnnotationId(), text = text))
+            text.isNotBlank() -> viewModelScope.launch {
+                val color = preferencesRepository.preferences.first().markupColor
+                controller.add(Note(newAnnotationId(), editor.pageIndex, color, editor.at, text))
+            }
+        }
+    }
+
+    fun onNoteDeleted() {
+        val edited = editing.value.noteEditor?.editing ?: return
+        controller.value?.remove(edited.id)
+        editing.update { it.copy(noteEditor = null) }
+    }
+
+    fun onNoteDismissed() = editing.update { it.copy(noteEditor = null) }
+
+    fun onUndo() {
+        controller.value?.undo()
+    }
+
+    /** Shows or hides the annotation toolbar; hiding it goes back to reading. */
+    fun onToggleAnnotating() = editing.update {
+        if (it.annotating) AnnotationEditing() else it.copy(annotating = true, tool = AnnotationTool.Select)
+    }
+
+    fun onToolSelected(tool: AnnotationTool) {
+        // The pen and eraser need both hands free of a selection.
+        if (tool == AnnotationTool.Pen || tool == AnnotationTool.Eraser) selection.value = null
+        editing.update { it.copy(tool = tool) }
+    }
+
+    fun onMarkupColorSelected(color: Int) {
+        viewModelScope.launch { preferencesRepository.setMarkupColor(color) }
+    }
+
+    fun onPenColorSelected(color: Int) {
+        viewModelScope.launch { preferencesRepository.setPenColor(color) }
+    }
+
+    fun onPenWidthSelected(widthPt: Float) {
+        viewModelScope.launch { preferencesRepository.setPenWidth(widthPt) }
+    }
+
+    /** A finished pen stroke on [pageIndex], in top-left points. */
+    fun onInkStroke(pageIndex: Int, points: List<PdfPoint>) {
+        if (points.isEmpty()) return
+        val controller = controller.value?.takeIf { it.state.value.ready } ?: return
+        viewModelScope.launch {
+            val preferences = preferencesRepository.preferences.first()
+            controller.add(Ink(newAnnotationId(), pageIndex, preferences.penColor, preferences.penWidthPt, listOf(points)))
+        }
+    }
+
+    /** Everything one eraser gesture crossed, removed as one undo step. */
+    fun onErase(erased: Erased) {
+        controller.value?.removeAll(erased.ids, erased.refs)
+    }
+
+    fun onRedo() {
+        controller.value?.redo()
+    }
+
     /** Selects the word at a point on a page, given in top-left PDF points. */
     fun onLongPress(pageIndex: Int, x: Float, y: Float) {
+        // One-finger drags draw or erase: holding still must not select text.
+        if (editing.value.drawing) return
         selectionJob?.cancel()
         val document = openedDocument() ?: return
         selectionJob = viewModelScope.launch {
@@ -354,6 +600,12 @@ class ReaderViewModel @Inject constructor(
     }
 
     override fun onCleared() {
+        // Writes and the save request run on the application scope: they outlive this screen.
+        controller.value?.let {
+            it.requestSave()
+            it.close()
+        }
+        retireReplacedDocument()
         val document = openedDocument() ?: return
         document.close()
         // viewModelScope is already cancelled here.
