@@ -6,6 +6,7 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import com.mustafakoceerr.tilepdf.core.geometry.PageViewTransform
 import com.mustafakoceerr.tilepdf.core.pdf.PdfDocument
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -46,6 +47,8 @@ class TiledPageImageSource(
     private val scope: CoroutineScope,
     tileCacheBytes: Int = defaultTileCacheBytes(),
     @get:VisibleForTesting internal val bitmapPool: BitmapPool = BitmapPool(BITMAP_POOL_BYTES),
+    /** How each page is shown when turned or cropped; a change needs a new source. */
+    private val transforms: List<PageViewTransform> = emptyList(),
 ) : PageImageSource {
 
     private val liveTiles = mutableStateMapOf<TileKey, RenderedTile>()
@@ -83,7 +86,7 @@ class TiledPageImageSource(
 
     override suspend fun loadDraft(pageIndex: Int, widthPx: Int): Bitmap =
         cachedDraft(pageIndex, widthPx)
-            ?: pageRenderer.renderPage(document, pageIndex, widthPx)
+            ?: pageRenderer.renderPage(document, pageIndex, widthPx, transforms.getOrNull(pageIndex))
                 .also { draftCache.put(pageIndex, it) }
 
     override fun requestTiles(tiles: List<Tile>) {
@@ -190,7 +193,7 @@ class TiledPageImageSource(
         // take a bitmap out of the pool.
         val reuse = bitmapPool.acquire(tile.bounds.width * tile.bounds.height * BYTES_PER_PIXEL)
         val bitmap = try {
-            pageRenderer.renderTile(document, tile, reuse)
+            pageRenderer.renderTile(document, tile, reuse, transforms.getOrNull(tile.key.pageIndex))
         } catch (e: CancellationException) {
             // The render itself always runs to completion before the
             // cancellation surfaces, so the bitmap is free again.
