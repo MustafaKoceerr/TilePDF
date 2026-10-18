@@ -27,14 +27,39 @@
 
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <!-- "Open with" from file managers, mail and browsers. -->
+            <!-- "Open with" from file managers, mail and browsers. Some apps still
+                 send the legacy application/x-pdf. -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
 
                 <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
 
                 <data android:scheme="content" />
                 <data android:mimeType="application/pdf" />
+                <data android:mimeType="application/x-pdf" />
+            </intent-filter>
+            <!-- File managers that don't know the type (application/octet-stream
+                 or */*) but whose URI ends in .pdf. pathPattern isn't greedy, so a
+                 dot earlier in the path needs its own repetition. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <data android:scheme="content" />
+                <data android:host="*" />
+                <data android:mimeType="application/octet-stream" />
+                <data android:mimeType="*/*" />
+                <data android:pathPattern=".*\\.pdf" />
+                <data android:pathPattern=".*\\..*\\.pdf" />
+                <data android:pathPattern=".*\\..*\\..*\\.pdf" />
+                <data android:pathPattern=".*\\..*\\..*\\..*\\.pdf" />
+                <data android:pathPattern=".*\\.PDF" />
+                <data android:pathPattern=".*\\..*\\.PDF" />
+                <data android:pathPattern=".*\\..*\\..*\\.PDF" />
+                <data android:pathPattern=".*\\..*\\..*\\..*\\.PDF" />
             </intent-filter>
             <!-- "Share" a PDF to TilePDF. -->
             <intent-filter>
@@ -43,6 +68,7 @@
                 <category android:name="android.intent.category.DEFAULT" />
 
                 <data android:mimeType="application/pdf" />
+                <data android:mimeType="application/x-pdf" />
             </intent-filter>
         </activity>
 
