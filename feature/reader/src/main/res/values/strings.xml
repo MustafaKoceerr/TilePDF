@@ -1,0 +1,25 @@
+<resources>
+    <string name="reader_untitled">TilePDF</string>
+    <string name="navigate_back">Geri</string>
+    <string name="cancel">İptal</string>
+    <string name="reader_page_description">Sayfa %1$d</string>
+    <string name="reader_night_mode">Gece modu</string>
+    <string name="reader_search">Ara</string>
+    <string name="reader_search_hint">Belgede ara</string>
+    <string name="reader_search_close">Aramayı kapat</string>
+    <string name="reader_search_previous">Önceki sonuç</string>
+    <string name="reader_search_next">Sonraki sonuç</string>
+    <string name="reader_search_counter">%1$d / %2$d</string>
+    <string name="reader_search_no_results">Sonuç yok</string>
+    <string name="reader_page_indicator">%1$d / %2$d</string>
+    <string name="reader_fast_scroll">Hızlı kaydırma</string>
+    <string name="reader_go_to_page">Sayfaya git</string>
+    <string name="reader_go_to_page_range">1 ile %1$d arasında bir sayfa</string>
+    <string name="reader_go_to_page_confirm">Git</string>
+    <string name="reader_toc">İçindekiler</string>
+    <string name="reader_more_options">Diğer seçenekler</string>
+    <string name="reader_copied">Kopyalandı</string>
+    <string name="reader_error_not_found">Dosya bulunamadı veya erişim izni yok.</string>
+    <string name="reader_error_password">Şifreli PDF\'ler henüz desteklenmiyor.</string>
+    <string name="reader_error_corrupt">PDF açılamadı; dosya bozuk olabilir.</string>
+</resources>

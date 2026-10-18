@@ -1,0 +1,8 @@
+<resources>
+    <string name="library_title">Kütüphane</string>
+    <string name="library_open_pdf">PDF Aç</string>
+    <string name="library_empty">Henüz bir PDF açmadın.\nBaşlamak için \"PDF Aç\"a dokun.</string>
+    <string name="library_page_progress">Sayfa %1$d / %2$d</string>
+    <string name="library_remove">Kütüphaneden kaldır</string>
+    <string name="library_no_access">Erişim izni yok, dosyayı yeniden aç</string>
+</resources>

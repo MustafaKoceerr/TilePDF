@@ -50,11 +50,32 @@ androidx-room-testing = { group = "androidx.room", name = "room-testing", versio
 androidx-room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
 androidx-datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "datastore" }
 pdfbox-android = { group = "com.tom-roush", name = "pdfbox-android", version.ref = "pdfbox" }
+androidx-test-core = { group = "androidx.test", name = "core", version = "1.7.0" }
+androidx-test-runner = { group = "androidx.test", name = "runner", version = "1.7.0" }
+
+# Dependencies of the included build-logic
+android-gradlePlugin = { group = "com.android.tools.build", name = "gradle", version.ref = "agp" }
+kotlin-gradlePlugin = { group = "org.jetbrains.kotlin", name = "kotlin-gradle-plugin", version.ref = "kotlin" }
+compose-gradlePlugin = { group = "org.jetbrains.kotlin", name = "compose-compiler-gradle-plugin", version.ref = "kotlin" }
+ksp-gradlePlugin = { group = "com.google.devtools.ksp", name = "symbol-processing-gradle-plugin", version.ref = "ksp" }
+room-gradlePlugin = { group = "androidx.room", name = "room-gradle-plugin", version.ref = "room" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
+android-library = { id = "com.android.library", version.ref = "agp" }
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 hilt = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
 room = { id = "androidx.room", version.ref = "room" }
+
+# Plugins defined by this project (build-logic)
+tilepdf-android-application = { id = "tilepdf.android.application" }
+tilepdf-android-application-compose = { id = "tilepdf.android.application.compose" }
+tilepdf-android-library = { id = "tilepdf.android.library" }
+tilepdf-android-library-compose = { id = "tilepdf.android.library.compose" }
+tilepdf-android-feature = { id = "tilepdf.android.feature" }
+tilepdf-android-room = { id = "tilepdf.android.room" }
+tilepdf-hilt = { id = "tilepdf.hilt" }
+tilepdf-jvm-library = { id = "tilepdf.jvm.library" }

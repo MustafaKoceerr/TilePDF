@@ -1,4 +1,5 @@
 pluginManagement {
+    includeBuild("build-logic")
     repositories {
         google {
             content {
@@ -23,4 +24,17 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "TilePDF"
+enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 include(":app")
+include(":core:common")
+include(":core:data")
+include(":core:database")
+include(":core:datastore")
+include(":core:designsystem")
+include(":core:domain")
+include(":core:model")
+include(":core:pdf")
+include(":core:render")
+include(":core:testing")
+include(":feature:library")
+include(":feature:reader")
