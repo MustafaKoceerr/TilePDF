@@ -20,6 +20,7 @@ work = "2.11.2"
 navigationCompose = "2.10.2"
 kotlinxSerialization = "1.11.0"
 coroutines = "1.11.0"
+mlkitTextRecognition = "16.0.1"
 turbine = "1.2.1"
 room = "2.8.5"
 datastore = "1.2.1"
@@ -62,6 +63,7 @@ androidx-work-runtime-ktx = { group = "androidx.work", name = "work-runtime-ktx"
 androidx-work-testing = { group = "androidx.work", name = "work-testing", version.ref = "work" }
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerialization" }
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
+mlkit-text-recognition = { group = "com.google.mlkit", name = "text-recognition", version.ref = "mlkitTextRecognition" }
 kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutines" }
 turbine = { group = "app.cash.turbine", name = "turbine", version.ref = "turbine" }
 androidx-room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "room" }

@@ -5,6 +5,7 @@ import com.mustafakoceerr.tilepdf.model.Annotation
 import com.mustafakoceerr.tilepdf.model.AnnotationDraft
 import com.mustafakoceerr.tilepdf.model.FileStamp
 import com.mustafakoceerr.tilepdf.model.ForeignRef
+import com.mustafakoceerr.tilepdf.model.OcrWord
 import com.mustafakoceerr.tilepdf.model.SaveError
 import kotlinx.coroutines.flow.Flow
 
@@ -39,6 +40,12 @@ interface AnnotationRepository {
 
     /** Records form field [name] filled in with [value]; the draft is dirty until it's saved. */
     suspend fun setFormValue(uri: String, name: String, value: String)
+
+    /** Keeps [words] recognised on [pageIndex] until they are saved; the draft is dirty until then. */
+    suspend fun setRecognizedText(uri: String, pageIndex: Int, words: List<OcrWord>)
+
+    /** The words waiting to be saved on each of [pages] that has some. */
+    suspend fun recognizedText(uri: String, pages: Set<Int>): Map<Int, List<OcrWord>>
 
     /**
      * Records that [saved] is now in the file, whose version is [newBase].

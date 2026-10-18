@@ -6,6 +6,7 @@ import android.os.ParcelFileDescriptor
 import androidx.annotation.VisibleForTesting
 import com.mustafakoceerr.tilepdf.core.geometry.PdfRect
 import com.mustafakoceerr.tilepdf.model.FormField
+import com.mustafakoceerr.tilepdf.model.OcrWord
 import com.mustafakoceerr.tilepdf.model.OutlineEntry
 import com.mustafakoceerr.tilepdf.model.PageAnnotations
 import com.mustafakoceerr.tilepdf.model.PageText
@@ -181,6 +182,17 @@ class PdfiumDocument internal constructor(
                 is FormEdit.SetChoice -> PdfiumNative.nativeSetFormChoice(handle, edit.pageIndex, edit.annotIndex, edit.optionIndex)
             }
         }
+    }
+
+    override suspend fun hasRecognizedText(pageIndex: Int): Boolean =
+        withDocument(pageIndex) { PdfiumNative.nativeHasRecognizedText(it, pageIndex) }
+
+    override suspend fun addRecognizedText(pageIndex: Int, words: List<OcrWord>) {
+        if (words.isEmpty()) return
+        val texts = words.map { it.text }.toTypedArray()
+        val quads = words.flatMap { word -> word.quad.flatMap { listOf(it.x, it.y) } }.toFloatArray()
+        val added = withDocument(pageIndex) { PdfiumNative.nativeAddRecognizedText(it, pageIndex, texts, quads) }
+        if (!added) throw PdfWriteException("Could not add recognised text to page $pageIndex")
     }
 
     internal suspend fun <T> withDocument(pageIndex: Int? = null, block: (Long) -> T): T {

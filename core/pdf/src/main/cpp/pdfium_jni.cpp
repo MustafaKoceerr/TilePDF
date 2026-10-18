@@ -27,6 +27,12 @@ namespace {
 
 bool g_initialized = false;
 
+// The fallback font's bytes, also the font recognised text is written in.
+std::vector<uint8_t> g_textFont;
+
+// The content mark on the invisible text objects of recognised words.
+constexpr char kOcrMark[] = "TilePdfOcr";
+
 // NativePageText(String, float[]), resolved once in JNI_OnLoad.
 jclass g_pageTextClass = nullptr;
 jmethodID g_pageTextConstructor = nullptr;
@@ -108,6 +114,8 @@ struct NativeDocument {
     // PDFium keeps a pointer to formInfo, so it lives as long as the form.
     FPDF_FORMFILLINFO formInfo{};
     FPDF_FORMHANDLE form = nullptr;
+    // The embedded font of recognised text, loaded when first needed.
+    FPDF_FONT textFont = nullptr;
 
     // The loaded page [index], from the cache when possible; null if it
     // can't be loaded. Owned by this document: callers must not close it.
@@ -145,6 +153,7 @@ struct NativeDocument {
     void Close() {
         Trim();
         if (form) FPDFDOC_ExitFormFillEnvironment(form);
+        if (textFont) FPDFFont_Close(textFont);
         FPDF_CloseDocument(document);
     }
 };
@@ -321,6 +330,56 @@ FS_POINTF ToPage(FPDF_PAGE page, float x, float y) {
     double pageX = 0, pageY = 0;
     TopLeftToPage(page, x, y, &pageX, &pageY);
     return FS_POINTF{static_cast<float>(pageX), static_cast<float>(pageY)};
+}
+
+// Whether [object] carries the content mark [name].
+bool HasMark(FPDF_PAGEOBJECT object, const char* name) {
+    const int count = FPDFPageObj_CountMarks(object);
+    for (int i = 0; i < count; ++i) {
+        FPDF_PAGEOBJECTMARK mark = FPDFPageObj_GetMark(object, static_cast<unsigned long>(i));
+        unsigned long bytes = 0;
+        if (!mark || !FPDFPageObjMark_GetName(mark, nullptr, 0, &bytes) || bytes <= sizeof(FPDF_WCHAR)) continue;
+        std::vector<FPDF_WCHAR> value(bytes / sizeof(FPDF_WCHAR));
+        if (!FPDFPageObjMark_GetName(mark, value.data(), bytes, &bytes)) continue;
+        value.pop_back();
+        size_t length = 0;
+        while (name[length]) ++length;
+        if (value.size() != length) continue;
+        bool same = true;
+        for (size_t c = 0; c < length && same; ++c) same = value[c] == static_cast<FPDF_WCHAR>(name[c]);
+        if (same) return true;
+    }
+    return false;
+}
+
+// Puts [text] on [page] as an invisible text object filling the quad whose
+// corners, top-left, top-right, bottom-right and bottom-left as read, are in
+// page user space.
+bool AddInvisibleWord(FPDF_DOCUMENT document, FPDF_PAGE page, FPDF_FONT font,
+                      const std::vector<FPDF_WCHAR>& text, const FS_POINTF quad[4]) {
+    FPDF_PAGEOBJECT object = FPDFPageObj_CreateTextObj(document, font, 1.0f);
+    if (!object) return false;
+    float left = 0, bottom = 0, right = 0, top = 0;
+    if (!FPDFText_SetText(object, text.data()) ||
+        !FPDFTextObj_SetTextRenderMode(object, FPDF_TEXTRENDERMODE_INVISIBLE) ||
+        !FPDFPageObj_AddMark(object, kOcrMark) ||
+        !FPDFPageObj_GetBounds(object, &left, &bottom, &right, &top) || right <= left || top <= bottom) {
+        FPDFPageObj_Destroy(object);
+        return false;
+    }
+    // The object's box, at size 1 at the origin, onto the quad: its bottom
+    // edge runs from the bottom-left to the bottom-right corner, its left
+    // edge from the bottom-left to the top-left one.
+    const FS_POINTF& origin = quad[3];
+    const double width = right - left;
+    const double height = top - bottom;
+    const double a = (quad[2].x - origin.x) / width;
+    const double b = (quad[2].y - origin.y) / width;
+    const double c = (quad[0].x - origin.x) / height;
+    const double d = (quad[0].y - origin.y) / height;
+    FPDFPageObj_Transform(object, a, b, c, d, origin.x - a * left - c * bottom, origin.y - b * left - d * bottom);
+    FPDFPage_InsertObject(page, object);
+    return true;
 }
 
 constexpr float kNoteIconSize = 20;
@@ -565,11 +624,12 @@ Java_com_mustafakoceerr_tilepdf_core_pdf_PdfiumNative_nativeInit(JNIEnv* env, jc
     config.version = 2;
     FPDF_InitLibraryWithConfig(&config);
     if (formFallbackFont) {
-        // PDFium copies the bytes; ours are released right after.
+        // PDFium copies the bytes; so do we, for recognised text.
         const jsize size = env->GetArrayLength(formFallbackFont);
         jbyte* bytes = env->GetByteArrayElements(formFallbackFont, nullptr);
         if (bytes) {
             FPDF_TilePdfSetFormFallbackFont(reinterpret_cast<const uint8_t*>(bytes), static_cast<uint32_t>(size));
+            g_textFont.assign(reinterpret_cast<const uint8_t*>(bytes), reinterpret_cast<const uint8_t*>(bytes) + size);
             env->ReleaseByteArrayElements(formFallbackFont, bytes, JNI_ABORT);
         }
     }
@@ -1178,6 +1238,53 @@ Java_com_mustafakoceerr_tilepdf_core_pdf_PdfiumNative_nativeSetFormChoice(
     const bool selected = FORM_SetIndexSelected(document->form, page, optionIndex, true);
     FORM_ForceToKillFocus(document->form);
     return selected ? JNI_TRUE : JNI_FALSE;
+}
+
+// Adds recognised words to page [index] as invisible text: [texts] holds the
+// words, [quads] each word's four top-left corners in reading order as x, y
+// pairs. The page then draws as before but has their text.
+JNIEXPORT jboolean JNICALL
+Java_com_mustafakoceerr_tilepdf_core_pdf_PdfiumNative_nativeAddRecognizedText(
+        JNIEnv* env, jclass, jlong handle, jint index, jobjectArray texts, jfloatArray quads) {
+    NativeDocument* document = FromHandle(handle);
+    FPDF_PAGE page = document->Page(index);
+    if (!page || g_textFont.empty()) return JNI_FALSE;
+    const jsize count = env->GetArrayLength(texts);
+    if (env->GetArrayLength(quads) != count * 8) return JNI_FALSE;
+    if (!document->textFont) {
+        document->textFont = FPDFText_LoadFont(document->document, g_textFont.data(),
+                                               static_cast<uint32_t>(g_textFont.size()), FPDF_FONT_TRUETYPE, true);
+        if (!document->textFont) return JNI_FALSE;
+    }
+    std::vector<jfloat> values(static_cast<size_t>(count) * 8);
+    env->GetFloatArrayRegion(quads, 0, count * 8, values.data());
+    for (jsize i = 0; i < count; ++i) {
+        auto word = static_cast<jstring>(env->GetObjectArrayElement(texts, i));
+        const jsize length = env->GetStringLength(word);
+        std::vector<FPDF_WCHAR> text(static_cast<size_t>(length) + 1, 0);
+        env->GetStringRegion(word, 0, length, reinterpret_cast<jchar*>(text.data()));
+        env->DeleteLocalRef(word);
+        FS_POINTF quad[4];
+        for (int corner = 0; corner < 4; ++corner) {
+            const size_t at = static_cast<size_t>(i) * 8 + static_cast<size_t>(corner) * 2;
+            quad[corner] = ToPage(page, values[at], values[at + 1]);
+        }
+        if (!AddInvisibleWord(document->document, page, document->textFont, text, quad)) return JNI_FALSE;
+    }
+    return FPDFPage_GenerateContent(page) ? JNI_TRUE : JNI_FALSE;
+}
+
+// Whether page [index] has text TilePDF recognised.
+JNIEXPORT jboolean JNICALL
+Java_com_mustafakoceerr_tilepdf_core_pdf_PdfiumNative_nativeHasRecognizedText(JNIEnv*, jclass, jlong handle, jint index) {
+    FPDF_PAGE page = FromHandle(handle)->Page(index);
+    if (!page) return JNI_FALSE;
+    const int count = FPDFPage_CountObjects(page);
+    for (int i = 0; i < count; ++i) {
+        FPDF_PAGEOBJECT object = FPDFPage_GetObject(page, i);
+        if (FPDFPageObj_GetType(object) == FPDF_PAGEOBJ_TEXT && HasMark(object, kOcrMark)) return JNI_TRUE;
+    }
+    return JNI_FALSE;
 }
 
 }  // extern "C"

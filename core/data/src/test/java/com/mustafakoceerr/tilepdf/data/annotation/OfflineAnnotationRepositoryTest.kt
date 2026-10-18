@@ -6,6 +6,7 @@ import com.mustafakoceerr.tilepdf.model.Annotation
 import com.mustafakoceerr.tilepdf.model.FileStamp
 import com.mustafakoceerr.tilepdf.model.ForeignRef
 import com.mustafakoceerr.tilepdf.model.Note
+import com.mustafakoceerr.tilepdf.model.OcrWord
 import com.mustafakoceerr.tilepdf.model.PageAnnotations
 import com.mustafakoceerr.tilepdf.model.SaveError
 import kotlinx.coroutines.flow.first
@@ -20,8 +21,9 @@ class OfflineAnnotationRepositoryTest {
 
     private val uri = "content://book"
     private val dao = FakeAnnotationDraftDao()
+    private val recognized = FakeRecognizedTextDao()
     private var stamp: FileStamp? = FileStamp(100, 5)
-    private val repository = OfflineAnnotationRepository(dao, stamps = { stamp }, now = { 1L })
+    private val repository = OfflineAnnotationRepository(dao, recognized, stamps = { stamp }, now = { 1L })
     private val document = FakePdfDocument(List(3) { "" })
 
     private fun note(id: String, page: Int = 0): Annotation = Note(id, page, 0xFFFFEB3B.toInt(), PdfPoint(1f, 1f), "")
@@ -202,5 +204,58 @@ class OfflineAnnotationRepositoryTest {
         repository.prepare("content://other", document)
         repository.update(uri, listOf(note("tilepdf-x")), emptySet())
         assertEquals(listOf(uri), repository.dirtyUris())
+    }
+
+    private fun words(text: String) =
+        listOf(OcrWord(text, listOf(PdfPoint(0f, 0f), PdfPoint(9f, 0f), PdfPoint(9f, 4f), PdfPoint(0f, 4f))))
+
+    @Test
+    fun recognizedTextIsPendingUntilSaved() = runTest {
+        repository.prepare(uri, document)
+
+        repository.setRecognizedText(uri, 1, words("bir"))
+
+        val draft = stored()
+        assertTrue(draft.dirty)
+        assertEquals(setOf(1), draft.recognizedPages)
+        assertEquals(mapOf(1 to words("bir")), repository.recognizedText(uri, setOf(1)))
+    }
+
+    @Test
+    fun markSavedDropsTheSavedPagesAndKeepsNewerOnes() = runTest {
+        repository.prepare(uri, document)
+        repository.setRecognizedText(uri, 0, words("bir"))
+        val saved = stored()
+        repository.setRecognizedText(uri, 2, words("üç"))
+
+        repository.markSaved(uri, saved, FileStamp(200, 6))
+
+        val draft = stored()
+        assertEquals(setOf(2), draft.recognizedPages)
+        assertTrue(draft.dirty)
+    }
+
+    @Test
+    fun savingEveryRecognizedPageLeavesTheDraftClean() = runTest {
+        repository.prepare(uri, document)
+        repository.setRecognizedText(uri, 0, words("bir"))
+
+        repository.markSaved(uri, stored(), FileStamp(200, 6))
+
+        assertEquals(emptySet<Int>(), stored().recognizedPages)
+        assertFalse(stored().dirty)
+    }
+
+    @Test
+    fun moveToKeepsOnlyTheUnsavedPages() = runTest {
+        repository.prepare(uri, document)
+        repository.setRecognizedText(uri, 0, words("bir"))
+        val saved = stored()
+        repository.setRecognizedText(uri, 1, words("iki"))
+
+        repository.moveTo(uri, "content://copy", saved, FileStamp(300, 7))
+
+        assertEquals(setOf(1), repository.observe("content://copy").first()!!.recognizedPages)
+        assertEquals(emptyMap<Int, List<OcrWord>>(), repository.recognizedText(uri, setOf(0, 1)))
     }
 }

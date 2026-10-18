@@ -11,7 +11,7 @@ import java.io.IOException
  * here, unlike in a reader's [PdfDocument], so it can be saved safely.
  * Calls after [close] throw [IllegalStateException].
  */
-interface EditablePdfDocument : Closeable, FillableForm {
+interface EditablePdfDocument : Closeable, FillableForm, RecognizedTextPages {
     override val pageCount: Int
 
     /** `/NM` of TilePDF's annotations on [pageIndex]. */

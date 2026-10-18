@@ -57,6 +57,11 @@ class FakePdfDocument(private val pages: List<String>) : PdfDocument {
     }
     override suspend fun setForeignHidden(pageIndex: Int, key: String, hidden: Boolean) = Unit
 
+    /** Pages that hold recognised text. */
+    var recognized: Set<Int> = emptySet()
+
+    override suspend fun hasRecognizedText(pageIndex: Int) = pageIndex in recognized
+
     override fun close() {
         closed = true
     }

@@ -28,7 +28,7 @@ class AnnotationSaveFlowTest {
     private val pdfium = Pdfium(context, Dispatchers.IO.limitedParallelism(1))
     private val database = Room.inMemoryDatabaseBuilder(context, TilePdfDatabase::class.java).build()
     private val files = SafAnnotationFiles(context, Dispatchers.IO, pdfium)
-    private val repository = OfflineAnnotationRepository(database.annotationDraftDao(), files)
+    private val repository = OfflineAnnotationRepository(database.annotationDraftDao(), database.recognizedTextDao(), files)
     private val passwords = SessionPasswords()
     private val saver = AnnotationSaver(repository, files, passwords)
 

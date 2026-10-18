@@ -14,6 +14,7 @@ enum class SaveError { NoWritePermission, FileChanged, NeedsPassword, Failed }
  * @param dirty whether the file lacks some of this.
  * @param base the file version [removedForeign] keys and the saved state refer to.
  * @param formValues form fields the user filled in, not yet saved.
+ * @param recognizedPages pages whose recognised text isn't in the file yet.
  */
 data class AnnotationDraft(
     val uri: String,
@@ -24,4 +25,5 @@ data class AnnotationDraft(
     val saveError: SaveError?,
     /** Form values the user set (field name → `/V`), not yet saved. */
     val formValues: Map<String, String> = emptyMap(),
+    val recognizedPages: Set<Int> = emptySet(),
 )

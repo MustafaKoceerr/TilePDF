@@ -190,6 +190,33 @@ class TilePdfDatabaseMigrationTest {
     }
 
     @Test
+    fun migrate7To8AddsRecognizedTextRemovedWithItsDocument() {
+        helper.createDatabase(DB_NAME, 7).use { db ->
+            db.execSQL(
+                "INSERT INTO documents (uri, displayName, pageCount, lastPage, pageOffsetFraction, zoom, panFraction, " +
+                    "addedAt, lastOpenedAt, favorite, rotation, cropMargins) " +
+                    "VALUES ('content://book', 'Book.pdf', 3, 1, 0, 1, 0, 1, 2, 0, 0, 0)"
+            )
+        }
+
+        // Validates the migrated schema against the exported 8.json.
+        helper.runMigrationsAndValidate(DB_NAME, 8, true).close()
+
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val database = Room.databaseBuilder(context, TilePdfDatabase::class.java, DB_NAME).build()
+        val pages = runBlocking {
+            val dao = database.recognizedTextDao()
+            dao.upsert(RecognizedTextEntity("content://book", 2, "[]"))
+            val before = dao.observePages("content://book").first()
+            database.documentDao().delete("content://book")
+            before to dao.observePages("content://book").first()
+        }
+        database.close()
+
+        assertEquals(listOf(2) to emptyList<Int>(), pages)
+    }
+
+    @Test
     fun viewSettingsAreStored() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val database = Room.inMemoryDatabaseBuilder(context, TilePdfDatabase::class.java).build()

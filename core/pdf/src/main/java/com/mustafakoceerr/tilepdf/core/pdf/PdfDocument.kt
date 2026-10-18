@@ -11,7 +11,7 @@ import java.io.Closeable
  * An open PDF. One instance serves rendering, text and the outline for as
  * long as a reader shows it. Calls after [close] throw [IllegalStateException].
  */
-interface PdfDocument : Closeable, FillableForm {
+interface PdfDocument : Closeable, FillableForm, RecognizedTextPages {
 
     /** Size of every page in points, read once when the document is opened. */
     val pageSizes: List<PageSize>

@@ -6,6 +6,7 @@ import com.mustafakoceerr.tilepdf.model.Annotation
 import com.mustafakoceerr.tilepdf.model.FormField
 import com.mustafakoceerr.tilepdf.model.Ink
 import com.mustafakoceerr.tilepdf.model.MarkupKind
+import com.mustafakoceerr.tilepdf.model.OcrWord
 import com.mustafakoceerr.tilepdf.model.Note
 import com.mustafakoceerr.tilepdf.model.TextMarkup
 import java.io.File
@@ -70,6 +71,10 @@ class PdfiumEditableDocument internal constructor(
     override suspend fun formFields(pageIndex: Int): List<FormField> = document.formFields(pageIndex)
 
     override suspend fun applyFormEdits(edits: List<FormEdit>): Boolean = document.applyFormEdits(edits)
+
+    override suspend fun hasRecognizedText(pageIndex: Int): Boolean = document.hasRecognizedText(pageIndex)
+
+    override suspend fun addRecognizedText(pageIndex: Int, words: List<OcrWord>) = document.addRecognizedText(pageIndex, words)
 
     override suspend fun saveIncremental(target: File) {
         val saved = ParcelFileDescriptor.open(

@@ -170,4 +170,16 @@ internal object PdfiumNative {
 
     /** Chooses option [optionIndex] of a combo or list box widget. */
     external fun nativeSetFormChoice(document: Long, index: Int, annotIndex: Int, optionIndex: Int): Boolean
+
+    /**
+     * Adds recognised words to page [index] as invisible text in the
+     * fallback font. [quads] holds each word's four top-left corners in
+     * reading order as x, y pairs, 8 floats per word.
+     */
+    @JvmStatic
+    external fun nativeAddRecognizedText(document: Long, index: Int, texts: Array<String>, quads: FloatArray): Boolean
+
+    /** Whether page [index] has text TilePDF recognised. */
+    @JvmStatic
+    external fun nativeHasRecognizedText(document: Long, index: Int): Boolean
 }
