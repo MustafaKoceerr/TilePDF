@@ -12,6 +12,9 @@ sealed interface ReaderUiState {
 
     data class Error(val reason: ReaderError) : ReaderUiState
 
+    /** The document is encrypted; [wrongPassword] when the last try failed. */
+    data class PasswordRequired(val wrongPassword: Boolean) : ReaderUiState
+
     data class Ready(
         val title: String,
         val pageSizes: List<PageSize>,
@@ -25,7 +28,7 @@ sealed interface ReaderUiState {
     ) : ReaderUiState
 }
 
-enum class ReaderError { NotFound, PasswordProtected, Corrupt }
+enum class ReaderError { NotFound, Corrupt }
 
 data class TocUiState(
     /** Table of contents; empty until loaded, or if the PDF has none. */

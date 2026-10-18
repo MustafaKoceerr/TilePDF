@@ -9,6 +9,8 @@ import javax.inject.Inject
 /** A document ready to read, plus where the user left off. */
 class OpenedDocument(
     val document: PdfDocument,
+    /** The URI the document was opened from, which the library and positions use. */
+    val uri: String,
     val displayName: String,
     val position: ReadingPosition,
 )
@@ -28,15 +30,21 @@ class OpenDocumentUseCase @Inject constructor(
      *
      * @throws Exception as documented on [DocumentRepository.open].
      */
-    suspend operator fun invoke(uri: String): OpenedDocument {
-        val document = documentRepository.open(uri)
+    suspend operator fun invoke(uri: String, password: String? = null): OpenedDocument {
+        // A URI the app can reopen later; possibly a private copy of the file.
+        val prepared = documentRepository.prepare(uri)
+        val document = documentRepository.open(prepared, password)
         try {
-            val displayName = documentRepository.displayName(uri) ?: uri.substringAfterLast('/')
-            libraryRepository.recordOpened(uri, displayName, document.pageCount)
+            // A private copy has no name of its own; the library kept the real one.
+            val displayName = documentRepository.displayName(uri)
+                ?: libraryRepository.displayName(prepared)
+                ?: uri.substringAfterLast('/')
+            libraryRepository.recordOpened(prepared, displayName, document.pageCount)
             return OpenedDocument(
                 document = document,
+                uri = prepared,
                 displayName = displayName,
-                position = libraryRepository.readingPosition(uri) ?: ReadingPosition(),
+                position = libraryRepository.readingPosition(prepared) ?: ReadingPosition(),
             )
         } catch (e: Throwable) {
             document.close()

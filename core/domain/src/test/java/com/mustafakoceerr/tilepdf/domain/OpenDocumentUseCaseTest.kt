@@ -12,7 +12,7 @@ import com.mustafakoceerr.tilepdf.model.PageText
 import com.mustafakoceerr.tilepdf.model.ReadingPosition
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -50,20 +50,80 @@ class OpenDocumentUseCaseTest {
         assertTrue("document leaked", document.closed)
     }
 
-    private inner class Documents(private val nameError: Throwable? = null) : DocumentRepository {
+    @Test
+    fun opensThePreparedUri() = runTest {
+        val documents = Documents(prepared = mapOf("content://x" to "file://copy.pdf"))
+        val library = Library()
+        val opened = OpenDocumentUseCase(documents, library)("content://x")
+        assertEquals("file://copy.pdf", opened.uri)
+        assertEquals(listOf("file://copy.pdf"), documents.opened)
+        assertEquals(listOf("file://copy.pdf"), library.recorded)
+    }
+
+    @Test
+    fun passesThePassword() = runTest {
+        val documents = Documents()
+        OpenDocumentUseCase(documents, Library())("content://x", password = "secret")
+        assertEquals(listOf("secret"), documents.passwords)
+    }
+
+    @Test
+    fun reopenedCopyKeepsItsLibraryName() = runTest {
+        // A private copy's file name is a stand-in; the library has the real name.
+        val documents = Documents(names = mapOf("file://copy.pdf" to null))
+        val library = Library(names = mapOf("file://copy.pdf" to "Sözleşme.pdf"))
+        val opened = OpenDocumentUseCase(documents, library)("file://copy.pdf")
+        assertEquals("Sözleşme.pdf", opened.displayName)
+        assertEquals(listOf("Sözleşme.pdf"), library.recordedNames)
+    }
+
+    @Test
+    fun cleanUpKeepsOnlyLibraryCopies() = runTest {
+        val documents = Documents()
+        val library = Library(documents = listOf("file://a.pdf", "content://b"))
+        CleanUpCopiesUseCase(documents, library)()
+        assertEquals(setOf("file://a.pdf", "content://b"), documents.kept)
+    }
+
+    private inner class Documents(
+        private val nameError: Throwable? = null,
+        private val prepared: Map<String, String> = emptyMap(),
+        private val names: Map<String, String?> = emptyMap(),
+    ) : DocumentRepository {
+        var kept: Set<String>? = null
+        val opened = mutableListOf<String>()
+        val passwords = mutableListOf<String?>()
         override fun persistAccess(uri: String) = Unit
         override suspend fun accessibleUris(): Set<String> = emptySet()
-        override suspend fun displayName(uri: String): String? = nameError?.let { throw it } ?: "a.pdf"
-        override suspend fun open(uri: String, password: String?): PdfDocument = document
+        override suspend fun displayName(uri: String): String? =
+            nameError?.let { throw it } ?: if (uri in names) names[uri] else "a.pdf"
+        override suspend fun prepare(uri: String): String = prepared[uri] ?: uri
+        override suspend fun forget(uri: String) = Unit
+        override suspend fun forgetCopiesExcept(keep: Set<String>) {
+            kept = keep
+        }
+        override suspend fun open(uri: String, password: String?): PdfDocument {
+            opened += uri
+            passwords += password
+            return document
+        }
     }
 
     private class Library(
         private val position: ReadingPosition? = null,
         private val recordError: Throwable? = null,
+        private val names: Map<String, String> = emptyMap(),
+        private val documents: List<String> = emptyList(),
     ) : LibraryRepository {
-        override fun observeDocuments(): Flow<List<LibraryDocument>> = emptyFlow()
+        val recorded = mutableListOf<String>()
+        val recordedNames = mutableListOf<String>()
+        override fun observeDocuments(): Flow<List<LibraryDocument>> =
+            flowOf(documents.map { LibraryDocument(it, "x.pdf", 1, ReadingPosition(), 0L) })
+        override suspend fun displayName(uri: String): String? = names[uri]
         override suspend fun recordOpened(uri: String, displayName: String, pageCount: Int) {
             recordError?.let { throw it }
+            recorded += uri
+            recordedNames += displayName
         }
         override suspend fun readingPosition(uri: String): ReadingPosition? = position
         override suspend fun saveReadingPosition(uri: String, position: ReadingPosition) = Unit

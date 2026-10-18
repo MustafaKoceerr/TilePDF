@@ -11,30 +11,30 @@ import java.io.IOException
 class ReaderErrorsTest {
 
     @Test
-    fun passwordProtectedIsNotReportedAsCorrupt() {
+    fun passwordProtectedAsksForThePassword() {
         // PdfPasswordException is an IOException; it must not fall through to Corrupt.
-        assertEquals(ReaderError.PasswordProtected, readerErrorFor(PdfPasswordException(wrongPassword = false)))
-        assertEquals(ReaderError.PasswordProtected, readerErrorFor(PdfPasswordException(wrongPassword = true)))
+        assertEquals(OpenFailure.NeedsPassword(wrongPassword = false), openFailureFor(PdfPasswordException(false)))
+        assertEquals(OpenFailure.NeedsPassword(wrongPassword = true), openFailureFor(PdfPasswordException(true)))
     }
 
     @Test
     fun missingFileIsNotFound() {
-        assertEquals(ReaderError.NotFound, readerErrorFor(FileNotFoundException()))
+        assertEquals(OpenFailure.Failed(ReaderError.NotFound), openFailureFor(FileNotFoundException()))
     }
 
     @Test
     fun revokedPermissionIsNotFound() {
-        assertEquals(ReaderError.NotFound, readerErrorFor(SecurityException("grant revoked")))
+        assertEquals(OpenFailure.Failed(ReaderError.NotFound), openFailureFor(SecurityException("grant revoked")))
     }
 
     @Test
     fun unreadablePdfIsCorrupt() {
-        assertEquals(ReaderError.Corrupt, readerErrorFor(PdfCorruptException("bad xref")))
-        assertEquals(ReaderError.Corrupt, readerErrorFor(IOException("read failed")))
+        assertEquals(OpenFailure.Failed(ReaderError.Corrupt), openFailureFor(PdfCorruptException("bad xref")))
+        assertEquals(OpenFailure.Failed(ReaderError.Corrupt), openFailureFor(IOException("read failed")))
     }
 
     @Test
     fun programmingErrorsAreNotMapped() {
-        assertNull(readerErrorFor(IllegalStateException()))
+        assertNull(openFailureFor(IllegalStateException()))
     }
 }

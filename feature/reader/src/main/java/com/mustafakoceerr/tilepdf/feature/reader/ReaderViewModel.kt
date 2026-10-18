@@ -46,7 +46,7 @@ private const val SEARCH_DEBOUNCE_MS = 300L
 @HiltViewModel
 class ReaderViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
-    openDocument: OpenDocumentUseCase,
+    private val openDocument: OpenDocumentUseCase,
     private val pageRenderer: PageRenderer,
     private val libraryRepository: LibraryRepository,
     private val preferencesRepository: ReaderPreferencesRepository,
@@ -55,6 +55,7 @@ class ReaderViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val uri = savedStateHandle.toRoute<ReaderRoute>().uri
+    private var openJob: Job? = null
 
     private val documentState = MutableStateFlow<DocumentState>(DocumentState.Loading)
     private val searchState = MutableStateFlow(SearchUiState())
@@ -80,6 +81,7 @@ class ReaderViewModel @Inject constructor(
         when (document) {
             DocumentState.Loading -> ReaderUiState.Loading
             is DocumentState.Failed -> ReaderUiState.Error(document.reason)
+            is DocumentState.NeedsPassword -> ReaderUiState.PasswordRequired(document.wrongPassword)
             is DocumentState.Opened -> ReaderUiState.Ready(
                 title = document.opened.displayName,
                 pageSizes = document.opened.document.pageSizes,
@@ -94,9 +96,20 @@ class ReaderViewModel @Inject constructor(
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ReaderUiState.Loading)
 
     init {
-        viewModelScope.launch {
+        open(password = null)
+        savePositionWhileReading()
+        searchAsQueryChanges()
+    }
+
+    /** Tries the document again with [password]; it is not kept afterwards. */
+    fun onPasswordEntered(password: String) = open(password)
+
+    private fun open(password: String?) {
+        openJob?.cancel()
+        documentState.value = DocumentState.Loading
+        openJob = viewModelScope.launch {
             documentState.value = try {
-                val opened = openDocument(uri)
+                val opened = openDocument(uri, password)
                 loadOutline(opened.document)
                 DocumentState.Opened(
                     opened = opened,
@@ -104,11 +117,12 @@ class ReaderViewModel @Inject constructor(
                 )
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
-                DocumentState.Failed(readerErrorFor(e) ?: throw e)
+                when (val failure = openFailureFor(e) ?: throw e) {
+                    is OpenFailure.NeedsPassword -> DocumentState.NeedsPassword(failure.wrongPassword)
+                    is OpenFailure.Failed -> DocumentState.Failed(failure.reason)
+                }
             }
         }
-        savePositionWhileReading()
-        searchAsQueryChanges()
     }
 
     fun onPositionChanged(position: ReadingPosition) {
@@ -243,7 +257,11 @@ class ReaderViewModel @Inject constructor(
         viewModelScope.launch {
             positionUpdates
                 .debounce(SAVE_POSITION_DEBOUNCE_MS)
-                .collect { libraryRepository.saveReadingPosition(uri, it) }
+                .collect { position ->
+                    // Saved under the URI it was opened from: possibly a private copy.
+                    val opened = (documentState.value as? DocumentState.Opened)?.opened ?: return@collect
+                    libraryRepository.saveReadingPosition(opened.uri, position)
+                }
         }
     }
 
@@ -275,6 +293,7 @@ class ReaderViewModel @Inject constructor(
     private sealed interface DocumentState {
         data object Loading : DocumentState
         data class Failed(val reason: ReaderError) : DocumentState
+        data class NeedsPassword(val wrongPassword: Boolean) : DocumentState
         data class Opened(
             val opened: OpenedDocument,
             val pageImages: TiledPageImageSource,

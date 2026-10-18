@@ -43,6 +43,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mustafakoceerr.tilepdf.core.designsystem.TilePdfIcons
 import com.mustafakoceerr.tilepdf.feature.reader.components.PageJump
+import com.mustafakoceerr.tilepdf.feature.reader.components.PasswordDialog
 import com.mustafakoceerr.tilepdf.feature.reader.components.PdfPageList
 import com.mustafakoceerr.tilepdf.feature.reader.components.SearchTopBar
 import com.mustafakoceerr.tilepdf.feature.reader.components.TableOfContentsSheet
@@ -74,6 +75,7 @@ fun ReaderScreen(
         onClearSelection = viewModel::onClearSelection,
         onOpenToc = viewModel::onOpenToc,
         onCloseToc = viewModel::onCloseToc,
+        onPasswordEntered = viewModel::onPasswordEntered,
     )
 }
 
@@ -113,6 +115,7 @@ internal fun ReaderScreen(
     onClearSelection: () -> Unit = {},
     onOpenToc: () -> Unit = {},
     onCloseToc: () -> Unit = {},
+    onPasswordEntered: (String) -> Unit = {},
 ) {
     val ready = uiState as? ReaderUiState.Ready
     val search = ready?.search
@@ -196,6 +199,11 @@ internal fun ReaderScreen(
                     text = stringResource(uiState.reason.messageRes),
                     style = MaterialTheme.typography.bodyLarge,
                     modifier = Modifier.padding(24.dp),
+                )
+                is ReaderUiState.PasswordRequired -> PasswordDialog(
+                    wrongPassword = uiState.wrongPassword,
+                    onSubmit = onPasswordEntered,
+                    onCancel = onBack,
                 )
                 is ReaderUiState.Ready -> PdfPageList(
                     pageSizes = uiState.pageSizes,
@@ -303,7 +311,6 @@ private fun OverflowMenu(
 private val ReaderError.messageRes: Int
     get() = when (this) {
         ReaderError.NotFound -> R.string.reader_error_not_found
-        ReaderError.PasswordProtected -> R.string.reader_error_password
         ReaderError.Corrupt -> R.string.reader_error_corrupt
     }
 
@@ -311,6 +318,6 @@ private val ReaderError.messageRes: Int
 @Composable
 private fun ReaderScreenErrorPreview() {
     TilePDFTheme {
-        ReaderScreen(ReaderUiState.Error(ReaderError.PasswordProtected), {}, {}, {}, SearchActions.None)
+        ReaderScreen(ReaderUiState.Error(ReaderError.Corrupt), {}, {}, {}, SearchActions.None)
     }
 }

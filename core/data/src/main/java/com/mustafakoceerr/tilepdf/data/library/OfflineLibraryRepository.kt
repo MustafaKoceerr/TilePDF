@@ -15,6 +15,8 @@ class OfflineLibraryRepository @Inject constructor(
     override fun observeDocuments(): Flow<List<LibraryDocument>> =
         dao.observeAll().map { entities -> entities.map { it.asExternalModel() } }
 
+    override suspend fun displayName(uri: String): String? = dao.get(uri)?.displayName
+
     override suspend fun recordOpened(uri: String, displayName: String, pageCount: Int) =
         dao.recordOpened(uri, displayName, pageCount, now = System.currentTimeMillis())
 
