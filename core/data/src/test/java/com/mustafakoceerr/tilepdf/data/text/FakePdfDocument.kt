@@ -36,6 +36,14 @@ class FakePdfDocument(private val pages: List<String>) : PdfDocument {
     override suspend fun outline(): List<OutlineEntry> = error("unused")
 
     override suspend fun trimMemory() = Unit
+
+    /** Text fields on page 0 by name. */
+    var form: Map<String, String> = emptyMap()
+
+    override suspend fun hasForm() = form.isNotEmpty()
+
+    override suspend fun formFields(pageIndex: Int) =
+        if (pageIndex == 0) com.mustafakoceerr.tilepdf.data.annotation.formFieldsOf(form) else emptyList()
     override suspend fun linkAt(pageIndex: Int, x: Float, y: Float): com.mustafakoceerr.tilepdf.core.pdf.PdfLink? = null
     /** What [annotations] returns per page; pages not listed have none. */
     var annotationsByPage: Map<Int, PageAnnotations> = emptyMap()

@@ -1,6 +1,8 @@
 package com.mustafakoceerr.tilepdf.data.annotation
 
 import com.mustafakoceerr.tilepdf.core.pdf.PdfPasswordException
+import com.mustafakoceerr.tilepdf.core.pdf.allFormFields
+import com.mustafakoceerr.tilepdf.core.pdf.fill
 import com.mustafakoceerr.tilepdf.core.pdf.write
 import com.mustafakoceerr.tilepdf.model.AnnotationDraft
 import com.mustafakoceerr.tilepdf.model.FileStamp
@@ -91,7 +93,10 @@ class AnnotationSaver @Inject constructor(
         val password = passwords.get(uri)
         val written = try {
             files.openForEditing(uri, password).use { document ->
-                if (draft != null) document.write(draft.annotations, removed)
+                if (draft != null) {
+                    document.write(draft.annotations, removed)
+                    document.fill(draft.formValues)
+                }
                 document.saveIncremental(target)
             }
             draft == null || holdsExactly(target, password, draft, removed)
@@ -134,7 +139,9 @@ class AnnotationSaver @Inject constructor(
         try {
             val changed = try {
                 files.openForEditing(source, password).use { document ->
-                    val changed = document.write(draft.annotations, removed)
+                    val annotationsChanged = document.write(draft.annotations, removed)
+                    val formChanged = document.fill(draft.formValues).isNotEmpty()
+                    val changed = annotationsChanged || formChanged
                     if (changed || target != source) document.saveIncremental(temp)
                     changed
                 }
@@ -165,13 +172,18 @@ class AnnotationSaver @Inject constructor(
         }
     }
 
-    /** Whether the saved [file] has exactly the draft's own annotations and none of its removed named ones. */
+    /**
+     * Whether the saved [file] has exactly the draft's own annotations, none
+     * of its removed named ones, and every filled-in field's value.
+     */
     private suspend fun holdsExactly(file: File, password: String?, draft: AnnotationDraft, removed: Set<ForeignRef>): Boolean =
         files.openForReading(file, password).use { document ->
             val pages = (0 until document.pageCount).map { document.annotations(it) }
             val ownIds = pages.flatMap { page -> page.own.map { it.id } }.toSet()
             val foreign = pages.flatMap { page -> page.foreign.map { it.ref } }.toSet()
+            val fields = document.allFormFields()
             ownIds == draft.annotations.map { it.id }.toSet() &&
-                removed.none { !it.key.startsWith("#") && it in foreign }
+                removed.none { !it.key.startsWith("#") && it in foreign } &&
+                draft.formValues.all { (name, value) -> fields.filter { it.name == name }.all { it.value == value } }
         }
 }
