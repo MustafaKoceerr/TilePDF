@@ -603,7 +603,10 @@ Java_com_mustafakoceerr_tilepdf_core_pdf_PdfiumNative_nativeOpen(
         return 0;
     }
     if (FPDF_GetFormType(native->document) != FORMTYPE_NONE) {
-        native->formInfo.version = 1;
+        // Version 2 is the only one our XFA-enabled PDFium accepts. XFA itself
+        // stays off until the reader can drive XFA forms.
+        native->formInfo.version = 2;
+        native->formInfo.xfa_disabled = 1;
         native->form = FPDFDOC_InitFormFillEnvironment(native->document, &native->formInfo);
     }
     return reinterpret_cast<jlong>(native);
