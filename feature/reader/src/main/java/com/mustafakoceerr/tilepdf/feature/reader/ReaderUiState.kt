@@ -36,6 +36,8 @@ sealed interface ReaderUiState {
         val selection: SelectionUiState?,
         /** A jump the page list should make, e.g. after tapping a link. */
         val jump: PageJump? = null,
+        /** The page the last jump left; offered as a way back while reading near its target. */
+        val backToPage: Int? = null,
         /** A web or mail link to hand to another app. */
         val externalLink: String? = null,
         /** The page at the top of the screen. */

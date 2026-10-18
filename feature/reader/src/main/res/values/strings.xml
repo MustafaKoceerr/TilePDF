@@ -24,6 +24,7 @@
     <string name="reader_go_to_page">Go to page</string>
     <string name="reader_go_to_page_range">A page from 1 to %1$d</string>
     <string name="reader_go_to_page_confirm">Go</string>
+    <string name="reader_jump_back">Back to page %1$d</string>
     <string name="reader_toc">Contents</string>
     <string name="reader_more_options">More options</string>
     <string name="reader_no_app_for_link">No app can open this link</string>

@@ -127,6 +127,12 @@ class ReaderViewModel @Inject constructor(
     private var position: ReadingPosition? = null
     private val selection = MutableStateFlow<Selection?>(null)
     private val linkTargets = MutableStateFlow(LinkTargets())
+
+    /**
+     * Where the last jump started. Kept across a reopen after a save: the
+     * pages are the same, and the reader is still where the jump took them.
+     */
+    private val jumpHistory = MutableStateFlow(JumpHistory())
     private val currentPage = MutableStateFlow(0)
     private val fullScreen = MutableStateFlow(false)
 
@@ -147,11 +153,11 @@ class ReaderViewModel @Inject constructor(
         preferencesRepository.preferences,
         combine(searchState, toc, ::Pair),
         combine(selection, linkTargets, currentPage, fullScreen, startPosition, ::PageState),
-        combine(annotations, editing, combine(saveCopyResult, handOff, ::Pair), ::Triple),
+        combine(annotations, editing, combine(saveCopyResult, handOff, ::Pair), jumpHistory, ::Outputs),
     ) { document, preferences, searchAndToc, pageState, annotationUi ->
         val (search, toc) = searchAndToc
         val (selection, links, page, fullScreen, start) = pageState
-        val (annotations, editing, results) = annotationUi
+        val (annotations, editing, results, history) = annotationUi
         val (copyResult, handOff) = results
         when (document) {
             DocumentState.Loading -> ReaderUiState.Loading
@@ -168,6 +174,7 @@ class ReaderViewModel @Inject constructor(
                 toc = toc,
                 selection = selection?.toUiState(),
                 jump = links.jump,
+                backToPage = history.origin?.pageIndex,
                 externalLink = links.externalLink,
                 currentPage = page,
                 isCurrentPageBookmarked = toc.bookmarks.any { it.pageIndex == page },
@@ -342,7 +349,7 @@ class ReaderViewModel @Inject constructor(
         viewModelScope.launch {
             val link = runCatchingCancellable { document.linkAt(pageIndex, x, y) }.getOrNull()
             when (val action = linkAction(link, document.pageCount)) {
-                is LinkAction.Jump -> linkTargets.update { it.copy(jump = action.jump) }
+                is LinkAction.Jump -> onJump(action.jump)
                 is LinkAction.Open -> linkTargets.update { it.copy(externalLink = action.uri) }
                 LinkAction.Ignore -> Unit
                 LinkAction.NoLink -> toggleFullScreen()
@@ -376,6 +383,22 @@ class ReaderViewModel @Inject constructor(
             .collect { bookmarks -> toc.update { it.copy(bookmarks = bookmarks) } }
     }
 
+    /** Moves to [jump] from contents, bookmarks, a link or a page number; the start is remembered. */
+    fun onJump(jump: PageJump) {
+        val from = position ?: ReadingPosition(pageIndex = currentPage.value)
+        jumpHistory.update { it.jumped(from, jump.pageIndex) }
+        linkTargets.update { it.copy(jump = jump) }
+    }
+
+    /** Back to where the last jump started. */
+    fun onJumpBack() {
+        val origin = jumpHistory.value.origin ?: return
+        val sizes = openedDocument()?.pageSizes ?: return
+        val page = origin.pageIndex.coerceIn(0, sizes.lastIndex)
+        jumpHistory.value = JumpHistory()
+        linkTargets.update { it.copy(jump = PageJump(page, origin.pageOffsetFraction * sizes[page].heightPt)) }
+    }
+
     fun onJumpHandled() = linkTargets.update { it.copy(jump = null) }
 
     fun onExternalLinkHandled() = linkTargets.update { it.copy(externalLink = null) }
@@ -384,6 +407,7 @@ class ReaderViewModel @Inject constructor(
         this.position = position
         currentPage.value = position.pageIndex
         positionUpdates.tryEmit(position)
+        jumpHistory.update { it.scrolledTo(position.pageIndex) }
         // A side panel stays open while reading; its highlight follows along.
         if (toc.value.isOpen) toc.update { it.copy(currentIndex = currentOutlineIndex(it.entries, position)) }
     }
@@ -652,6 +676,13 @@ class ReaderViewModel @Inject constructor(
         val currentPage: Int,
         val fullScreen: Boolean,
         val startPosition: ReadingPosition?,
+    )
+
+    private data class Outputs(
+        val annotations: AnnotationsUiState,
+        val editing: AnnotationEditing,
+        val results: Pair<SaveCopyResult?, HandOff?>,
+        val jumpHistory: JumpHistory,
     )
 
     /** Where a tapped link leads, until the screen has acted on it. */

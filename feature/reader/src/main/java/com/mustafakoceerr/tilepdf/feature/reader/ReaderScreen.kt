@@ -36,6 +36,7 @@ import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -43,6 +44,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ElevatedAssistChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -148,6 +150,8 @@ fun ReaderScreen(
         onRetryOpen = viewModel::onRetryOpen,
         onTapPage = viewModel::onTap,
         onTapOutsidePage = viewModel::onTapOutsidePage,
+        onJump = viewModel::onJump,
+        onJumpBack = viewModel::onJumpBack,
         onJumpHandled = viewModel::onJumpHandled,
         onExternalLinkHandled = viewModel::onExternalLinkHandled,
         onToggleBookmark = viewModel::onToggleBookmark,
@@ -251,6 +255,8 @@ internal fun ReaderScreen(
     onRetryOpen: () -> Unit = {},
     onTapPage: (pageIndex: Int, x: Float, y: Float) -> Unit = { _, _, _ -> },
     onTapOutsidePage: () -> Unit = {},
+    onJump: (PageJump) -> Unit = {},
+    onJumpBack: () -> Unit = {},
     onJumpHandled: () -> Unit = {},
     onExternalLinkHandled: () -> Unit = {},
     onToggleBookmark: () -> Unit = {},
@@ -270,6 +276,9 @@ internal fun ReaderScreen(
     val search = ready?.search
     val selection = ready?.selection
     val copySelection = rememberCopyAction(selection?.text, onCopied = onClearSelection)
+    // Before the others: clearing a selection or closing search comes first.
+    val canJumpBack = ready?.backToPage != null && !ready.editing.annotating
+    BackHandler(enabled = canJumpBack, onBack = onJumpBack)
     BackHandler(enabled = selection != null, onBack = onClearSelection)
     var goToPageOpen by rememberSaveable { mutableStateOf(false) }
     var pagesOpen by rememberSaveable { mutableStateOf(false) }
@@ -381,11 +390,11 @@ internal fun ReaderScreen(
                     outline = ready.toc.entries,
                     currentIndex = ready.toc.currentIndex,
                     bookmarks = ready.toc.bookmarks,
-                    onSelect = { entry -> pageJump = PageJump(entry.pageIndex, entry.topPt) },
-                    onSelectPage = { page -> pageJump = PageJump(page) },
+                    onSelect = { entry -> onJump(PageJump(entry.pageIndex, entry.topPt)) },
+                    onSelectPage = { page -> onJump(PageJump(page)) },
                     onClose = onCloseToc,
                     annotations = remember(ready.annotations) { annotationListItems(ready.annotations.own, ready.annotations.foreign) },
-                    onSelectAnnotation = { item -> pageJump = PageJump(item.pageIndex, item.topPt) },
+                    onSelectAnnotation = { item -> onJump(PageJump(item.pageIndex, item.topPt)) },
                     onDeleteAnnotation = annotationActions.onDelete,
                 )
             }
@@ -417,6 +426,7 @@ internal fun ReaderScreen(
                                 ready = uiState,
                                 goToPageOpen = goToPageOpen,
                                 onGoToPageOpenChange = { goToPageOpen = it },
+                                onGoToPage = { onJump(PageJump(it)) },
                                 pageJump = pageJump,
                                 onPageJumpHandled = { pageJump = null },
                                 onPositionChanged = onPositionChanged,
@@ -434,7 +444,15 @@ internal fun ReaderScreen(
                         }
                     }
                 }
-                Column(Modifier.align(Alignment.BottomCenter)) {
+                Column(Modifier.align(Alignment.BottomCenter), horizontalAlignment = Alignment.CenterHorizontally) {
+                    val backToPage = ready?.backToPage
+                    if (backToPage != null && canJumpBack && selection == null) {
+                        JumpBackChip(
+                            pageNumber = backToPage + 1,
+                            onClick = onJumpBack,
+                            modifier = Modifier.navigationBarsPadding(),
+                        )
+                    }
                     if (selection != null) {
                         SelectionMarkupBar(enabled = ready.annotations.ready, onMarkup = annotationActions.onMarkup)
                     }
@@ -486,17 +504,17 @@ internal fun ReaderScreen(
                 bookmarks = ready.toc.bookmarks,
                 onSelect = { entry ->
                     onCloseToc()
-                    pageJump = PageJump(entry.pageIndex, entry.topPt)
+                    onJump(PageJump(entry.pageIndex, entry.topPt))
                 },
                 onSelectPage = { page ->
                     onCloseToc()
-                    pageJump = PageJump(page)
+                    onJump(PageJump(page))
                 },
                 onDismiss = onCloseToc,
                 annotations = remember(ready.annotations) { annotationListItems(ready.annotations.own, ready.annotations.foreign) },
                 onSelectAnnotation = { item ->
                     onCloseToc()
-                    pageJump = PageJump(item.pageIndex, item.topPt)
+                    onJump(PageJump(item.pageIndex, item.topPt))
                 },
                 onDeleteAnnotation = annotationActions.onDelete,
             )
@@ -541,7 +559,7 @@ internal fun ReaderScreen(
                 ready = ready,
                 onSelect = { page ->
                     pagesOpen = false
-                    pageJump = PageJump(page)
+                    onJump(PageJump(page))
                 },
                 onDismiss = { pagesOpen = false },
             )
@@ -555,6 +573,7 @@ private fun ReaderPages(
     ready: ReaderUiState.Ready,
     goToPageOpen: Boolean,
     onGoToPageOpenChange: (Boolean) -> Unit,
+    onGoToPage: (pageIndex: Int) -> Unit,
     pageJump: PageJump?,
     onPageJumpHandled: () -> Unit,
     onPositionChanged: (ReadingPosition) -> Unit,
@@ -591,6 +610,7 @@ private fun ReaderPages(
             onPositionChanged = onPositionChanged,
             goToPageOpen = goToPageOpen,
             onGoToPageOpenChange = onGoToPageOpenChange,
+            onGoToPage = onGoToPage,
             pageJump = pageJump,
             onPageJumpHandled = onPageJumpHandled,
             onTapPage = onTapPage,
@@ -611,6 +631,7 @@ private fun ReaderPages(
             onPageChanged = { onPositionChanged(ReadingPosition(pageIndex = it)) },
             goToPageOpen = goToPageOpen,
             onGoToPageOpenChange = onGoToPageOpenChange,
+            onGoToPage = onGoToPage,
             pageJump = pageJump,
             onPageJumpHandled = onPageJumpHandled,
             onTapPage = onTapPage,
@@ -816,6 +837,17 @@ private fun rememberCopyAction(text: String?, onCopied: () -> Unit): () -> Unit 
             }
         }
     }
+}
+
+/** "12. sayfaya dön": back to where the last jump started. */
+@Composable
+private fun JumpBackChip(pageNumber: Int, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    ElevatedAssistChip(
+        onClick = onClick,
+        label = { Text(stringResource(R.string.reader_jump_back, pageNumber)) },
+        leadingIcon = { Icon(painterResource(TilePdfIcons.ArrowBack), contentDescription = null) },
+        modifier = modifier.padding(bottom = 16.dp),
+    )
 }
 
 /** Less frequent actions, so the title keeps its room in the top bar. */
