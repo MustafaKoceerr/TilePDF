@@ -68,6 +68,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.mustafakoceerr.tilepdf.feature.reader.components.FormFieldDialog
+import com.mustafakoceerr.tilepdf.feature.reader.components.SignatureHint
+import com.mustafakoceerr.tilepdf.feature.reader.components.SignaturePadDialog
 import com.mustafakoceerr.tilepdf.feature.reader.components.showsSpreads
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.platform.LocalDensity
@@ -171,6 +174,11 @@ fun ReaderScreen(
         onVolumeKeysChange = viewModel::onVolumeKeysChange,
         onTwoPageSpreadsChange = viewModel::onTwoPageSpreadsChange,
         onRotate = viewModel::onRotate,
+        onFormValueSubmitted = viewModel::onFormValueSubmitted,
+        onAddSignature = viewModel::onAddSignature,
+        onSignatureDrawn = viewModel::onSignatureDrawn,
+        onSignatureCancelled = viewModel::onSignatureCancelled,
+        onFormEditorDismissed = viewModel::onFormEditorDismissed,
         onCropMarginsChange = viewModel::onCropMarginsChange,
         annotationActions = AnnotationActions(
             onMarkup = viewModel::onMarkup,
@@ -280,6 +288,11 @@ internal fun ReaderScreen(
     onVolumeKeysChange: (Boolean) -> Unit = {},
     onTwoPageSpreadsChange: (Boolean) -> Unit = {},
     onRotate: () -> Unit = {},
+    onFormValueSubmitted: (String) -> Unit = {},
+    onAddSignature: () -> Unit = {},
+    onSignatureDrawn: (List<List<PdfPoint>>) -> Unit = {},
+    onSignatureCancelled: () -> Unit = {},
+    onFormEditorDismissed: () -> Unit = {},
     onCropMarginsChange: (Boolean) -> Unit = {},
     annotationActions: AnnotationActions = AnnotationActions.None,
     onOpenDocument: (uri: String) -> Unit = {},
@@ -390,6 +403,7 @@ internal fun ReaderScreen(
                             onShare = annotationActions.onShare,
                             onPrint = annotationActions.onPrint,
                             cropMargins = ready.documentView.cropMargins,
+                            onAddSignature = onAddSignature,
                             onRotate = onRotate,
                             onCropMarginsChange = onCropMarginsChange,
                         )
@@ -468,6 +482,9 @@ internal fun ReaderScreen(
                     }
                 }
                 Column(Modifier.align(Alignment.BottomCenter), horizontalAlignment = Alignment.CenterHorizontally) {
+                    if (ready?.signatureStep is SignatureStep.Place) {
+                        SignatureHint(onCancel = onSignatureCancelled, modifier = Modifier.navigationBarsPadding())
+                    }
                     val backToPage = ready?.backToPage
                     if (backToPage != null && canJumpBack && selection == null) {
                         JumpBackChip(
@@ -544,6 +561,14 @@ internal fun ReaderScreen(
         }
     }
 
+    (ready?.signatureStep as? SignatureStep.Pad)?.let { step ->
+        SignaturePadDialog(saved = step.saved, onPlace = onSignatureDrawn, onDismiss = onSignatureCancelled)
+    }
+    BackHandler(enabled = ready?.signatureStep is SignatureStep.Place, onBack = onSignatureCancelled)
+    ready?.formEditor?.let { field ->
+        // A new field starts from its own value, not the last dialog's.
+        key(field) { FormFieldDialog(field, onSubmit = onFormValueSubmitted, onDismiss = onFormEditorDismissed) }
+    }
     ready?.editing?.menu?.let { target ->
         AnnotationMenuDialog(
             target = target,
@@ -632,6 +657,8 @@ private fun ReaderPages(
         showsSpreads(ready.preferences.twoPageSpreads, spreadSpace.width.toDp().value, spreadSpace.height.toDp().value)
     }
     Box(Modifier.fillMaxSize().onSizeChanged { spreadSpace = it })
+    // Tools on the page take taps then, so fields aren't marked as fillable.
+    val formFields = if (ready.editing.annotating) emptyMap() else ready.formFields
     VolumeKeyPagingEffect(
         enabled = ready.preferences.volumeKeysTurnPages,
         currentPage = ready.currentPage,
@@ -643,6 +670,7 @@ private fun ReaderPages(
         ReadingMode.Vertical -> PdfPageList(
             pageSizes = ready.pageSizes,
             pageTransforms = ready.pageTransforms,
+            formFields = formFields,
             pageImages = ready.pageImages,
             initialPosition = ready.initialPosition,
             pageTheme = ready.preferences.pageTheme,
@@ -666,6 +694,7 @@ private fun ReaderPages(
             pageSizes = ready.pageSizes,
             pageTransforms = ready.pageTransforms,
             twoPageSpreads = twoPageSpreads,
+            formFields = formFields,
             pageImages = ready.pageImages,
             initialPage = ready.initialPosition.pageIndex,
             pageTheme = ready.preferences.pageTheme,
@@ -925,6 +954,7 @@ private fun OverflowMenu(
     onShare: () -> Unit,
     onPrint: () -> Unit,
     cropMargins: Boolean,
+    onAddSignature: () -> Unit,
     onRotate: () -> Unit,
     onCropMarginsChange: (Boolean) -> Unit,
 ) {
@@ -957,6 +987,14 @@ private fun OverflowMenu(
                 onClick = {
                     onExpandedChange(false)
                     onGoToPage()
+                },
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.reader_add_signature)) },
+                leadingIcon = { Icon(painterResource(TilePdfIcons.Signature), contentDescription = null) },
+                onClick = {
+                    onExpandedChange(false)
+                    onAddSignature()
                 },
             )
             DropdownMenuItem(

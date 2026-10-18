@@ -219,6 +219,7 @@ class FakeAnnotationRepository : AnnotationRepository {
     override suspend fun update(uri: String, annotations: List<Annotation>, removedForeign: Set<ForeignRef>) {
         drafts.value += uri to draft(uri).copy(annotations = annotations, removedForeign = removedForeign, dirty = true)
     }
+    override suspend fun setFormValue(uri: String, name: String, value: String) = Unit
 
     override suspend fun markSaved(uri: String, saved: AnnotationDraft, newBase: FileStamp) = error("unused")
     override suspend fun markFailed(uri: String, error: SaveError) = error("unused")

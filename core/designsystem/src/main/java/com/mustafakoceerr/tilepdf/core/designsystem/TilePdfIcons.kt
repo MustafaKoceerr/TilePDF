@@ -25,6 +25,7 @@ object TilePdfIcons {
     @DrawableRes val RotateRight = R.drawable.ic_rotate_right
     @DrawableRes val Search = R.drawable.ic_search
     @DrawableRes val Share = R.drawable.ic_share
+    @DrawableRes val Signature = R.drawable.ic_signature
     @DrawableRes val Sort = R.drawable.ic_sort
     @DrawableRes val Star = R.drawable.ic_star
     @DrawableRes val StarBorder = R.drawable.ic_star_border

@@ -106,6 +106,45 @@ class OfflineAnnotationRepositoryTest {
     }
 
     @Test
+    fun formValueMarksDirty() = runTest {
+        repository.prepare(uri, document)
+
+        repository.setFormValue(uri, "name", "Ada")
+        repository.setFormValue(uri, "city", "İzmir")
+
+        val draft = stored()
+        assertTrue(draft.dirty)
+        assertEquals(mapOf("name" to "Ada", "city" to "İzmir"), draft.formValues)
+    }
+
+    @Test
+    fun savedFormValuesAreDropped() = runTest {
+        repository.prepare(uri, document)
+        repository.setFormValue(uri, "name", "Ada")
+        val saved = stored()
+
+        repository.markSaved(uri, saved, FileStamp(150, 7))
+
+        val draft = stored()
+        assertFalse(draft.dirty)
+        assertEquals(emptyMap<String, String>(), draft.formValues)
+    }
+
+    @Test
+    fun newerFormValueSurvivesSave() = runTest {
+        repository.prepare(uri, document)
+        repository.setFormValue(uri, "name", "Ada")
+        val saved = stored()
+        repository.setFormValue(uri, "name", "Grace")
+
+        repository.markSaved(uri, saved, FileStamp(150, 7))
+
+        val draft = stored()
+        assertTrue(draft.dirty)
+        assertEquals(mapOf("name" to "Grace"), draft.formValues)
+    }
+
+    @Test
     fun markSavedKeepsLaterEditsDirty() = runTest {
         repository.prepare(uri, document)
         repository.update(uri, listOf(note("tilepdf-x")), emptySet())

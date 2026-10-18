@@ -6,14 +6,26 @@ import com.mustafakoceerr.tilepdf.core.pdf.PdfDocument
 import com.mustafakoceerr.tilepdf.core.pdf.PdfPasswordException
 import com.mustafakoceerr.tilepdf.data.text.FakePdfDocument
 import com.mustafakoceerr.tilepdf.model.Annotation
+import com.mustafakoceerr.tilepdf.core.pdf.FormEdit
 import com.mustafakoceerr.tilepdf.model.FileStamp
+import com.mustafakoceerr.tilepdf.model.FormField
+import com.mustafakoceerr.tilepdf.model.FormFieldKind
 import com.mustafakoceerr.tilepdf.model.ForeignAnnotation
 import com.mustafakoceerr.tilepdf.core.geometry.PdfRect
 import com.mustafakoceerr.tilepdf.model.PageAnnotations
 import java.io.File
 
-/** A 3-page PDF's annotations: ours, and other apps' keys per page. */
-data class FakePdf(val own: List<Annotation> = emptyList(), val foreign: Map<Int, Set<String>> = emptyMap())
+/** A 3-page PDF's annotations: ours, and other apps' keys per page; its text fields on page 0 by name. */
+data class FakePdf(
+    val own: List<Annotation> = emptyList(),
+    val foreign: Map<Int, Set<String>> = emptyMap(),
+    val form: Map<String, String> = emptyMap(),
+)
+
+/** [form] as text field widgets on page 0, in order. */
+fun formFieldsOf(form: Map<String, String>): List<FormField> = form.entries.mapIndexed { index, (name, value) ->
+    FormField(0, index, name, FormFieldKind.Text, value, PdfRect(0f, 0f, 1f, 1f))
+}
 
 /**
  * Files as [AnnotationSaver] sees them, in memory. Saved temp files are real
@@ -40,6 +52,9 @@ class FakeAnnotationFiles(private val tempDir: File) : AnnotationFiles {
     /** Drops this annotation id when saving, as a broken save would. */
     var loseOnSave: String? = null
 
+    /** Empties this form field when saving, as a broken save would. */
+    var loseFormOnSave: String? = null
+
     override suspend fun stamp(uri: String): FileStamp? = stamps[uri]
 
     override suspend fun openForEditing(uri: String, password: String?): EditablePdfDocument {
@@ -52,6 +67,7 @@ class FakeAnnotationFiles(private val tempDir: File) : AnnotationFiles {
     override suspend fun openForReading(file: File, password: String?): PdfDocument {
         val pdf = saved.getValue(file)
         return FakePdfDocument(List(PAGES) { "" }).apply {
+            form = pdf.form
             annotationsByPage = (0 until PAGES).associateWith { page ->
                 PageAnnotations(
                     own = pdf.own.filter { it.pageIndex == page },
@@ -84,9 +100,21 @@ class FakeAnnotationFiles(private val tempDir: File) : AnnotationFiles {
             )
         }
 
+        override suspend fun hasForm() = pdf.form.isNotEmpty()
+
+        override suspend fun formFields(pageIndex: Int) = if (pageIndex == 0) formFieldsOf(pdf.form) else emptyList()
+
+        override suspend fun applyFormEdits(edits: List<FormEdit>): Boolean {
+            val names = pdf.form.keys.toList()
+            val texts = edits.filterIsInstance<FormEdit.SetText>().associate { names[it.annotIndex] to it.text }
+            pdf = pdf.copy(form = pdf.form + texts)
+            return true
+        }
+
         override suspend fun saveIncremental(target: File) {
             target.writeText("pdf")
-            saved[target] = pdf.copy(own = pdf.own.filterNot { it.id == loseOnSave })
+            val form = loseFormOnSave?.let { lost -> pdf.form + (lost to "") } ?: pdf.form
+            saved[target] = pdf.copy(own = pdf.own.filterNot { it.id == loseOnSave }, form = form)
         }
 
         override fun close() = Unit

@@ -3,6 +3,7 @@ package com.mustafakoceerr.tilepdf.core.pdf
 import android.os.ParcelFileDescriptor
 import androidx.annotation.VisibleForTesting
 import com.mustafakoceerr.tilepdf.model.Annotation
+import com.mustafakoceerr.tilepdf.model.FormField
 import com.mustafakoceerr.tilepdf.model.Ink
 import com.mustafakoceerr.tilepdf.model.MarkupKind
 import com.mustafakoceerr.tilepdf.model.Note
@@ -63,6 +64,12 @@ class PdfiumEditableDocument internal constructor(
             )
         }
     }
+
+    override suspend fun hasForm(): Boolean = document.hasForm()
+
+    override suspend fun formFields(pageIndex: Int): List<FormField> = document.formFields(pageIndex)
+
+    override suspend fun applyFormEdits(edits: List<FormEdit>): Boolean = document.applyFormEdits(edits)
 
     override suspend fun saveIncremental(target: File) {
         val saved = ParcelFileDescriptor.open(

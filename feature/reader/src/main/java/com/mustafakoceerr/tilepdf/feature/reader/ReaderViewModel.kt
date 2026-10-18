@@ -13,9 +13,16 @@ import com.mustafakoceerr.tilepdf.core.render.TiledPageImageSource
 import com.mustafakoceerr.tilepdf.core.geometry.PageViewTransform
 import com.mustafakoceerr.tilepdf.core.geometry.PdfPoint
 import com.mustafakoceerr.tilepdf.core.geometry.PdfRect
+import com.mustafakoceerr.tilepdf.core.pdf.fill
 import com.mustafakoceerr.tilepdf.model.DocumentView
+import com.mustafakoceerr.tilepdf.model.FormField
+import com.mustafakoceerr.tilepdf.model.FormFieldKind
 import com.mustafakoceerr.tilepdf.data.document.SharedDocuments
+import com.mustafakoceerr.tilepdf.data.signature.SignatureStore
 import com.mustafakoceerr.tilepdf.data.thumbnail.ThumbnailStore
+import com.mustafakoceerr.tilepdf.model.Signature
+import com.mustafakoceerr.tilepdf.model.normalizeSignature
+import com.mustafakoceerr.tilepdf.model.placedAround
 import com.mustafakoceerr.tilepdf.data.annotation.AnnotationRepository
 import com.mustafakoceerr.tilepdf.data.annotation.AnnotationSaveScheduler
 import com.mustafakoceerr.tilepdf.data.annotation.SaveResult
@@ -78,6 +85,11 @@ import javax.inject.Inject
 private const val SAVE_POSITION_DEBOUNCE_MS = 500L
 private const val SEARCH_DEBOUNCE_MS = 300L
 
+/** A signature as wide as one written by hand on a form line. */
+private const val SIGNATURE_WIDTH_PT = 160f
+private const val SIGNATURE_PEN_PT = 1.5f
+private const val SIGNATURE_COLOR = 0xFF000000.toInt()
+
 /** Twice the library's 40 dp row picture at most densities, still small as a PNG. */
 private const val THUMBNAIL_WIDTH_PX = 240
 
@@ -96,6 +108,7 @@ class ReaderViewModel @Inject constructor(
     private val saveAsCopy: SaveAsCopyUseCase,
     private val sharedDocuments: SharedDocuments,
     private val thumbnailStore: ThumbnailStore,
+    private val signatureStore: SignatureStore,
     @param:ApplicationScope private val applicationScope: CoroutineScope,
 ) : ViewModel() {
 
@@ -120,6 +133,17 @@ class ReaderViewModel @Inject constructor(
      */
     private var margins: List<PdfRect?>? = null
     private var marginsJob: Job? = null
+
+    /** Whether the open document has a form to fill; read once per open. */
+    private var documentHasForm = false
+
+    /** Fillable widgets by page, loaded around the reader as it moves. */
+    private val formFields = MutableStateFlow<Map<Int, List<FormField>>>(emptyMap())
+
+    /** A text or choice field being filled in through a dialog. */
+    private val formEditor = MutableStateFlow<FormField?>(null)
+
+    private val signatureStep = MutableStateFlow<SignatureStep?>(null)
 
     /** Reopens the document when a save wrote a new version; one per controller. */
     private var fileSavedJob: Job? = null
@@ -168,11 +192,11 @@ class ReaderViewModel @Inject constructor(
         preferencesRepository.preferences,
         combine(searchState, toc, ::Pair),
         combine(selection, linkTargets, currentPage, fullScreen, startPosition, ::PageState),
-        combine(annotations, editing, combine(saveCopyResult, handOff, ::Pair), jumpHistory, ::Outputs),
+        combine(annotations, editing, combine(saveCopyResult, handOff, ::Pair), jumpHistory, combine(formFields, formEditor, signatureStep, ::Triple), ::Outputs),
     ) { document, preferences, searchAndToc, pageState, annotationUi ->
         val (search, toc) = searchAndToc
         val (selection, links, page, fullScreen, start) = pageState
-        val (annotations, editing, results, history) = annotationUi
+        val (annotations, editing, results, history, forms) = annotationUi
         val (copyResult, handOff) = results
         when (document) {
             DocumentState.Loading -> ReaderUiState.Loading
@@ -200,6 +224,9 @@ class ReaderViewModel @Inject constructor(
                 editing = editing,
                 saveCopyResult = copyResult,
                 handOff = handOff,
+                formFields = forms.first,
+                formEditor = forms.second,
+                signatureStep = forms.third,
             )
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ReaderUiState.Loading)
@@ -234,6 +261,13 @@ class ReaderViewModel @Inject constructor(
                 observeBookmarks(opened)
                 // A password-protected document's first page isn't kept unencrypted.
                 if (password == null) saveThumbnail(opened)
+                documentHasForm = runCatchingCancellable { opened.document.hasForm() }.getOrDefault(false)
+                // Values filled in but not saved yet show as filled; a failed one shows as the file has it.
+                if (documentHasForm) {
+                    val pending = annotationRepository.observe(opened.uri).first()?.formValues.orEmpty()
+                    runCatchingCancellable { opened.document.fill(pending) }
+                }
+                formFields.value = emptyMap()
                 val view = libraryRepository.documentView(opened.uri)
                 if (margins?.size != opened.document.pageCount) margins = null
                 if (view.cropMargins) findMargins(opened)
@@ -246,6 +280,68 @@ class ReaderViewModel @Inject constructor(
                     is OpenFailure.Failed -> DocumentState.Failed(failure.reason)
                 }
             }
+            loadFormFields(currentPage.value)
+        }
+    }
+
+    /** Loads the form fields of [around] and its neighbours, the pages a tap can reach. */
+    private fun loadFormFields(around: Int) {
+        if (!documentHasForm) return
+        val document = openedDocument() ?: return
+        val pages = (around - 1..around + 1).filter { it in 0 until document.pageCount && it !in formFields.value }
+        if (pages.isEmpty()) return
+        viewModelScope.launch {
+            val loaded = pages.associateWith { page -> fieldsOf(document, page) }
+            formFields.update { it + loaded }
+        }
+    }
+
+    /** [pageIndex]'s fields, read from the engine; none when it can't tell. */
+    private suspend fun fieldsOf(document: PdfDocument, pageIndex: Int): List<FormField> =
+        runCatchingCancellable { document.formFields(pageIndex) }.getOrDefault(emptyList())
+
+    /** A check box or radio button changes at once; text and choices open a dialog. */
+    private fun onFormFieldTapped(field: FormField) {
+        val value = tapValue(field)
+        when {
+            value != null -> setFormValue(field.name, value)
+            field.kind == FormFieldKind.Text || field.kind == FormFieldKind.ComboBox || field.kind == FormFieldKind.ListBox ->
+                formEditor.value = field
+        }
+    }
+
+    fun onFormValueSubmitted(value: String) {
+        val field = formEditor.value ?: return
+        formEditor.value = null
+        if (value != field.value) setFormValue(field.name, value)
+    }
+
+    fun onFormEditorDismissed() {
+        formEditor.value = null
+    }
+
+    /**
+     * Fills field [name] with [value]: kept in the draft until saved, and put
+     * into the open document so its pages show it at once.
+     */
+    private fun setFormValue(name: String, value: String) {
+        val state = documentState.value as? DocumentState.Opened ?: return
+        val opened = state.opened
+        viewModelScope.launch {
+            annotationRepository.setFormValue(opened.uri, name, value)
+            val pages = runCatchingCancellable { opened.document.fill(mapOf(name to value)) }.getOrDefault(emptySet())
+            stateOf(opened)?.let { shown ->
+                pages.forEach { page ->
+                    shown.pageImages.invalidate(page)
+                    shown.thumbnails.invalidate(page)
+                }
+            }
+            val reloaded = pages.associateWith { page -> fieldsOf(opened.document, page) }
+            formFields.update { it + reloaded }
+            // The field may keep less than it was given (a length limit, say): the draft
+            // holds what the file will hold, or every save would fail to verify.
+            val kept = reloaded.values.flatten().firstOrNull { it.name == name }?.value
+            if (kept != null && kept != value) annotationRepository.setFormValue(opened.uri, name, kept)
         }
     }
 
@@ -414,6 +510,10 @@ class ReaderViewModel @Inject constructor(
      * toggles full screen, in that order. Pen and eraser handle their own taps.
      */
     fun onTap(pageIndex: Int, x: Float, y: Float) {
+        (signatureStep.value as? SignatureStep.Place)?.let { step ->
+            placeSignature(step.signature, pageIndex, PdfPoint(x, y))
+            return
+        }
         if (selection.value != null) {
             selection.value = null
             return
@@ -433,6 +533,15 @@ class ReaderViewModel @Inject constructor(
         }
         val document = openedDocument() ?: return
         viewModelScope.launch {
+            if (documentHasForm && !tools.annotating) {
+                val fields = formFields.value[pageIndex] ?: fieldsOf(document, pageIndex).also { loaded ->
+                    formFields.update { it + (pageIndex to loaded) }
+                }
+                formFieldAt(fields, PdfPoint(x, y))?.let { field ->
+                    onFormFieldTapped(field)
+                    return@launch
+                }
+            }
             val link = runCatchingCancellable { document.linkAt(pageIndex, x, y) }.getOrNull()
             when (val action = linkAction(link, document.pageCount)) {
                 is LinkAction.Jump -> onJump(action.jump)
@@ -492,6 +601,7 @@ class ReaderViewModel @Inject constructor(
 
     fun onPositionChanged(position: ReadingPosition) {
         this.position = position
+        if (currentPage.value != position.pageIndex) loadFormFields(position.pageIndex)
         currentPage.value = position.pageIndex
         positionUpdates.tryEmit(position)
         jumpHistory.update { it.scrolledTo(position.pageIndex) }
@@ -625,6 +735,36 @@ class ReaderViewModel @Inject constructor(
             val preferences = preferencesRepository.preferences.first()
             controller.add(Ink(newAnnotationId(), pageIndex, preferences.penColor, preferences.penWidthPt, listOf(points)))
         }
+    }
+
+    /** Opens the signature pad, with the saved signature when there is one. */
+    fun onAddSignature() {
+        if (controller.value?.state?.value?.ready != true) return
+        viewModelScope.launch { signatureStep.value = SignatureStep.Pad(signatureStore.load()) }
+    }
+
+    /** The pad's strokes, in any units: kept for next time, then placed with a tap. */
+    fun onSignatureDrawn(strokes: List<List<PdfPoint>>) {
+        val signature = normalizeSignature(strokes)
+        if (signature == null) {
+            signatureStep.value = null
+            return
+        }
+        signatureStep.value = SignatureStep.Place(signature)
+        viewModelScope.launch { signatureStore.save(signature) }
+    }
+
+    fun onSignatureCancelled() {
+        signatureStep.value = null
+    }
+
+    /** An ink drawing like the pen's, so it undoes, erases and saves the same way. */
+    private fun placeSignature(signature: Signature, pageIndex: Int, centre: PdfPoint) {
+        signatureStep.value = null
+        val controller = controller.value?.takeIf { it.state.value.ready } ?: return
+        controller.add(
+            Ink(newAnnotationId(), pageIndex, SIGNATURE_COLOR, SIGNATURE_PEN_PT, signature.placedAround(centre, SIGNATURE_WIDTH_PT)),
+        )
     }
 
     /** Everything one eraser gesture crossed, removed as one undo step. */
@@ -778,6 +918,7 @@ class ReaderViewModel @Inject constructor(
         val editing: AnnotationEditing,
         val results: Pair<SaveCopyResult?, HandOff?>,
         val jumpHistory: JumpHistory,
+        val forms: Triple<Map<Int, List<FormField>>, FormField?, SignatureStep?>,
     )
 
     /** Where a tapped link leads, until the screen has acted on it. */

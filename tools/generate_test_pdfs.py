@@ -21,6 +21,10 @@ Writes to core/testing/src/main/assets/:
                  popup, a foreign square without /NM, and a TilePDF ink
                  annotation (/NM tilepdf-fixture-ink), each with an
                  appearance stream. Page 2 has /Rotate 90; annotations.
+- forms.pdf      1 A4 page with an AcroForm: text "name", multiline text
+                 "notes", check box "agree" (export Yes), radio group
+                 "size" (S, L), combo box "city" (Ankara, İstanbul, İzmir)
+                 and read-only text "id" (value 42); form filling.
 """
 
 import hashlib
@@ -281,6 +285,36 @@ def annotated():
     write_pdf(objects, 14, "annotated.pdf")
 
 
+def forms():
+    # Rects are in PDF user space (bottom-left origin); tests read them back
+    # in top-left points (y' = 842 - y).
+    widget = "/Type /Annot /Subtype /Widget /F 4 /P 3 0 R"
+    objects = [
+        FONT,
+        stream("BT /F1 12 Tf 72 760 Td (Form) Tj ET"),
+        "<< /Type /Page /Parent 4 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 1 0 R >> >> "
+        "/Contents 2 0 R /Annots [7 0 R 8 0 R 9 0 R 11 0 R 12 0 R 13 0 R 14 0 R] >>",
+        "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        "<< /Type /Catalog /Pages 4 0 R /AcroForm 6 0 R >>",
+        "<< /Fields [7 0 R 8 0 R 9 0 R 10 0 R 13 0 R 14 0 R] /DR << /Font << /Helv 1 0 R >> >> "
+        "/DA (/Helv 12 Tf 0 g) /NeedAppearances true >>",
+        f"<< {widget} /FT /Tx /T (name) /Rect [72 700 300 724] /DA (/Helv 12 Tf 0 g) >>",
+        f"<< {widget} /FT /Tx /T (notes) /Ff 4096 /Rect [72 600 300 680] /DA (/Helv 12 Tf 0 g) >>",
+        f"<< {widget} /FT /Btn /T (agree) /V /Off /AS /Off /Rect [72 560 86 574] "
+        "/AP << /N << /Yes 15 0 R /Off 16 0 R >> >> >>",
+        "<< /FT /Btn /Ff 49152 /T (size) /V /Off /Kids [11 0 R 12 0 R] >>",
+        f"<< {widget} /Parent 10 0 R /AS /Off /Rect [72 520 86 534] /AP << /N << /S 17 0 R /Off 16 0 R >> >> >>",
+        f"<< {widget} /Parent 10 0 R /AS /Off /Rect [120 520 134 534] /AP << /N << /L 17 0 R /Off 16 0 R >> >> >>",
+        f"<< {widget} /FT /Ch /Ff 131072 /T (city) /Opt [(Ankara) {utf16('İstanbul')} {utf16('İzmir')}] "
+        "/Rect [72 470 200 490] /DA (/Helv 12 Tf 0 g) >>",
+        f"<< {widget} /FT /Tx /T (id) /Ff 1 /V (42) /Rect [72 430 200 450] /DA (/Helv 12 Tf 0 g) >>",
+        form("0 0 14 14", "0 g 2 2 10 10 re f"),
+        form("0 0 14 14", "0 G 0.5 0.5 13 13 re S"),
+        form("0 0 14 14", "0 g 4 4 6 6 re f"),
+    ]
+    write_pdf(objects, 5, "forms.pdf")
+
+
 if __name__ == "__main__":
     sample()
     text_dense()
@@ -288,3 +322,4 @@ if __name__ == "__main__":
     encrypted()
     links()
     annotated()
+    forms()

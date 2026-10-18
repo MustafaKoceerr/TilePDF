@@ -250,4 +250,51 @@ class AnnotationSaverTest {
         passwords.remember(uri, "pw")
         assertTrue(saver.export(uri, target))
     }
+
+    @Test
+    fun savesFormValues() = runTest {
+        givenDraft(emptyList(), pdf = FakePdf(form = mapOf("name" to "", "city" to "")))
+        repository.setFormValue(uri, "name", "Ada")
+
+        assertEquals(SaveResult.Saved(uri), saver.save(uri))
+
+        assertEquals(mapOf("name" to "Ada", "city" to ""), files.pdfs.getValue(uri).form)
+        val draft = draft()!!
+        assertFalse(draft.dirty)
+        assertEquals(emptyMap<String, String>(), draft.formValues)
+    }
+
+    @Test
+    fun matchingFormValuesNeedNoWrite() = runTest {
+        givenDraft(emptyList(), pdf = FakePdf(form = mapOf("name" to "Ada")))
+        repository.setFormValue(uri, "name", "Ada")
+
+        assertEquals(SaveResult.Saved(uri), saver.save(uri))
+
+        assertEquals(emptyList<String>(), files.replaced)
+        assertFalse(draft()!!.dirty)
+    }
+
+    @Test
+    fun lostFormValueFailsVerification() = runTest {
+        givenDraft(emptyList(), pdf = FakePdf(form = mapOf("name" to "")))
+        repository.setFormValue(uri, "name", "Ada")
+        files.loseFormOnSave = "name"
+
+        assertEquals(SaveResult.Failed(SaveError.Failed), saver.save(uri))
+
+        assertEquals(emptyList<String>(), files.replaced)
+        assertEquals(mapOf("name" to "Ada"), draft()!!.formValues)
+    }
+
+    @Test
+    fun exportIncludesFormValues() = runTest {
+        givenDraft(emptyList(), pdf = FakePdf(form = mapOf("name" to "")))
+        repository.setFormValue(uri, "name", "Ada")
+        val target = tmp.newFile("shared.pdf")
+
+        assertTrue(saver.export(uri, target))
+
+        assertEquals(mapOf("name" to "Ada"), files.openForReading(target, null).let { (it as FakePdfDocument).form })
+    }
 }

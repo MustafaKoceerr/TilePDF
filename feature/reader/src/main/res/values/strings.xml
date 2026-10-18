@@ -70,6 +70,12 @@
     <string name="annotation_page">Page %1$d</string>
     <string name="reader_save_copy">Save as copy</string>
     <string name="reader_share">Share</string>
+    <string name="reader_add_signature">Add signature</string>
+    <string name="signature_title">Your signature</string>
+    <string name="signature_pad_description">Signature pad</string>
+    <string name="signature_clear">Clear</string>
+    <string name="signature_place">Place</string>
+    <string name="signature_hint">Tap where to sign</string>
     <string name="reader_rotate">Rotate pages</string>
     <string name="reader_crop_margins">Crop margins</string>
     <string name="reader_print">Print</string>

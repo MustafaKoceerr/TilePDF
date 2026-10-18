@@ -37,6 +37,9 @@ interface AnnotationRepository {
     /** Replaces the draft's content; it now needs saving. */
     suspend fun update(uri: String, annotations: List<Annotation>, removedForeign: Set<ForeignRef>)
 
+    /** Records form field [name] filled in with [value]; the draft is dirty until it's saved. */
+    suspend fun setFormValue(uri: String, name: String, value: String)
+
     /**
      * Records that [saved] is now in the file, whose version is [newBase].
      * Edits made since [saved] was read stay unsaved.

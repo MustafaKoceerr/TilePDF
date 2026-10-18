@@ -49,4 +49,11 @@ class AnnotationCodecTest {
         val json = """[{"type":"stamp","v":1,"id":"tilepdf-9","page":0,"color":0},$noteJson]"""
         assertEquals(listOf(note), AnnotationCodec.decodeAnnotations(json))
     }
+
+    @Test
+    fun formValuesRoundTrip() {
+        val values = mapOf("name" to "Ada \"Lovelace\"", "city" to "İzmir", "agree" to "Off")
+
+        assertEquals(values, AnnotationCodec.decodeFormValues(AnnotationCodec.encodeFormValues(values)))
+    }
 }

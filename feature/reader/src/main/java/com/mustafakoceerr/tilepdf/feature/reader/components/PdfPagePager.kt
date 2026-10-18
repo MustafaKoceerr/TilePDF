@@ -55,6 +55,7 @@ import com.mustafakoceerr.tilepdf.feature.reader.SelectionActions
 import com.mustafakoceerr.tilepdf.feature.reader.SelectionUiState
 import com.mustafakoceerr.tilepdf.feature.reader.annotation.PageDrawing
 import com.mustafakoceerr.tilepdf.model.Annotation
+import com.mustafakoceerr.tilepdf.model.FormField
 import com.mustafakoceerr.tilepdf.model.PageTheme
 import com.mustafakoceerr.tilepdf.model.SearchMatch
 import kotlinx.coroutines.FlowPreview
@@ -98,6 +99,8 @@ internal fun PdfPagePager(
     annotations: Map<Int, List<Annotation>> = emptyMap(),
     /** Each page's pen or eraser input; null when neither is active. */
     drawingFor: ((pageIndex: Int) -> PageDrawing)? = null,
+    /** Fillable form widgets by page. */
+    formFields: Map<Int, List<FormField>> = emptyMap(),
     /** Two pages side by side, as [spreads] pairs them. */
     twoPageSpreads: Boolean = false,
 ) {
@@ -185,6 +188,7 @@ internal fun PdfPagePager(
                             selectionActions = selectionActions,
                             annotations = annotations[pageIndex].orEmpty(),
                             drawing = drawingFor?.invoke(pageIndex),
+                    formFields = formFields[pageIndex].orEmpty(),
                             modifier = Modifier
                                 .offset { IntOffset(fitted.left, fitted.top) }
                                 .graphicsLayer {

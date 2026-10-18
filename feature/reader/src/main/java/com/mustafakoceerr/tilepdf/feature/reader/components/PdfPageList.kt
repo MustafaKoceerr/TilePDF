@@ -27,6 +27,7 @@ import com.mustafakoceerr.tilepdf.feature.reader.SelectionActions
 import com.mustafakoceerr.tilepdf.feature.reader.SelectionUiState
 import com.mustafakoceerr.tilepdf.feature.reader.annotation.PageDrawing
 import com.mustafakoceerr.tilepdf.model.Annotation
+import com.mustafakoceerr.tilepdf.model.FormField
 import com.mustafakoceerr.tilepdf.model.PageTheme
 import com.mustafakoceerr.tilepdf.model.ReadingPosition
 import com.mustafakoceerr.tilepdf.model.SearchMatch
@@ -63,6 +64,8 @@ internal fun PdfPageList(
     annotations: Map<Int, List<Annotation>> = emptyMap(),
     /** Each page's pen or eraser input; null when neither is active. */
     drawingFor: ((pageIndex: Int) -> PageDrawing)? = null,
+    /** Fillable form widgets by page. */
+    formFields: Map<Int, List<FormField>> = emptyMap(),
 ) {
     val matchesByPage = remember(matches) { matches.groupBy { it.pageIndex } }
 
@@ -158,6 +161,7 @@ internal fun PdfPageList(
                     selectionActions = selectionActions,
                     annotations = annotations[pageIndex].orEmpty(),
                     drawing = drawingFor?.invoke(pageIndex),
+                    formFields = formFields[pageIndex].orEmpty(),
                 )
             }
         }

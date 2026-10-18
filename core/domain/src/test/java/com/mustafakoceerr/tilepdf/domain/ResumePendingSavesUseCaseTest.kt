@@ -22,6 +22,7 @@ class ResumePendingSavesUseCaseTest {
         override fun observe(uri: String): Flow<AnnotationDraft?> = error("unused")
         override suspend fun prepare(uri: String, document: PdfDocument): AnnotationDraft = error("unused")
         override suspend fun update(uri: String, annotations: List<Annotation>, removedForeign: Set<ForeignRef>) = error("unused")
+        override suspend fun setFormValue(uri: String, name: String, value: String) = Unit
         override suspend fun markSaved(uri: String, saved: AnnotationDraft, newBase: FileStamp) = error("unused")
         override suspend fun markFailed(uri: String, error: SaveError) = error("unused")
         override suspend fun moveTo(from: String, to: String, saved: AnnotationDraft, newBase: FileStamp) = error("unused")

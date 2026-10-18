@@ -161,6 +161,35 @@ class TilePdfDatabaseMigrationTest {
     }
 
     @Test
+    fun migrate6To7KeepsDraftsWithNoPendingFormValues() {
+        helper.createDatabase(DB_NAME, 6).use { db ->
+            db.execSQL(
+                "INSERT INTO documents (uri, displayName, pageCount, lastPage, pageOffsetFraction, zoom, panFraction, " +
+                    "addedAt, lastOpenedAt, favorite, rotation, cropMargins) " +
+                    "VALUES ('content://book', 'Book.pdf', 3, 1, 0, 1, 0, 1, 2, 0, 90, 1)"
+            )
+            db.execSQL(
+                "INSERT INTO annotation_drafts (uri, annotations, removedForeign, dirty, baseSize, " +
+                    "baseModified, saveError, updatedAt) VALUES ('content://book', '[]', '[]', 1, 10, NULL, NULL, 3)"
+            )
+        }
+
+        // Validates the migrated schema against the exported 7.json.
+        helper.runMigrationsAndValidate(DB_NAME, 7, true).close()
+
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val database = Room.databaseBuilder(context, TilePdfDatabase::class.java, DB_NAME).build()
+        val (document, draft) = runBlocking {
+            database.documentDao().get("content://book") to database.annotationDraftDao().get("content://book")
+        }
+        database.close()
+
+        assertEquals(90, document!!.rotation)
+        assertEquals(true, draft!!.dirty)
+        assertEquals("{}", draft.formValues)
+    }
+
+    @Test
     fun viewSettingsAreStored() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val database = Room.inMemoryDatabaseBuilder(context, TilePdfDatabase::class.java).build()

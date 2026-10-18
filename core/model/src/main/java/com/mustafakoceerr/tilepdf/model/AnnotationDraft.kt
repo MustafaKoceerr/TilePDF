@@ -13,6 +13,7 @@ enum class SaveError { NoWritePermission, FileChanged, NeedsPassword, Failed }
  * @param removedForeign other apps' annotations the user deleted, not yet saved.
  * @param dirty whether the file lacks some of this.
  * @param base the file version [removedForeign] keys and the saved state refer to.
+ * @param formValues form fields the user filled in, not yet saved.
  */
 data class AnnotationDraft(
     val uri: String,
@@ -21,4 +22,6 @@ data class AnnotationDraft(
     val dirty: Boolean,
     val base: FileStamp,
     val saveError: SaveError?,
+    /** Form values the user set (field name → `/V`), not yet saved. */
+    val formValues: Map<String, String> = emptyMap(),
 )

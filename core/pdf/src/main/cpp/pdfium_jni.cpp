@@ -17,6 +17,7 @@
 
 #include "fpdf_annot.h"
 #include "fpdf_doc.h"
+#include "fpdf_formfill.h"
 #include "fpdf_save.h"
 #include "fpdf_text.h"
 #include "fpdfview.h"
@@ -32,6 +33,10 @@ jmethodID g_pageTextConstructor = nullptr;
 // NativeAnnotation(int, int, String, String, int, float, float[], float[], int[], boolean).
 jclass g_annotationClass = nullptr;
 jmethodID g_annotationConstructor = nullptr;
+
+// NativeFormField(int, int, String, String, int, float[], String[], boolean, String).
+jclass g_formFieldClass = nullptr;
+jmethodID g_formFieldConstructor = nullptr;
 
 // /NM prefix of the annotations TilePDF creates.
 constexpr char kOwnPrefix[] = "tilepdf-";
@@ -98,6 +103,10 @@ struct NativeDocument {
     bool hideOwn = false;
     // Most recently used first.
     std::list<std::pair<int, FPDF_PAGE>> pages;
+    // The form-fill environment of a document with an AcroForm, else null.
+    // PDFium keeps a pointer to formInfo, so it lives as long as the form.
+    FPDF_FORMFILLINFO formInfo{};
+    FPDF_FORMHANDLE form = nullptr;
 
     // The loaded page [index], from the cache when possible; null if it
     // can't be loaded. Owned by this document: callers must not close it.
@@ -110,24 +119,31 @@ struct NativeDocument {
         }
         FPDF_PAGE page = FPDF_LoadPage(document, index);
         if (!page) return nullptr;
+        if (form) FORM_OnAfterLoadPage(page, form);
         if (hideOwn) HideOwnAnnotations(page);
         pages.emplace_front(index, page);
         if (pages.size() > kLoadedPages) {
-            FPDF_ClosePage(pages.back().second);
+            ClosePage(pages.back().second);
             pages.pop_back();
         }
         return page;
     }
 
+    void ClosePage(FPDF_PAGE page) {
+        if (form) FORM_OnBeforeClosePage(page, form);
+        FPDF_ClosePage(page);
+    }
+
     // Closes every loaded page; later calls load them again.
     void Trim() {
-        for (auto& entry : pages) FPDF_ClosePage(entry.second);
+        for (auto& entry : pages) ClosePage(entry.second);
         pages.clear();
     }
 
-    // Pages first: PDFium requires them closed before their document.
+    // Pages, then the form, then the document, as PDFium requires.
     void Close() {
         Trim();
+        if (form) FPDFDOC_ExitFormFillEnvironment(form);
         FPDF_CloseDocument(document);
     }
 };
@@ -334,6 +350,100 @@ jstring NewStringOrNull(JNIEnv* env, const std::vector<jchar>& chars) {
     return chars.empty() ? nullptr : env->NewString(chars.data(), static_cast<jsize>(chars.size()));
 }
 
+// A UTF-16LE string from a PDFium getter taking (buffer, byte length) and
+// returning the byte length with its NUL; empty when absent.
+template <typename Getter>
+std::vector<jchar> Utf16(Getter get) {
+    const unsigned long bytes = get(nullptr, 0);
+    if (bytes <= sizeof(FPDF_WCHAR)) return {};
+    std::vector<jchar> value(bytes / sizeof(FPDF_WCHAR));
+    get(reinterpret_cast<FPDF_WCHAR*>(value.data()), bytes);
+    value.pop_back();
+    return value;
+}
+
+// Draws the form's widgets over a render made with [m]: FPDF_RenderPage
+// leaves widgets to the form-fill environment. FPDF_FFLDraw takes a box and
+// a quarter turn instead of a matrix, so both are read off [m], which only
+// ever scales, turns by quarter turns and translates.
+void DrawForm(FPDF_FORMHANDLE form, FPDF_BITMAP bitmap, FPDF_PAGE page, const jfloat* m, int flags) {
+    const float width = FPDF_GetPageWidthF(page);
+    const float height = FPDF_GetPageHeightF(page);
+    float minX = 0, minY = 0, maxX = 0, maxY = 0;
+    bool first = true;
+    for (const auto& corner : {std::pair<float, float>{0, 0}, {width, 0}, {0, height}, {width, height}}) {
+        const float x = m[0] * corner.first + m[2] * corner.second + m[4];
+        const float y = m[1] * corner.first + m[3] * corner.second + m[5];
+        minX = first ? x : std::min(minX, x);
+        maxX = first ? x : std::max(maxX, x);
+        minY = first ? y : std::min(minY, y);
+        maxY = first ? y : std::max(maxY, y);
+        first = false;
+    }
+    int rotate = 0;
+    if (m[1] > 0 && m[2] < 0) rotate = 1;
+    else if (m[0] < 0 && m[3] < 0) rotate = 2;
+    else if (m[1] < 0 && m[2] > 0) rotate = 3;
+    FPDF_FFLDraw(form, bitmap, page, static_cast<int>(std::lround(minX)), static_cast<int>(std::lround(minY)),
+                 static_cast<int>(std::lround(maxX - minX)), static_cast<int>(std::lround(maxY - minY)), rotate, flags);
+}
+
+// The widget at [annotIndex] of page [index] as a NativeFormField, or null
+// for widgets TilePDF doesn't fill (push buttons, signatures, XFA).
+jobject ReadFormField(JNIEnv* env, FPDF_FORMHANDLE form, FPDF_PAGE page, FPDF_ANNOTATION annotation, int annotIndex) {
+    const int type = FPDFAnnot_GetFormFieldType(form, annotation);
+    if (type < FPDF_FORMFIELD_CHECKBOX || type > FPDF_FORMFIELD_TEXTFIELD) return nullptr;
+    const std::vector<jchar> name = Utf16([&](FPDF_WCHAR* buffer, unsigned long length) {
+        return FPDFAnnot_GetFormFieldName(form, annotation, buffer, length);
+    });
+    const std::vector<jchar> value = Utf16([&](FPDF_WCHAR* buffer, unsigned long length) {
+        return FPDFAnnot_GetFormFieldValue(form, annotation, buffer, length);
+    });
+    const std::vector<jchar> exportValue = Utf16([&](FPDF_WCHAR* buffer, unsigned long length) {
+        return FPDFAnnot_GetFormFieldExportValue(form, annotation, buffer, length);
+    });
+    std::vector<std::vector<jchar>> options;
+    if (type == FPDF_FORMFIELD_COMBOBOX || type == FPDF_FORMFIELD_LISTBOX) {
+        const int count = FPDFAnnot_GetOptionCount(form, annotation);
+        for (int i = 0; i < count; ++i) {
+            options.push_back(Utf16([&](FPDF_WCHAR* buffer, unsigned long length) {
+                return FPDFAnnot_GetOptionLabel(form, annotation, i, buffer, length);
+            }));
+        }
+    }
+    jfloat rect[4] = {0, 0, 0, 0};
+    FS_RECTF pageRect{};
+    if (FPDFAnnot_GetRect(annotation, &pageRect)) {
+        float x1, y1, x2, y2;
+        PageToTopLeft(page, pageRect.left, pageRect.top, &x1, &y1);
+        PageToTopLeft(page, pageRect.right, pageRect.bottom, &x2, &y2);
+        rect[0] = std::min(x1, x2);
+        rect[1] = std::min(y1, y2);
+        rect[2] = std::max(x1, x2);
+        rect[3] = std::max(y1, y2);
+    }
+    const bool checked = FPDFAnnot_IsChecked(form, annotation);
+
+    jstring nameString = env->NewString(name.data(), static_cast<jsize>(name.size()));
+    jstring valueString = env->NewString(value.data(), static_cast<jsize>(value.size()));
+    jstring exportString = env->NewString(exportValue.data(), static_cast<jsize>(exportValue.size()));
+    jobjectArray optionArray = NewStringArray(env, options);
+    jfloatArray rectArray = env->NewFloatArray(4);
+    jobject result = nullptr;
+    if (nameString && valueString && exportString && optionArray && rectArray) {
+        env->SetFloatArrayRegion(rectArray, 0, 4, rect);
+        result = env->NewObject(g_formFieldClass, g_formFieldConstructor, annotIndex, type, nameString, valueString,
+                                FPDFAnnot_GetFormFieldFlags(form, annotation), rectArray, optionArray,
+                                checked ? JNI_TRUE : JNI_FALSE, exportString);
+    }
+    if (nameString) env->DeleteLocalRef(nameString);
+    if (valueString) env->DeleteLocalRef(valueString);
+    if (exportString) env->DeleteLocalRef(exportString);
+    if (optionArray) env->DeleteLocalRef(optionArray);
+    if (rectArray) env->DeleteLocalRef(rectArray);
+    return result;
+}
+
 // The annotation at [index] as a NativeAnnotation in top-left points.
 jobject ReadAnnotation(JNIEnv* env, NativeDocument* document, FPDF_PAGE page, FPDF_ANNOTATION annotation, int index) {
     const int subtype = FPDFAnnot_GetSubtype(annotation);
@@ -437,7 +547,14 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void*) {
     env->DeleteLocalRef(local);
     g_annotationConstructor = env->GetMethodID(
             g_annotationClass, "<init>", "(IILjava/lang/String;Ljava/lang/String;IF[F[F[IZ)V");
-    return g_annotationConstructor ? JNI_VERSION_1_6 : JNI_ERR;
+    if (!g_annotationConstructor) return JNI_ERR;
+    local = env->FindClass("com/mustafakoceerr/tilepdf/core/pdf/NativeFormField");
+    if (!local) return JNI_ERR;
+    g_formFieldClass = static_cast<jclass>(env->NewGlobalRef(local));
+    env->DeleteLocalRef(local);
+    g_formFieldConstructor = env->GetMethodID(
+            g_formFieldClass, "<init>", "(IILjava/lang/String;Ljava/lang/String;I[F[Ljava/lang/String;ZLjava/lang/String;)V");
+    return g_formFieldConstructor ? JNI_VERSION_1_6 : JNI_ERR;
 }
 
 JNIEXPORT void JNICALL
@@ -474,6 +591,10 @@ Java_com_mustafakoceerr_tilepdf_core_pdf_PdfiumNative_nativeOpen(
         env->SetIntArrayRegion(error, 0, 1, &reported);
         delete native;
         return 0;
+    }
+    if (FPDF_GetFormType(native->document) != FORMTYPE_NONE) {
+        native->formInfo.version = 1;
+        native->form = FPDFDOC_InitFormFillEnvironment(native->document, &native->formInfo);
     }
     return reinterpret_cast<jlong>(native);
 }
@@ -526,7 +647,8 @@ Java_com_mustafakoceerr_tilepdf_core_pdf_PdfiumNative_nativeRender(
         info.format != ANDROID_BITMAP_FORMAT_RGBA_8888 || env->GetArrayLength(matrix) != 6) {
         return JNI_FALSE;
     }
-    FPDF_PAGE page = FromHandle(handle)->Page(index);
+    NativeDocument* document = FromHandle(handle);
+    FPDF_PAGE page = document->Page(index);
     if (!page) return JNI_FALSE;
 
     void* pixels = nullptr;
@@ -544,6 +666,7 @@ Java_com_mustafakoceerr_tilepdf_core_pdf_PdfiumNative_nativeRender(
     if (target) {
         // REVERSE_BYTE_ORDER writes RGBA, which is Android's ARGB_8888 layout.
         FPDF_RenderPageBitmapWithMatrix(target, page, &transform, &clip, FPDF_ANNOT | FPDF_REVERSE_BYTE_ORDER);
+        if (document->form) DrawForm(document->form, target, page, m, FPDF_ANNOT | FPDF_REVERSE_BYTE_ORDER);
         FPDFBitmap_Destroy(target);
     }
     AndroidBitmap_unlockPixels(env, bitmap);
@@ -958,6 +1081,90 @@ Java_com_mustafakoceerr_tilepdf_core_pdf_PdfiumNative_nativeSaveIncremental(
     writer.fd = fd;
     const bool saved = FPDF_SaveAsCopy(FromHandle(handle)->document, &writer, FPDF_INCREMENTAL);
     return saved && !writer.failed ? JNI_TRUE : JNI_FALSE;
+}
+
+// Whether the document has a form TilePDF can fill.
+JNIEXPORT jboolean JNICALL
+Java_com_mustafakoceerr_tilepdf_core_pdf_PdfiumNative_nativeHasForm(JNIEnv*, jclass, jlong handle) {
+    return FromHandle(handle)->form ? JNI_TRUE : JNI_FALSE;
+}
+
+// The fillable widgets of page [index]; null if the page can't be loaded.
+JNIEXPORT jobjectArray JNICALL
+Java_com_mustafakoceerr_tilepdf_core_pdf_PdfiumNative_nativeFormFields(JNIEnv* env, jclass, jlong handle, jint index) {
+    NativeDocument* document = FromHandle(handle);
+    FPDF_PAGE page = document->Page(index);
+    if (!page) return nullptr;
+    std::vector<jobject> fields;
+    if (document->form) {
+        const int count = FPDFPage_GetAnnotCount(page);
+        for (int i = 0; i < count; ++i) {
+            Annotation annotation(FPDFPage_GetAnnot(page, i));
+            if (!annotation.handle || FPDFAnnot_GetSubtype(annotation.handle) != FPDF_ANNOT_WIDGET) continue;
+            jobject field = ReadFormField(env, document->form, page, annotation.handle, i);
+            if (field) fields.push_back(field);
+        }
+    }
+    jobjectArray result = env->NewObjectArray(static_cast<jsize>(fields.size()), g_formFieldClass, nullptr);
+    for (size_t i = 0; i < fields.size(); ++i) {
+        if (result) env->SetObjectArrayElement(result, static_cast<jsize>(i), fields[i]);
+        env->DeleteLocalRef(fields[i]);
+    }
+    return result;
+}
+
+// Replaces the text of the text field widget [annotIndex], as typing would,
+// so PDFium writes /V and a new appearance.
+JNIEXPORT jboolean JNICALL
+Java_com_mustafakoceerr_tilepdf_core_pdf_PdfiumNative_nativeSetFormText(
+        JNIEnv* env, jclass, jlong handle, jint index, jint annotIndex, jstring text) {
+    NativeDocument* document = FromHandle(handle);
+    FPDF_PAGE page = document->Page(index);
+    if (!page || !document->form) return JNI_FALSE;
+    Annotation annotation(FPDFPage_GetAnnot(page, annotIndex));
+    if (!annotation.handle || !FORM_SetFocusedAnnot(document->form, annotation.handle)) return JNI_FALSE;
+    std::vector<jchar> chars = Chars(env, text);
+    chars.push_back(0);
+    FORM_SelectAllText(document->form, page);
+    FORM_ReplaceSelection(document->form, page, reinterpret_cast<FPDF_WIDESTRING>(chars.data()));
+    return FORM_ForceToKillFocus(document->form) ? JNI_TRUE : JNI_FALSE;
+}
+
+// Turns the check box or radio button widget [annotIndex] on or off with a
+// click at its centre, as a user would; nothing happens if it already is.
+JNIEXPORT jboolean JNICALL
+Java_com_mustafakoceerr_tilepdf_core_pdf_PdfiumNative_nativeSetFormChecked(
+        JNIEnv*, jclass, jlong handle, jint index, jint annotIndex, jboolean checked) {
+    NativeDocument* document = FromHandle(handle);
+    FPDF_PAGE page = document->Page(index);
+    if (!page || !document->form) return JNI_FALSE;
+    Annotation annotation(FPDFPage_GetAnnot(page, annotIndex));
+    FS_RECTF rect{};
+    if (!annotation.handle || !FPDFAnnot_GetRect(annotation.handle, &rect)) return JNI_FALSE;
+    const bool wanted = checked == JNI_TRUE;
+    if (FPDFAnnot_IsChecked(document->form, annotation.handle) != wanted) {
+        const double x = (rect.left + rect.right) / 2;
+        const double y = (rect.top + rect.bottom) / 2;
+        FORM_OnMouseMove(document->form, page, 0, x, y);
+        FORM_OnLButtonDown(document->form, page, 0, x, y);
+        FORM_OnLButtonUp(document->form, page, 0, x, y);
+        FORM_ForceToKillFocus(document->form);
+    }
+    return FPDFAnnot_IsChecked(document->form, annotation.handle) == wanted ? JNI_TRUE : JNI_FALSE;
+}
+
+// Chooses option [optionIndex] of the combo or list box widget [annotIndex].
+JNIEXPORT jboolean JNICALL
+Java_com_mustafakoceerr_tilepdf_core_pdf_PdfiumNative_nativeSetFormChoice(
+        JNIEnv*, jclass, jlong handle, jint index, jint annotIndex, jint optionIndex) {
+    NativeDocument* document = FromHandle(handle);
+    FPDF_PAGE page = document->Page(index);
+    if (!page || !document->form) return JNI_FALSE;
+    Annotation annotation(FPDFPage_GetAnnot(page, annotIndex));
+    if (!annotation.handle || !FORM_SetFocusedAnnot(document->form, annotation.handle)) return JNI_FALSE;
+    const bool selected = FORM_SetIndexSelected(document->form, page, optionIndex, true);
+    FORM_ForceToKillFocus(document->form);
+    return selected ? JNI_TRUE : JNI_FALSE;
 }
 
 }  // extern "C"

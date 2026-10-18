@@ -8,6 +8,8 @@ import com.mustafakoceerr.tilepdf.model.Bookmark
 import com.mustafakoceerr.tilepdf.core.geometry.PageViewTransform
 import com.mustafakoceerr.tilepdf.core.geometry.PdfRect
 import com.mustafakoceerr.tilepdf.model.DocumentView
+import com.mustafakoceerr.tilepdf.model.FormField
+import com.mustafakoceerr.tilepdf.model.Signature
 import com.mustafakoceerr.tilepdf.core.pdf.PageSize
 import com.mustafakoceerr.tilepdf.core.render.PageImageSource
 import com.mustafakoceerr.tilepdf.core.render.ThumbnailSource
@@ -59,6 +61,12 @@ sealed interface ReaderUiState {
         val pageTransforms: List<PageViewTransform> = pageSizes.map { PageViewTransform.of(it) },
         /** This document's rotation and margin cropping, for the menu. */
         val documentView: DocumentView = DocumentView(),
+        /** Fillable widgets of the pages near the reader, by page; empty without a form. */
+        val formFields: Map<Int, List<FormField>> = emptyMap(),
+        /** A text or choice field being filled in. */
+        val formEditor: FormField? = null,
+        /** Adding a signature: drawing it, then a tap places it. */
+        val signatureStep: SignatureStep? = null,
     ) : ReaderUiState
 }
 
@@ -118,4 +126,13 @@ data class SearchUiState(
     val isSearching: Boolean = false,
 ) {
     val currentMatch: SearchMatch? get() = matches.getOrNull(currentIndex)
+}
+
+/** Where adding a signature is. */
+sealed interface SignatureStep {
+    /** Drawing it on the pad, from the [saved] one if any. */
+    data class Pad(val saved: Signature?) : SignatureStep
+
+    /** Waiting for a tap on the page to put [signature] there. */
+    data class Place(val signature: Signature) : SignatureStep
 }

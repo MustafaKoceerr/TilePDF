@@ -54,6 +54,13 @@ class OfflineAnnotationRepository internal constructor(
         }
     }
 
+    override suspend fun setFormValue(uri: String, name: String, value: String) {
+        dao.update(uri) {
+            val values = AnnotationCodec.decodeFormValues(it.formValues) + (name to value)
+            it.copy(formValues = AnnotationCodec.encodeFormValues(values), dirty = true, updatedAt = now())
+        }
+    }
+
     override suspend fun markSaved(uri: String, saved: AnnotationDraft, newBase: FileStamp) {
         dao.update(uri) { it.afterSave(saved, newBase) }
     }
@@ -80,9 +87,12 @@ class OfflineAnnotationRepository internal constructor(
         val annotations = AnnotationCodec.decodeAnnotations(annotations)
         val removed = AnnotationCodec.decodeRefs(removedForeign) - saved.removedForeign
         val kept = removed.filterNot { it.key.startsWith("#") }.toSet()
+        // Values changed again since the save started are still pending.
+        val pendingValues = AnnotationCodec.decodeFormValues(formValues).filter { (name, value) -> saved.formValues[name] != value }
         return copy(
             removedForeign = AnnotationCodec.encodeRefs(kept),
-            dirty = annotations != saved.annotations || kept.isNotEmpty(),
+            formValues = AnnotationCodec.encodeFormValues(pendingValues),
+            dirty = annotations != saved.annotations || kept.isNotEmpty() || pendingValues.isNotEmpty(),
             baseSize = newBase.size,
             baseModified = newBase.lastModified,
             saveError = null,
@@ -97,6 +107,7 @@ class OfflineAnnotationRepository internal constructor(
         dirty = dirty,
         base = FileStamp(baseSize, baseModified),
         saveError = saveError?.let { name -> SaveError.entries.firstOrNull { it.name == name } },
+        formValues = AnnotationCodec.decodeFormValues(formValues),
     )
 
     private fun AnnotationDraft.toEntity() = AnnotationDraftEntity(
@@ -108,5 +119,6 @@ class OfflineAnnotationRepository internal constructor(
         baseModified = base.lastModified,
         saveError = saveError?.name,
         updatedAt = now(),
+        formValues = AnnotationCodec.encodeFormValues(formValues),
     )
 }

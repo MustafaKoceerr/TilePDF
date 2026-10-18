@@ -151,4 +151,19 @@ internal object PdfiumNative {
 
     /** PDFium's `FPDF_ERR_PASSWORD`. */
     const val ERROR_PASSWORD = 4
+
+    /** Whether the document has an AcroForm. */
+    external fun nativeHasForm(document: Long): Boolean
+
+    /** The fillable widgets of page [index]; null if it can't be loaded. */
+    external fun nativeFormFields(document: Long, index: Int): Array<NativeFormField?>?
+
+    /** Replaces a text field widget's text as typing would. */
+    external fun nativeSetFormText(document: Long, index: Int, annotIndex: Int, text: String): Boolean
+
+    /** Turns a check box or radio button widget on or off with a click. */
+    external fun nativeSetFormChecked(document: Long, index: Int, annotIndex: Int, checked: Boolean): Boolean
+
+    /** Chooses option [optionIndex] of a combo or list box widget. */
+    external fun nativeSetFormChoice(document: Long, index: Int, annotIndex: Int, optionIndex: Int): Boolean
 }
