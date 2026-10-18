@@ -5,31 +5,37 @@ RAHAT OKU
 • Dikey kaydırma ya da tek tek sayfa
 • Açık, gece ve sepya sayfa renkleri
 • Tüm belgede arama ve sonuçlar arasında gezinme
-• İçindekiler, yer imleri ve sayfa ızgarası
+• İçindekiler, yer imleri ve sayfa ızgarası; her atlamadan sonra geri dönüş
+• Sayfaları döndür, boş kenar boşluklarını kırp
+• Ses tuşlarıyla sayfa çevir
 • Tam ekran okumak için sayfaya dokun
 • Her belgeyi tam kaldığın yerden açar
 • Şifreli PDF'leri açar
 
-PDF'LERİNİ İŞARETLE
+İŞARETLE, DOLDUR VE İMZALA
 • Metni vurgula, altını ya da üstünü çiz
 • Farklı renk ve kalınlıklarda kalemle çiz, çizgileri sil
 • Yapışkan not ekle
+• PDF formlarını doldur: metin alanları, onay kutuları, seçenek düğmeleri ve listeler
+• Parmağınla imzala; imzan bir sonraki sefer için saklanır
 • Geri al ve yinele
 • Açıklamalar PDF'in içine kaydedilir; diğer PDF uygulamaları da görür
 • Değiştirilemeyen dosyalar açıklamalı bir kopya olarak kaydedilir
+• Belgeyi açıklamaları ve doldurulmuş formlarıyla paylaş ya da yazdır
 
 KÜTÜPHANEN
-• Açtığın her belge, devam etmeye hazır
+• Açtığın her belge, ilk sayfası kapak olarak, devam etmeye hazır
 • Favoriler, sıralama ve arama
 • "Birlikte aç" ya da "Paylaş" ile her uygulamadan PDF aç
 
 HER EKRANA UYGUN
 • Tablet ve katlanabilirlerde içindekiler sayfaların yanında bir panelde
+• Geniş ekranda kitap gibi yan yana iki sayfa
 • Açık, koyu ya da sistem teması; istersen Material You renkleri
 • Türkçe ve İngilizce
 • TalkBack etiketleri ve büyük dokunma alanları
 
 GİZLİLİK ESAS
-TilePDF tamamen çevrimdışı çalışır. Hiçbir veri toplamaz, hiçbir şey paylaşmaz. Dosyaların, notların ve ayarların cihazında kalır.
+TilePDF tamamen çevrimdışı çalışır. Hiçbir veri toplamaz, hiçbir yere bir şey göndermez. Dosyaların, notların ve ayarların cihazında kalır.
 
 TilePDF, Chrome'da PDF'leri gösteren motorun aynısı olan PDFium'u kullanır.

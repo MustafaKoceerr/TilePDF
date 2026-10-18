@@ -5,31 +5,37 @@ READ COMFORTABLY
 • Vertical scrolling or one page at a time
 • Light, night and sepia page colors
 • Search the whole document and jump between results
-• Table of contents, bookmarks and a page grid
+• Table of contents, bookmarks and a page grid, with a way back after every jump
+• Rotate pages and crop empty margins
+• Turn pages with the volume keys
 • Tap a page for full-screen reading
 • Reopens every document exactly where you left it
 • Opens password-protected PDFs
 
-MARK UP YOUR PDFS
+MARK UP, FILL IN AND SIGN
 • Highlight, underline or strike out text
 • Draw with a pen in several colors and widths, and erase strokes
 • Add sticky notes
+• Fill in PDF forms: text fields, check boxes, radio buttons and lists
+• Sign with your finger; your signature is kept for next time
 • Undo and redo
 • Annotations are saved into the PDF itself, so other PDF apps show them too
 • Files that can't be changed are saved as an annotated copy
+• Share or print a document with its annotations and filled-in forms
 
 YOUR LIBRARY
-• Every document you opened, ready to continue
+• Every document you opened, ready to continue, with its first page as a cover
 • Favorites, sorting and search
 • Open PDFs from any app with "Open with" or "Share"
 
 MADE FOR EVERY SCREEN
 • Tablets and foldables keep the contents in a side panel next to the pages
+• Two pages side by side, like a book, on wide screens
 • Light, dark or system theme, with optional Material You colors
 • English and Turkish
 • TalkBack labels and large touch targets
 
 PRIVATE BY DESIGN
-TilePDF works completely offline. It collects no data and shares nothing. Your files, notes and settings stay on your device.
+TilePDF works completely offline. It collects no data and sends nothing anywhere. Your files, notes and settings stay on your device.
 
 TilePDF uses the PDFium engine, the same engine that renders PDFs in Chrome.
