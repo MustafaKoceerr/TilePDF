@@ -1,6 +1,9 @@
 package com.mustafakoceerr.tilepdf.feature.library
 
+import androidx.compose.ui.test.DeviceConfigurationOverride
+import androidx.compose.ui.test.ForcedSize
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -9,7 +12,10 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.mustafakoceerr.tilepdf.model.LibraryDocument
 import com.mustafakoceerr.tilepdf.model.ReadingPosition
+import androidx.compose.ui.unit.DpSize
+import androidx.compose.ui.unit.dp
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -24,6 +30,28 @@ class LibraryScreenTest {
     private fun text(id: Int) = context.getString(id)
 
     private val book = LibraryItem(LibraryDocument("content://book", "Book.pdf", 10, ReadingPosition(), 1), isAccessible = true)
+
+    private val other = LibraryItem(LibraryDocument("content://other", "Other.pdf", 3, ReadingPosition(), 0), isAccessible = true)
+
+    private fun showAt(size: DpSize) = compose.setContent {
+        DeviceConfigurationOverride(DeviceConfigurationOverride.ForcedSize(size)) {
+            LibraryScreen(LibraryUiState.Success(listOf(book, other)), LibraryActions())
+        }
+    }
+
+    private fun top(name: String) = compose.onNodeWithText(name).getBoundsInRoot().top
+
+    @Test
+    fun wideLibraryUsesColumns() {
+        showAt(DpSize(1000.dp, 800.dp))
+        assertEquals(top("Book.pdf"), top("Other.pdf"))
+    }
+
+    @Test
+    fun phoneLibraryIsOneColumn() {
+        showAt(DpSize(400.dp, 800.dp))
+        assertTrue(top("Other.pdf") > top("Book.pdf"))
+    }
 
     @Test
     fun favoriteToggleReports() {

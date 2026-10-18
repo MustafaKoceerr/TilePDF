@@ -41,6 +41,7 @@ import com.mustafakoceerr.tilepdf.model.Note
 import com.mustafakoceerr.tilepdf.model.PageText
 import com.mustafakoceerr.tilepdf.model.PageTheme
 import com.mustafakoceerr.tilepdf.model.ReadingMode
+import com.mustafakoceerr.tilepdf.model.OutlineEntry
 import com.mustafakoceerr.tilepdf.model.ReadingPosition
 import com.mustafakoceerr.tilepdf.model.newAnnotationId
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -356,24 +357,23 @@ class ReaderViewModel @Inject constructor(
         this.position = position
         currentPage.value = position.pageIndex
         positionUpdates.tryEmit(position)
+        // A side panel stays open while reading; its highlight follows along.
+        if (toc.value.isOpen) toc.update { it.copy(currentIndex = currentOutlineIndex(it.entries, position)) }
     }
 
     fun onOpenToc() {
         fullScreen.value = false
         val opened = (documentState.value as? DocumentState.Opened)?.opened ?: return
         val at = position ?: opened.position
+        toc.update { state -> state.copy(isOpen = true, currentIndex = currentOutlineIndex(state.entries, at)) }
+    }
+
+    /** The outline entry the reader is in, or -1. */
+    private fun currentOutlineIndex(entries: List<OutlineEntry>, at: ReadingPosition): Int {
+        val document = openedDocument() ?: return -1
         // The position is the fraction scrolled into the top page; convert to points.
-        val pageHeight = opened.document.pageSizes.getOrNull(at.pageIndex)?.heightPt ?: 0
-        toc.update { state ->
-            state.copy(
-                isOpen = true,
-                currentIndex = OutlineLocator.currentIndex(
-                    state.entries,
-                    at.pageIndex,
-                    at.pageOffsetFraction * pageHeight,
-                ) ?: -1,
-            )
-        }
+        val pageHeight = document.pageSizes.getOrNull(at.pageIndex)?.heightPt ?: 0
+        return OutlineLocator.currentIndex(entries, at.pageIndex, at.pageOffsetFraction * pageHeight) ?: -1
     }
 
     fun onCloseToc() {
