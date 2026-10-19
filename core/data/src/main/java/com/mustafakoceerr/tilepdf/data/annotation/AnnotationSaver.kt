@@ -1,7 +1,9 @@
 package com.mustafakoceerr.tilepdf.data.annotation
 
 import com.mustafakoceerr.tilepdf.core.pdf.PdfPasswordException
+import com.mustafakoceerr.tilepdf.core.geometry.PdfPoint
 import com.mustafakoceerr.tilepdf.core.pdf.addMissingRecognizedText
+import com.mustafakoceerr.tilepdf.core.pdf.replay
 import com.mustafakoceerr.tilepdf.core.pdf.allFormFields
 import com.mustafakoceerr.tilepdf.core.pdf.fill
 import com.mustafakoceerr.tilepdf.core.pdf.write
@@ -9,6 +11,7 @@ import com.mustafakoceerr.tilepdf.model.AnnotationDraft
 import com.mustafakoceerr.tilepdf.model.FileStamp
 import com.mustafakoceerr.tilepdf.model.ForeignRef
 import com.mustafakoceerr.tilepdf.model.SaveError
+import com.mustafakoceerr.tilepdf.model.XfaEdit
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import java.io.File
@@ -98,6 +101,7 @@ class AnnotationSaver @Inject constructor(
                     document.write(draft.annotations, removed)
                     document.fill(draft.formValues)
                     document.addMissingRecognizedText(repository.recognizedText(uri, draft.recognizedPages))
+                    document.replay(draft.xfaEdits)
                 }
                 document.saveIncremental(target)
             }
@@ -145,7 +149,8 @@ class AnnotationSaver @Inject constructor(
                     val formChanged = document.fill(draft.formValues).isNotEmpty()
                     val recognized = repository.recognizedText(source, draft.recognizedPages)
                     val textChanged = document.addMissingRecognizedText(recognized).isNotEmpty()
-                    val changed = annotationsChanged || formChanged || textChanged
+                    document.replay(draft.xfaEdits)
+                    val changed = annotationsChanged || formChanged || textChanged || draft.xfaEdits.isNotEmpty()
                     if (changed || target != source) document.saveIncremental(temp)
                     changed
                 }
@@ -178,8 +183,8 @@ class AnnotationSaver @Inject constructor(
 
     /**
      * Whether the saved [file] has exactly the draft's own annotations, none
-     * of its removed named ones, every filled-in field's value, and text on
-     * every recognised page.
+     * of its removed named ones, every filled-in field's value, text on
+     * every recognised page, and the last text written at each XFA point.
      */
     private suspend fun holdsExactly(file: File, password: String?, draft: AnnotationDraft, removed: Set<ForeignRef>): Boolean =
         files.openForReading(file, password).use { document ->
@@ -190,6 +195,11 @@ class AnnotationSaver @Inject constructor(
             ownIds == draft.annotations.map { it.id }.toSet() &&
                 removed.none { !it.key.startsWith("#") && it in foreign } &&
                 draft.formValues.all { (name, value) -> fields.filter { it.name == name }.all { it.value == value } } &&
-                draft.recognizedPages.all { document.hasRecognizedText(it) }
+                draft.recognizedPages.all { document.hasRecognizedText(it) } &&
+                lastXfaTexts(draft.xfaEdits).all { (point, text) -> document.xfaTap(point.first, point.second) == text }
         }
 }
+
+/** The text each XFA point was last given, by page and point. */
+private fun lastXfaTexts(edits: List<XfaEdit>): Map<Pair<Int, PdfPoint>, String> =
+    edits.mapNotNull { edit -> edit.text?.let { (edit.pageIndex to edit.at) to it } }.toMap()

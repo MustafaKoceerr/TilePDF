@@ -7,6 +7,7 @@ import com.mustafakoceerr.tilepdf.model.FileStamp
 import com.mustafakoceerr.tilepdf.model.ForeignRef
 import com.mustafakoceerr.tilepdf.model.OcrWord
 import com.mustafakoceerr.tilepdf.model.SaveError
+import com.mustafakoceerr.tilepdf.model.XfaEdit
 import kotlinx.coroutines.flow.Flow
 
 /** The current version of a file, or null if it can't be read. */
@@ -40,6 +41,9 @@ interface AnnotationRepository {
 
     /** Records form field [name] filled in with [value]; the draft is dirty until it's saved. */
     suspend fun setFormValue(uri: String, name: String, value: String)
+
+    /** Appends [edit] to the XFA form's edits; the draft is dirty until they're saved. */
+    suspend fun addXfaEdit(uri: String, edit: XfaEdit)
 
     /** Keeps [words] recognised on [pageIndex] until they are saved; the draft is dirty until then. */
     suspend fun setRecognizedText(uri: String, pageIndex: Int, words: List<OcrWord>)

@@ -8,6 +8,7 @@ import com.mustafakoceerr.tilepdf.model.AnnotationDraft
 import com.mustafakoceerr.tilepdf.model.FileStamp
 import com.mustafakoceerr.tilepdf.model.ForeignRef
 import com.mustafakoceerr.tilepdf.model.OcrWord
+import com.mustafakoceerr.tilepdf.model.XfaEdit
 import com.mustafakoceerr.tilepdf.model.SaveError
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.test.runTest
@@ -24,6 +25,7 @@ class ResumePendingSavesUseCaseTest {
         override suspend fun prepare(uri: String, document: PdfDocument): AnnotationDraft = error("unused")
         override suspend fun update(uri: String, annotations: List<Annotation>, removedForeign: Set<ForeignRef>) = error("unused")
         override suspend fun setFormValue(uri: String, name: String, value: String) = Unit
+        override suspend fun addXfaEdit(uri: String, edit: XfaEdit) = error("unused")
         override suspend fun setRecognizedText(uri: String, pageIndex: Int, words: List<OcrWord>) = error("unused")
         override suspend fun recognizedText(uri: String, pages: Set<Int>): Map<Int, List<OcrWord>> = error("unused")
         override suspend fun markSaved(uri: String, saved: AnnotationDraft, newBase: FileStamp) = error("unused")

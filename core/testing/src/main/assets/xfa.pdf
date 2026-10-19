@@ -1,0 +1,85 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+2 0 obj
+<< /Length 42 >>
+stream
+BT /F1 18 Tf 72 720 Td (Please wait) Tj ET
+endstream
+endobj
+3 0 obj
+<< /Type /Page /Parent 4 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 1 0 R >> >> /Contents 2 0 R >>
+endobj
+4 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+5 0 obj
+<< /Type /Catalog /Pages 4 0 R /AcroForm 6 0 R /NeedsRendering true >>
+endobj
+6 0 obj
+<< /Fields [] /XFA [(preamble) 7 0 R (config) 8 0 R (template) 9 0 R (datasets) 10 0 R (postamble) 11 0 R] >>
+endobj
+7 0 obj
+<< /Length 85 >>
+stream
+<?xml version="1.0" encoding="UTF-8"?>
+<xdp:xdp xmlns:xdp="http://ns.adobe.com/xdp/">
+endstream
+endobj
+8 0 obj
+<< /Length 197 >>
+stream
+<config xmlns="http://www.xfa.org/schema/xci/3.1/"><acrobat><acrobat7><dynamicRender>required</dynamicRender></acrobat7></acrobat><present><pdf><interactive>1</interactive></pdf></present></config>
+endstream
+endobj
+9 0 obj
+<< /Length 756 >>
+stream
+<template xmlns="http://www.xfa.org/schema/xfa-template/3.3/">
+<subform name="form1" layout="tb" locale="en_US">
+<pageSet><pageArea name="Page1" id="Page1"><contentArea x="0in" y="0in" w="8.5in" h="11in"/>
+<medium stock="letter" short="8.5in" long="11in"/></pageArea></pageSet>
+<subform name="main" w="8.5in" h="11in">
+<field name="name" x="1in" y="1.5in" w="3in" h="0.4in"><ui><textEdit/></ui>
+<font typeface="Helvetica" size="12pt"/>
+<caption reserve="0.8in"><value><text>Name</text></value></caption></field>
+<field name="agree" x="1in" y="2.2in" w="2in" h="0.3in"><ui><checkButton/></ui>
+<caption reserve="1in"><value><text>Agree</text></value></caption>
+<items><integer>1</integer><integer>0</integer></items></field>
+</subform>
+</subform>
+</template>
+endstream
+endobj
+10 0 obj
+<< /Length 153 >>
+stream
+<xfa:datasets xmlns:xfa="http://www.xfa.org/schema/xfa-data/1.0/"><xfa:data><form1><main><name/><agree>0</agree></main></form1></xfa:data></xfa:datasets>
+endstream
+endobj
+11 0 obj
+<< /Length 10 >>
+stream
+</xdp:xdp>
+endstream
+endobj
+xref
+0 12
+0000000000 65535 f 
+0000000009 00000 n 
+0000000079 00000 n 
+0000000171 00000 n 
+0000000297 00000 n 
+0000000354 00000 n 
+0000000440 00000 n 
+0000000565 00000 n 
+0000000700 00000 n 
+0000000948 00000 n 
+0000001755 00000 n 
+0000001960 00000 n 
+trailer
+<< /Size 12 /Root 5 0 R >>
+startxref
+2021
+%%EOF

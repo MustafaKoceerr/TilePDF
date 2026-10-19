@@ -112,6 +112,12 @@ constexpr size_t kLoadedPages = 2;
 
 struct NativeDocument;
 
+// The form-fill callbacks of one document; PDFium hands them back to every
+// callback, and they lead to the document.
+struct FormCallbacks : FPDF_FORMFILLINFO {
+    NativeDocument* owner = nullptr;
+};
+
 // The JavaScript platform of one document: PDFium hands it back to every
 // callback, and it leads to the document's FormScriptHost.
 struct ScriptPlatform : IPDF_JSPLATFORM {
@@ -129,7 +135,7 @@ struct NativeDocument {
     std::list<std::pair<int, FPDF_PAGE>> pages;
     // The form-fill environment of a document with an AcroForm, else null.
     // PDFium keeps a pointer to formInfo, so it lives as long as the form.
-    FPDF_FORMFILLINFO formInfo{};
+    FormCallbacks formInfo{};
     FPDF_FORMHANDLE form = nullptr;
     // The embedded font of recognised text, loaded when first needed.
     FPDF_FONT textFont = nullptr;
@@ -138,6 +144,8 @@ struct NativeDocument {
     ScriptPlatform scripts{};
     jobject scriptHost = nullptr;
     bool openActionDone = false;
+    // An XFA form whose pages PDFium lays out from its template.
+    bool xfa = false;
 
     // The loaded page [index], from the cache when possible; null if it
     // can't be loaded. Owned by this document: callers must not close it.
@@ -278,6 +286,12 @@ void ScriptGoToPage(IPDF_JSPLATFORM* platform, int pageIndex) {
     if (!host) return;
     env->CallVoidMethod(host, g_hostGoToPage, pageIndex);
     Threw(env);
+}
+
+// XFA widgets one types into: date and time, numeric, password and text
+// edits, as FORM_TilePdfGetFocusedXfaWidgetType reports them.
+bool IsXfaTextWidget(int type) {
+    return type == 5 || type == 7 || type == 8 || type == 10;
 }
 
 NativeDocument* FromHandle(jlong handle) {
@@ -782,11 +796,13 @@ Java_com_mustafakoceerr_tilepdf_core_pdf_PdfiumNative_nativeOpen(
         delete native;
         return 0;
     }
-    if (FPDF_GetFormType(native->document) != FORMTYPE_NONE) {
-        // Version 2 is the only one our XFA-enabled PDFium accepts. XFA itself
-        // stays off until the reader can drive XFA forms.
+    const int formType = FPDF_GetFormType(native->document);
+    if (formType != FORMTYPE_NONE) {
+        const bool xfa = formType == FORMTYPE_XFA_FULL || formType == FORMTYPE_XFA_FOREGROUND;
+        // Version 2 is the only one our XFA-enabled PDFium accepts.
         native->formInfo.version = 2;
-        native->formInfo.xfa_disabled = 1;
+        native->formInfo.xfa_disabled = xfa ? 0 : 1;
+        native->formInfo.owner = native;
         native->scripts.version = 3;
         native->scripts.app_alert = ScriptAlert;
         native->scripts.app_response = ScriptResponse;
@@ -795,6 +811,8 @@ Java_com_mustafakoceerr_tilepdf_core_pdf_PdfiumNative_nativeOpen(
         native->scripts.owner = native;
         native->formInfo.m_pJsPlatform = &native->scripts;
         native->form = FPDFDOC_InitFormFillEnvironment(native->document, &native->formInfo);
+        // An XFA form lays out its own pages, replacing the PDF's placeholder ones.
+        if (native->form && xfa) native->xfa = FPDF_LoadXFA(native->document);
         // Field scripts call the functions the document-level scripts define.
         if (native->form) FORM_DoDocumentJSAction(native->form);
     }
@@ -1428,6 +1446,48 @@ Java_com_mustafakoceerr_tilepdf_core_pdf_PdfiumNative_nativeSetScriptHost(
         document->openActionDone = true;
         FORM_DoDocumentOpenAction(document->form);
     }
+}
+
+// Whether the document is an XFA form whose pages PDFium lays out itself.
+JNIEXPORT jboolean JNICALL
+Java_com_mustafakoceerr_tilepdf_core_pdf_PdfiumNative_nativeIsXfa(JNIEnv*, jclass, jlong handle) {
+    NativeDocument* document = FromHandle(handle);
+    return document->xfa && FPDF_GetFormType(document->document) == FORMTYPE_XFA_FULL ? JNI_TRUE : JNI_FALSE;
+}
+
+// Taps top-left point (x, y) of page [index] as a finger would. Returns the
+// text of the field the tap focused if it's a text field, else null.
+JNIEXPORT jstring JNICALL
+Java_com_mustafakoceerr_tilepdf_core_pdf_PdfiumNative_nativeFormTap(
+        JNIEnv* env, jclass, jlong handle, jint index, jfloat x, jfloat y) {
+    NativeDocument* document = FromHandle(handle);
+    FPDF_PAGE page = document->Page(index);
+    if (!page || !document->form) return nullptr;
+    double pageX = 0;
+    double pageY = 0;
+    TopLeftToPage(page, x, y, &pageX, &pageY);
+    FORM_OnMouseMove(document->form, page, 0, pageX, pageY);
+    FORM_OnLButtonDown(document->form, page, 0, pageX, pageY);
+    FORM_OnLButtonUp(document->form, page, 0, pageX, pageY);
+    if (!IsXfaTextWidget(FORM_TilePdfGetFocusedXfaWidgetType(document->form))) return nullptr;
+    const std::vector<jchar> text = Utf16([&](FPDF_WCHAR* buffer, unsigned long length) {
+        return FORM_GetFocusedText(document->form, page, buffer, length);
+    });
+    return env->NewString(text.data(), static_cast<jsize>(text.size()));
+}
+
+// Replaces the text of the focused field on page [index] and commits it.
+JNIEXPORT jboolean JNICALL
+Java_com_mustafakoceerr_tilepdf_core_pdf_PdfiumNative_nativeFormReplaceText(
+        JNIEnv* env, jclass, jlong handle, jint index, jstring text) {
+    NativeDocument* document = FromHandle(handle);
+    FPDF_PAGE page = document->Page(index);
+    if (!page || !document->form) return JNI_FALSE;
+    std::vector<jchar> chars = Chars(env, text);
+    chars.push_back(0);
+    FORM_SelectAllText(document->form, page);
+    FORM_ReplaceSelection(document->form, page, reinterpret_cast<FPDF_WIDESTRING>(chars.data()));
+    return FORM_ForceToKillFocus(document->form) ? JNI_TRUE : JNI_FALSE;
 }
 
 }  // extern "C"

@@ -62,6 +62,12 @@ class FakePdfDocument(private val pages: List<String>) : PdfDocument {
 
     override suspend fun hasRecognizedText(pageIndex: Int) = pageIndex in recognized
 
+    /** XFA text fields on page 0: where a tap focuses each, and its text. */
+    var xfa: Map<com.mustafakoceerr.tilepdf.core.geometry.PdfPoint, String> = emptyMap()
+
+    override suspend fun xfaTap(pageIndex: Int, at: com.mustafakoceerr.tilepdf.core.geometry.PdfPoint): String? =
+        if (pageIndex == 0) xfa[at] else null
+
     override fun close() {
         closed = true
     }

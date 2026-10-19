@@ -49,6 +49,9 @@ minSdk 29
   form's own scripts run: totals calculate themselves, number and percent
   formats apply, validation rejects bad values with the form's message, and
   `app.alert` / `app.response` show as dialogs
+- XFA forms, the dynamic ones most readers show only as "Please wait…",
+  open laid out and can be filled in and saved. A tap goes to the form as a
+  finger's would; a text field opens the text dialog
 - Recognise text on scanned pages (OCR), on the device with Google ML Kit:
   the words go into the page as invisible text, so they can be searched,
   selected and copied, also in other apps once saved. Works offline; a chip
@@ -160,15 +163,27 @@ write their appearance streams, and saves incrementally: the original bytes
 followed by the changes.
 
 TilePDF uses its own PDFium build: PDFium with V8 and XFA, and with TilePDF's
-patch (`patches/tilepdf/` on the `tilepdf` branch of
+patches (`patches/tilepdf/` on the `tilepdf` branch of
 [MustafaKoceerr/pdfium-binaries](https://github.com/MustafaKoceerr/pdfium-binaries),
 a fork of [bblanchon/pdfium-binaries](https://github.com/bblanchon/pdfium-binaries)).
 It is built there by GitHub Actions for arm64-v8a, armeabi-v7a, x86_64 and x86
-and published as a release. The patch adds
-`FPDF_TilePdfSetFormFallbackFont`: a font form fields use for letters their
-own font lacks. Upstream PDFium finds such fonts only on Windows. TilePDF hands
-it a 40 KB Noto Sans subset (Latin, Greek, Cyrillic), so Turkish İ, ş and ğ
-show in Helvetica fields, and the font is embedded once per document. The
+and published as a release. The patches:
+
+- add `FPDF_TilePdfSetFormFallbackFont`, a font form fields use for letters
+  their own font lacks; upstream PDFium finds such fonts only on Windows.
+  TilePDF hands it a 40 KB Noto Sans subset (Latin, Greek, Cyrillic), so
+  Turkish İ, ş and ğ show in Helvetica fields, and the font is embedded once
+  per document;
+- turn on `AFNumber_Format` and `AFPercent_Format` in form scripts, which
+  upstream leaves out on Android;
+- add `FORM_TilePdfGetFocusedXfaWidgetType`, which tells what kind of XFA
+  widget a tap focused;
+- write XML text without a line break in front of it. Upstream writes one
+  after every start tag, both in XFA's data and in its saved form state, so a
+  filled-in field saved as "Ada" read back as "\nAda", and captions moved down
+  a line when the file was opened again.
+
+The
 `tilepdf.pdfium` convention plugin downloads the archives into
 `.gradle/pdfium/`, and the build fails if an archive's SHA-256 differs from the
 pinned one; no binaries are committed. To update PDFium, rebuild on the fork,
@@ -349,6 +364,13 @@ rerunning it reproduces them byte for byte.
   and are saved as invisible text (render mode 3) in the Noto Sans subset,
   inside `TilePdfOcr` marked content, so a page is never recognised into the
   file twice.
+- XFA values can't be read or set by name, so an XFA form's draft keeps its
+  edits instead: each tap point and the text written there, in order
+  (`annotation_drafts.xfaEdits`, Room v9). The engine is deterministic, so
+  replaying them on the file, on open and when saving, fills it in the same
+  way; the save checks the last text at each point by tapping it in the
+  saved file. Whether a tap focused a text field comes from
+  `FORM_TilePdfGetFocusedXfaWidgetType`, a patch in our PDFium build.
 - TilePDF stays offline: the manifest removes `INTERNET`, and
   `checkReleasePermissions` fails the release build if the merged manifest
   asks for any permission outside an allowlist.
@@ -365,8 +387,10 @@ rerunning it reproduces them byte for byte.
 - Text recognition reads Latin script only (Turkish and English included).
   Search inside a document folds İ/ı/I/i but not other Turkish letters, so
   "sisli" doesn't find "Şişli" there, unlike the library search.
-- Forms: no XFA forms, and multi-select list boxes show only their first
-  choice. Scripts can't mail or submit a form (TilePDF is offline), and
+- Forms: multi-select list boxes show only their first choice. XFA pages
+  aren't PDF pages, so they take no annotations, signature or recognised
+  text, and search finds nothing there; XFA support in PDFium is still
+  marked experimental. Scripts can't mail or submit a form (TilePDF is offline), and
   timers and page open/close scripts don't run.
 - The signature is a drawing, not a cryptographic (PAdES) signature.
 

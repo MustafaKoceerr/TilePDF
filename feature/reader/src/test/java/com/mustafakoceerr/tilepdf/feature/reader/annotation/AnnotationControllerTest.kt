@@ -10,6 +10,7 @@ import com.mustafakoceerr.tilepdf.core.pdf.PdfLink
 import com.mustafakoceerr.tilepdf.data.annotation.AnnotationRepository
 import com.mustafakoceerr.tilepdf.model.Annotation
 import com.mustafakoceerr.tilepdf.model.OcrWord
+import com.mustafakoceerr.tilepdf.model.XfaEdit
 import com.mustafakoceerr.tilepdf.model.AnnotationDraft
 import com.mustafakoceerr.tilepdf.model.FileStamp
 import com.mustafakoceerr.tilepdf.model.ForeignAnnotation
@@ -221,6 +222,10 @@ class FakeAnnotationRepository : AnnotationRepository {
         drafts.value += uri to draft(uri).copy(annotations = annotations, removedForeign = removedForeign, dirty = true)
     }
     override suspend fun setFormValue(uri: String, name: String, value: String) = Unit
+
+    override suspend fun addXfaEdit(uri: String, edit: XfaEdit) {
+        drafts.value[uri]?.let { drafts.value += uri to it.copy(dirty = true, xfaEdits = it.xfaEdits + edit) }
+    }
 
     /** Recognised words by uri and page, until saved. */
     val recognized = MutableStateFlow<Map<Pair<String, Int>, List<OcrWord>>>(emptyMap())

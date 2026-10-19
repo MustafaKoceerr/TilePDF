@@ -1,5 +1,6 @@
 package com.mustafakoceerr.tilepdf.data.annotation
 
+import com.mustafakoceerr.tilepdf.model.XfaEdit
 import com.mustafakoceerr.tilepdf.core.geometry.PdfPoint
 import com.mustafakoceerr.tilepdf.core.geometry.PdfRect
 import com.mustafakoceerr.tilepdf.model.Annotation
@@ -66,5 +67,12 @@ class AnnotationCodecTest {
         )
 
         assertEquals(words, AnnotationCodec.decodeWords(AnnotationCodec.encodeWords(words)))
+    }
+
+    @Test
+    fun xfaEditsRoundTrip() {
+        val edits = listOf(XfaEdit(0, PdfPoint(200f, 122.5f), "Ada \"Lovelace\""), XfaEdit(1, PdfPoint(3f, 4f)))
+
+        assertEquals(edits, AnnotationCodec.decodeXfaEdits(AnnotationCodec.encodeXfaEdits(edits)))
     }
 }

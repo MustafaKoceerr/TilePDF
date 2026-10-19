@@ -4,6 +4,7 @@ import com.mustafakoceerr.tilepdf.core.pdf.AnnotationChanges
 import com.mustafakoceerr.tilepdf.core.pdf.EditablePdfDocument
 import com.mustafakoceerr.tilepdf.core.pdf.PdfDocument
 import com.mustafakoceerr.tilepdf.core.pdf.PdfPasswordException
+import com.mustafakoceerr.tilepdf.core.pdf.PdfWriteException
 import com.mustafakoceerr.tilepdf.data.text.FakePdfDocument
 import com.mustafakoceerr.tilepdf.model.Annotation
 import com.mustafakoceerr.tilepdf.core.pdf.FormEdit
@@ -12,6 +13,7 @@ import com.mustafakoceerr.tilepdf.model.FormField
 import com.mustafakoceerr.tilepdf.model.FormFieldKind
 import com.mustafakoceerr.tilepdf.model.OcrWord
 import com.mustafakoceerr.tilepdf.model.ForeignAnnotation
+import com.mustafakoceerr.tilepdf.core.geometry.PdfPoint
 import com.mustafakoceerr.tilepdf.core.geometry.PdfRect
 import com.mustafakoceerr.tilepdf.model.PageAnnotations
 import java.io.File
@@ -25,6 +27,8 @@ data class FakePdf(
     val foreign: Map<Int, Set<String>> = emptyMap(),
     val form: Map<String, String> = emptyMap(),
     val recognized: Map<Int, List<OcrWord>> = emptyMap(),
+    /** XFA text fields on page 0: where a tap focuses each, and its text. */
+    val xfa: Map<PdfPoint, String> = emptyMap(),
 )
 
 /** [form] as text field widgets on page 0, in order. */
@@ -63,6 +67,9 @@ class FakeAnnotationFiles(private val tempDir: File) : AnnotationFiles {
     /** Drops recognised text when saving, as a broken save would. */
     var loseRecognizedOnSave = false
 
+    /** Drops XFA data when saving, as a broken save would. */
+    var loseXfaOnSave = false
+
     /** Pages recognised text was added to, across every opened document. */
     val recognizedAdds = mutableListOf<Int>()
 
@@ -80,6 +87,7 @@ class FakeAnnotationFiles(private val tempDir: File) : AnnotationFiles {
         return FakePdfDocument(List(PAGES) { "" }).apply {
             form = pdf.form
             recognized = pdf.recognized.keys
+            xfa = pdf.xfa
             annotationsByPage = (0 until PAGES).associateWith { page ->
                 PageAnnotations(
                     own = pdf.own.filter { it.pageIndex == page },
@@ -125,6 +133,20 @@ class FakeAnnotationFiles(private val tempDir: File) : AnnotationFiles {
 
         override suspend fun hasRecognizedText(pageIndex: Int) = pageIndex in pdf.recognized
 
+        private var focused: PdfPoint? = null
+
+        override suspend fun isXfa() = pdf.xfa.isNotEmpty()
+
+        override suspend fun xfaTap(pageIndex: Int, at: PdfPoint): String? {
+            focused = at.takeIf { pageIndex == 0 && it in pdf.xfa }
+            return focused?.let { pdf.xfa.getValue(it) }
+        }
+
+        override suspend fun xfaWrite(pageIndex: Int, text: String) {
+            val at = focused ?: throw PdfWriteException("No focused XFA field")
+            pdf = pdf.copy(xfa = pdf.xfa + (at to text))
+        }
+
         override suspend fun addRecognizedText(pageIndex: Int, words: List<OcrWord>) {
             recognizedAdds += pageIndex
             pdf = pdf.copy(recognized = pdf.recognized + (pageIndex to words))
@@ -134,7 +156,8 @@ class FakeAnnotationFiles(private val tempDir: File) : AnnotationFiles {
             target.writeText("pdf")
             val form = loseFormOnSave?.let { lost -> pdf.form + (lost to "") } ?: pdf.form
             val recognized = if (loseRecognizedOnSave) emptyMap() else pdf.recognized
-            saved[target] = pdf.copy(own = pdf.own.filterNot { it.id == loseOnSave }, form = form, recognized = recognized)
+            val xfa = if (loseXfaOnSave) pdf.xfa.mapValues { "" } else pdf.xfa
+            saved[target] = pdf.copy(own = pdf.own.filterNot { it.id == loseOnSave }, form = form, recognized = recognized, xfa = xfa)
         }
 
         override fun close() = Unit

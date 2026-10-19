@@ -75,6 +75,7 @@
     <string name="signature_hint">İmzalamak için dokunun</string>
     <string name="reader_recognize_text">Metni tanı</string>
     <string name="script_title">Bu belge diyor ki</string>
+    <string name="form_text_field">Metin alanı</string>
     <string name="script_ok">Tamam</string>
     <string name="script_yes">Evet</string>
     <string name="script_no">Hayır</string>
