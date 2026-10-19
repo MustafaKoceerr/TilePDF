@@ -13,6 +13,7 @@ import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -572,9 +573,16 @@ internal fun ReaderScreen(
                         NoTextChip(onClick = recognitionActions.onRequest, modifier = Modifier.navigationBarsPadding())
                     }
                     val backToPage = ready?.backToPage
-                    if (backToPage != null && canJumpBack && selection == null) {
+                    // Kept while the chip fades out, after the way back is forgotten.
+                    var fadingBackToPage by remember { mutableStateOf(backToPage) }
+                    if (backToPage != null) fadingBackToPage = backToPage
+                    AnimatedVisibility(
+                        visible = backToPage != null && canJumpBack && selection == null,
+                        enter = fadeIn(),
+                        exit = fadeOut(tween(JUMP_BACK_FADE_MS)),
+                    ) {
                         JumpBackChip(
-                            pageNumber = backToPage + 1,
+                            pageNumber = (fadingBackToPage ?: 0) + 1,
                             onClick = onJumpBack,
                             modifier = Modifier.navigationBarsPadding(),
                         )
@@ -1087,6 +1095,9 @@ private fun rememberCopyAction(text: String?, onCopied: () -> Unit): () -> Unit 
         }
     }
 }
+
+/** How slowly the "Back to page" chip fades once its time is up. */
+private const val JUMP_BACK_FADE_MS = 600
 
 /** "12. sayfaya dön": back to where the last jump started. */
 @Composable
