@@ -30,6 +30,7 @@
     <string name="reader_toc">Contents</string>
     <string name="reader_more_options">More options</string>
     <string name="reader_no_app_for_link">No app can open this link</string>
+    <string name="link_confirm_title">Open this link?</string>
     <string name="reader_bookmarks">Bookmarks</string>
     <string name="reader_bookmark_add">Add bookmark</string>
     <string name="reader_bookmark_remove">Remove bookmark</string>

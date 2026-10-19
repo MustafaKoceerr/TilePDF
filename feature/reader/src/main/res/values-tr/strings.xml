@@ -27,6 +27,7 @@
     <string name="reader_toc">İçindekiler</string>
     <string name="reader_more_options">Diğer seçenekler</string>
     <string name="reader_no_app_for_link">Bu bağlantıyı açacak uygulama yok</string>
+    <string name="link_confirm_title">Bu bağlantı açılsın mı?</string>
     <string name="reader_bookmarks">Yer imleri</string>
     <string name="reader_bookmark_add">Yer imi ekle</string>
     <string name="reader_bookmark_remove">Yer imini kaldır</string>

@@ -27,13 +27,23 @@ class Pdfium @Inject constructor(
 
     override suspend fun open(uri: Uri, password: String?): PdfiumDocument = open(uri, password, hideOwn = true)
 
-    override suspend fun openForEditing(uri: Uri, password: String?): PdfiumEditableDocument =
-        PdfiumEditableDocument(open(uri, password, hideOwn = false))
+    override suspend fun openForEditing(uri: Uri, password: String?): PdfiumEditableDocument {
+        val original = open(uri, password, hideOwn = false)
+        // Page sizes come from the copy: reading them loads every page
+        // dictionary, and an incremental save writes out whatever is loaded.
+        val document = try {
+            open(uri, password, hideOwn = false, pageSizes = original.pageSizes)
+        } catch (e: Exception) {
+            original.close()
+            throw e
+        }
+        return PdfiumEditableDocument(document, original)
+    }
 
-    private suspend fun open(uri: Uri, password: String?, hideOwn: Boolean): PdfiumDocument {
+    private suspend fun open(uri: Uri, password: String?, hideOwn: Boolean, pageSizes: List<PageSize>? = null): PdfiumDocument {
         // Not cancellable midway: a cancelled withContext would drop a document
         // it had already opened. Cancellation is honoured right after instead.
-        val document = withContext(dispatcher + NonCancellable) { openNow(uri, password, hideOwn) }
+        val document = withContext(dispatcher + NonCancellable) { openNow(uri, password, hideOwn, pageSizes) }
         try {
             currentCoroutineContext().ensureActive()
         } catch (e: CancellationException) {
@@ -43,7 +53,7 @@ class Pdfium @Inject constructor(
         return document
     }
 
-    private fun openNow(uri: Uri, password: String?, hideOwn: Boolean): PdfiumDocument {
+    private fun openNow(uri: Uri, password: String?, hideOwn: Boolean, knownPageSizes: List<PageSize>?): PdfiumDocument {
         PdfiumNative.nativeInit(formFallbackFont)
         val fileDescriptor = context.contentResolver.openFileDescriptor(uri, "r")
             ?: throw FileNotFoundException("Cannot open $uri")
@@ -53,7 +63,7 @@ class Pdfium @Inject constructor(
             val error = IntArray(1)
             val handle = openedHandle(PdfiumNative.nativeOpen(fileDescriptor.fd, size, password, hideOwn, error), error[0], password)
             val pageSizes = try {
-                List(PdfiumNative.nativePageCount(handle)) { index -> pageSize(handle, index) }
+                knownPageSizes ?: List(PdfiumNative.nativePageCount(handle)) { index -> pageSize(handle, index) }
             } catch (e: Exception) {
                 PdfiumNative.nativeCloseDocument(handle)
                 throw e

@@ -42,6 +42,20 @@ class ZoomStateTest {
     }
 
     @Test
+    fun pinchingBackToTheSmallestZoomLandsExactlyOnIt() {
+        // 1.7 * (1 / 1.7) is 0.99999994 in floats; the pan range then went
+        // negative and clamping the pan threw.
+        state.onTransform(Offset.Zero, Offset.Zero, zoom = 1.7f)
+        state.commit()
+        state.onTransform(Offset(500f, 400f), Offset.Zero, zoom = 0.01f)
+        state.commit()
+
+        assertEquals(1f, state.scale)
+        assertEquals(0f, state.panX)
+        assertEquals(0f, state.panBy(-30f))
+    }
+
+    @Test
     fun commitMatchesPreviewAtLeftEdge() {
         // Zoom 2x around the viewport centre: viewport x 250 moves to x 0.
         state.onTransform(Offset(500f, 400f), Offset.Zero, zoom = 2f)
