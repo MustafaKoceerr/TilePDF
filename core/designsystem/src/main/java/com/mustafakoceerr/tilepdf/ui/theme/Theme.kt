@@ -5,14 +5,15 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import com.mustafakoceerr.thememanager.ThemeSettings
 import com.mustafakoceerr.thememanager.compose.ManagedTheme
+import com.mustafakoceerr.tilepdf.model.AppPalette
 
-private val DarkColorScheme = darkColorScheme(
+internal val VioletDark = darkColorScheme(
     primary = Purple80,
     secondary = PurpleGrey80,
     tertiary = Pink80
 )
 
-private val LightColorScheme = lightColorScheme(
+internal val VioletLight = lightColorScheme(
     primary = Purple40,
     secondary = PurpleGrey40,
     tertiary = Pink40
@@ -29,19 +30,21 @@ private val LightColorScheme = lightColorScheme(
 )
 
 /**
- * The app theme in the user's choice of light, dark or system, with Material
- * You colours when they turned it on (Android 12+); the default follows the
- * system with TilePDF's own colours, which is also what previews show.
+ * The app theme in the user's choice of light, dark or system and [palette],
+ * with Material You colours instead when they turned it on (Android 12+); the
+ * default follows the system with TilePDF's own violet, which is also what
+ * previews show.
  */
 @Composable
 fun TilePDFTheme(
     settings: ThemeSettings = ThemeSettings(),
+    palette: AppPalette = AppPalette.Violet,
     content: @Composable () -> Unit,
 ) {
     ManagedTheme(
         settings = settings,
-        lightColorScheme = LightColorScheme,
-        darkColorScheme = DarkColorScheme,
+        lightColorScheme = palette.lightScheme,
+        darkColorScheme = palette.darkScheme,
         typography = Typography,
         content = content,
     )

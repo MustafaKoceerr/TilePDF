@@ -7,6 +7,7 @@ object TilePdfIcons {
     @DrawableRes val Add = R.drawable.ic_add
     @DrawableRes val ArrowBack = R.drawable.ic_arrow_back
     @DrawableRes val Bookmark = R.drawable.ic_bookmark
+    @DrawableRes val Check = R.drawable.ic_check
     @DrawableRes val BookmarkBorder = R.drawable.ic_bookmark_border
     @DrawableRes val Close = R.drawable.ic_close
     @DrawableRes val Crop = R.drawable.ic_crop

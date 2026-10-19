@@ -5,6 +5,11 @@
     <string name="settings_theme_system">System default</string>
     <string name="settings_theme_light">Light</string>
     <string name="settings_theme_dark">Dark</string>
+    <string name="settings_palette">Color</string>
+    <string name="palette_violet">Violet</string>
+    <string name="palette_ocean">Ocean</string>
+    <string name="palette_forest">Forest</string>
+    <string name="palette_sand">Sand</string>
     <string name="settings_dynamic_color">Dynamic color</string>
     <string name="settings_dynamic_color_summary">Use colors from your wallpaper</string>
     <string name="settings_language">Language</string>
