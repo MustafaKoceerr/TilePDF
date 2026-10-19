@@ -1,9 +1,9 @@
 TilePDF is a fast PDF reader that keeps everything on your phone. It has no internet permission, no ads and no account, so your documents never leave your device.
 
 READ COMFORTABLY
-• Smooth scrolling and sharp zoom, even on large documents
+• Smooth scrolling and pinch zoom that follows your fingers, even on large documents
 • Vertical scrolling or one page at a time
-• Light, night and sepia page colors
+• Six page colors: light, sepia, green, and for the dark dim, warm night and night, all easy on the eyes
 • Search the whole document and jump between results
 • Table of contents, bookmarks and a page grid, with a way back after every jump
 • Rotate pages and crop empty margins
@@ -13,7 +13,7 @@ READ COMFORTABLY
 • Opens password-protected PDFs
 
 MARK UP, FILL IN AND SIGN
-• Highlight, underline or strike out text
+• Highlight, underline or strike out text; tap again to take it off
 • Draw with a pen in several colors and widths, and erase strokes
 • Add sticky notes
 • Fill in PDF forms: text fields, check boxes, radio buttons and lists; totals calculate themselves
@@ -33,7 +33,7 @@ YOUR LIBRARY
 MADE FOR EVERY SCREEN
 • Tablets and foldables keep the contents in a side panel next to the pages
 • Two pages side by side, like a book, on wide screens
-• Light, dark or system theme, with optional Material You colors
+• Light, dark or system theme in violet, ocean, forest or sand, or Material You colors
 • English and Turkish
 • TalkBack labels and large touch targets
 

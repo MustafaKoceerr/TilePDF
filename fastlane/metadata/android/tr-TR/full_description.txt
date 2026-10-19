@@ -1,9 +1,9 @@
 TilePDF, her şeyi telefonunda tutan hızlı bir PDF okuyucudur. İnternet izni, reklamı ve hesabı yoktur; belgelerin cihazından hiç çıkmaz.
 
 RAHAT OKU
-• Büyük belgelerde bile akıcı kaydırma ve net yakınlaştırma
+• Büyük belgelerde bile akıcı kaydırma ve parmaklarını izleyen yakınlaştırma
 • Dikey kaydırma ya da tek tek sayfa
-• Açık, gece ve sepya sayfa renkleri
+• Altı sayfa rengi: açık, sepya, yeşil; karanlık için loş, sıcak gece ve gece; hepsi göz yormaz
 • Tüm belgede arama ve sonuçlar arasında gezinme
 • İçindekiler, yer imleri ve sayfa ızgarası; her atlamadan sonra geri dönüş
 • Sayfaları döndür, boş kenar boşluklarını kırp
@@ -13,7 +13,7 @@ RAHAT OKU
 • Şifreli PDF'leri açar
 
 İŞARETLE, DOLDUR VE İMZALA
-• Metni vurgula, altını ya da üstünü çiz
+• Metni vurgula, altını ya da üstünü çiz; tekrar dokununca kalkar
 • Farklı renk ve kalınlıklarda kalemle çiz, çizgileri sil
 • Yapışkan not ekle
 • PDF formlarını doldur: metin alanları, onay kutuları, seçenek düğmeleri ve listeler; toplamlar kendiliğinden hesaplanır
@@ -33,7 +33,7 @@ KÜTÜPHANEN
 HER EKRANA UYGUN
 • Tablet ve katlanabilirlerde içindekiler sayfaların yanında bir panelde
 • Geniş ekranda kitap gibi yan yana iki sayfa
-• Açık, koyu ya da sistem teması; istersen Material You renkleri
+• Açık, koyu ya da sistem teması; mor, okyanus, orman ya da kum renginde, istersen Material You
 • Türkçe ve İngilizce
 • TalkBack etiketleri ve büyük dokunma alanları
 

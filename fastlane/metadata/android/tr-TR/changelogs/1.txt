@@ -1,1 +1,1 @@
-İlk sürüm: hızlı okuma, arama, içindekiler ve yer imleri, PDF'e kaydedilen vurgular, çizimler ve notlar, favorili kütüphane, geniş ekran düzeni, açık ve koyu tema, Türkçe ve İngilizce.
+İlk sürüm: gerçek yakınlaştırmayla akıcı okuma, göz yormayan altı sayfa rengi, arama, içindekiler ve yer imleri, PDF'e kaydedilen vurgular, çizimler ve notlar, form doldurma, metin tanıma, imza denetimi, favorili kütüphane, dört renk paleti, Türkçe ve İngilizce.

@@ -12,10 +12,8 @@ TilePDF, Android için bir PDF okuyucudur. Tamamen cihazınızda çalışacak
 - TilePDF'te **analiz, reklam, hata raporlama veya hesap sistemi yoktur**.
 - Geliştirici hiçbir kişisel veriyi veya kullanım bilgisini **toplamaz,
   saklamaz, paylaşmaz**.
-- **Sertifikayla imza**, Android'in kendi sertifika deposundaki bir
-  sertifikayla cihazınızda atılır. TilePDF anahtarınızı, parolanızı ya da
-  sertifikanın adını saklamaz; .p12/.pfx dosyasını Android'in kendi
-  yükleyicisi açar.
+- **Dijital imzaların denetimi** cihazınızda, Android'in kendi güvendiği
+  sertifikalarla yapılır. İnternette hiçbir şey sorgulanmaz.
 - Taranmış sayfalarda **metin tanıma**, cihazınızda Google ML Kit'in
   uygulamayla gelen modeliyle çalışır. Sayfalarınız hiçbir yere gönderilmez.
   ML Kit kullanım istatistiklerini Google'a bildirecek şekilde yapılmıştır,

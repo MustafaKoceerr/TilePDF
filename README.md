@@ -23,7 +23,10 @@ minSdk 29
   permission, or a stream of unknown size) are kept as a private copy
 - Password-protected PDFs open after entering the password; it is never
   stored
-- Pinch-to-zoom (1x–5x), double-tap zoom, horizontal pan with fling
+- Pinch-to-zoom (1x–5x) that lays the pages out at the new size on every
+  frame, so pages coming into view while zooming out show at once; the
+  content under the fingers stays there, and stays still past 1x or 5x.
+  Double-tap zoom, horizontal pan with fling
 - Sharp text at every zoom level via tiles, with an instant low-resolution
   draft underneath
 - Full-text search with live results, a match counter, previous/next, and
@@ -64,15 +67,19 @@ minSdk 29
   select all from the system text toolbar
 - Vertical scrolling or horizontal single pages (swipe; each page fits the
   screen and zooms on its own); switching keeps the current page
-- Light, night (colour inversion) and sepia pages, recoloured without
-  re-rendering
+- Six page colours, recoloured without re-rendering: light, sepia and green
+  (pale green paper) by day; dim (dark grey paper, light grey text), warm
+  night (dark brown paper, cream text) and night (colour inversion) for the
+  dark
 - Keep screen on while reading
 - Library of opened documents: favorites, sorting by last opened, name or
   date added (remembered), and search that ignores case and Turkish accents
   ("sozlesme" finds "Sözleşme.pdf"). Removing a document can be undone for a
   few seconds, since it also deletes its private copy and unsaved annotations
 - Annotations, saved into the PDF itself so other apps show them:
-  highlight, underline or strike out selected text; draw with a pen
+  highlight, underline or strike out selected text, which toggles: marking
+  text that has it all through takes it off, and partly marked text gets it
+  whole; draw with a pen
   (colours, three widths) and erase whole strokes; sticky notes; undo and
   redo. Any markup annotation, also one made by another app, can be tapped
   and deleted. Every annotation is listed next to the table of contents. A
@@ -83,8 +90,9 @@ minSdk 29
   and 480 dp tall) contents, bookmarks and annotations open in a panel
   beside the pages that stays open while reading; a phone in landscape
   keeps the bottom sheet. The library flows into columns on wide screens
-- Settings (library menu): theme (system, light or dark, with optional
-  Material You colours on Android 12+) and language (English or Turkish,
+- Settings (library menu): theme (system, light or dark), colour palette
+  (violet, ocean, forest or sand, full Material 3 schemes from a seed) or
+  Material You colours on Android 12+, and language (English or Turkish,
   following the device by default; also in Android 13+ app settings). Both
   come from the developer's own libraries,
   [compose-theme-manager](https://github.com/MustafaKoceerr/compose-theme-manager) and
@@ -237,11 +245,9 @@ killed process left unsaved are saved at the next start.
 ## Rendering pipeline
 
 ```
- pinch in progress ──► graphicsLayer transform of what's already drawn (no work)
-        │ fingers up
-        ▼
- commit zoom ──► pages re-laid out at the new width, scroll anchored in the
-        │        same frame (requestScrollToItem) so nothing jumps
+ pinch frame ──► pages re-laid out at the new width, scroll anchored under
+        │        the fingers in the same frame (requestScrollToItem); the
+        │        list's own scrolling is off until every finger lifts
         ▼
  visible pages (LazyListLayoutInfo + zoom + pan) ──► Viewport ──► page-local
         │                                                         visible region

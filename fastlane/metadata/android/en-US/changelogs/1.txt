@@ -1,1 +1,1 @@
-First release: fast reading, search, contents and bookmarks, highlights, drawings and notes saved into the PDF, a library with favorites, large-screen layout, light and dark themes, English and Turkish.
+First release: smooth reading with real pinch zoom, six easy-on-the-eyes page colors, search, contents and bookmarks, highlights, drawings and notes saved into the PDF, form filling, text recognition, signature checks, a library with favorites, four app palettes, English and Turkish.
