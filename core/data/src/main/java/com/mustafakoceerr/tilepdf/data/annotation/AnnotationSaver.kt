@@ -1,6 +1,7 @@
 package com.mustafakoceerr.tilepdf.data.annotation
 
 import com.mustafakoceerr.tilepdf.core.pdf.PdfPasswordException
+import com.mustafakoceerr.tilepdf.core.pdf.addMissingRecognizedText
 import com.mustafakoceerr.tilepdf.core.pdf.allFormFields
 import com.mustafakoceerr.tilepdf.core.pdf.fill
 import com.mustafakoceerr.tilepdf.core.pdf.write
@@ -96,6 +97,7 @@ class AnnotationSaver @Inject constructor(
                 if (draft != null) {
                     document.write(draft.annotations, removed)
                     document.fill(draft.formValues)
+                    document.addMissingRecognizedText(repository.recognizedText(uri, draft.recognizedPages))
                 }
                 document.saveIncremental(target)
             }
@@ -141,7 +143,9 @@ class AnnotationSaver @Inject constructor(
                 files.openForEditing(source, password).use { document ->
                     val annotationsChanged = document.write(draft.annotations, removed)
                     val formChanged = document.fill(draft.formValues).isNotEmpty()
-                    val changed = annotationsChanged || formChanged
+                    val recognized = repository.recognizedText(source, draft.recognizedPages)
+                    val textChanged = document.addMissingRecognizedText(recognized).isNotEmpty()
+                    val changed = annotationsChanged || formChanged || textChanged
                     if (changed || target != source) document.saveIncremental(temp)
                     changed
                 }
@@ -174,7 +178,8 @@ class AnnotationSaver @Inject constructor(
 
     /**
      * Whether the saved [file] has exactly the draft's own annotations, none
-     * of its removed named ones, and every filled-in field's value.
+     * of its removed named ones, every filled-in field's value, and text on
+     * every recognised page.
      */
     private suspend fun holdsExactly(file: File, password: String?, draft: AnnotationDraft, removed: Set<ForeignRef>): Boolean =
         files.openForReading(file, password).use { document ->
@@ -184,6 +189,7 @@ class AnnotationSaver @Inject constructor(
             val fields = document.allFormFields()
             ownIds == draft.annotations.map { it.id }.toSet() &&
                 removed.none { !it.key.startsWith("#") && it in foreign } &&
-                draft.formValues.all { (name, value) -> fields.filter { it.name == name }.all { it.value == value } }
+                draft.formValues.all { (name, value) -> fields.filter { it.name == name }.all { it.value == value } } &&
+                draft.recognizedPages.all { document.hasRecognizedText(it) }
         }
 }

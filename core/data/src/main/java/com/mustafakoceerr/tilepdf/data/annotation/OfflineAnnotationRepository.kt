@@ -3,25 +3,34 @@ package com.mustafakoceerr.tilepdf.data.annotation
 import com.mustafakoceerr.tilepdf.core.pdf.PdfDocument
 import com.mustafakoceerr.tilepdf.data.local.AnnotationDraftDao
 import com.mustafakoceerr.tilepdf.data.local.AnnotationDraftEntity
+import com.mustafakoceerr.tilepdf.data.local.RecognizedTextDao
+import com.mustafakoceerr.tilepdf.data.local.RecognizedTextEntity
 import com.mustafakoceerr.tilepdf.model.Annotation
 import com.mustafakoceerr.tilepdf.model.AnnotationDraft
 import com.mustafakoceerr.tilepdf.model.FileStamp
 import com.mustafakoceerr.tilepdf.model.ForeignRef
+import com.mustafakoceerr.tilepdf.model.OcrWord
 import com.mustafakoceerr.tilepdf.model.SaveError
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import javax.inject.Inject
 
 class OfflineAnnotationRepository internal constructor(
     private val dao: AnnotationDraftDao,
+    private val recognized: RecognizedTextDao,
     private val stamps: FileStamps,
     private val now: () -> Long,
 ) : AnnotationRepository {
 
     @Inject
-    constructor(dao: AnnotationDraftDao, stamps: FileStamps) : this(dao, stamps, System::currentTimeMillis)
+    constructor(dao: AnnotationDraftDao, recognized: RecognizedTextDao, stamps: FileStamps) :
+        this(dao, recognized, stamps, System::currentTimeMillis)
 
-    override fun observe(uri: String): Flow<AnnotationDraft?> = dao.observe(uri).map { it?.toDraft() }
+    override fun observe(uri: String): Flow<AnnotationDraft?> =
+        combine(dao.observe(uri), recognized.observePages(uri)) { draft, pages ->
+            draft?.toDraft()?.copy(recognizedPages = pages.toSet())
+        }
 
     override suspend fun prepare(uri: String, document: PdfDocument): AnnotationDraft {
         val current = stamps.stampOrUnknown(uri)
@@ -61,8 +70,23 @@ class OfflineAnnotationRepository internal constructor(
         }
     }
 
+    override suspend fun setRecognizedText(uri: String, pageIndex: Int, words: List<OcrWord>) {
+        recognized.upsert(RecognizedTextEntity(uri, pageIndex, AnnotationCodec.encodeWords(words)))
+        dao.update(uri) { it.copy(dirty = true, updatedAt = now()) }
+    }
+
+    override suspend fun recognizedText(uri: String, pages: Set<Int>): Map<Int, List<OcrWord>> =
+        if (pages.isEmpty()) emptyMap() else recognized.get(uri, pages).associate { it.pageIndex to AnnotationCodec.decodeWords(it.words) }
+
     override suspend fun markSaved(uri: String, saved: AnnotationDraft, newBase: FileStamp) {
-        dao.update(uri) { it.afterSave(saved, newBase) }
+        val pending = pendingRecognizedPages(uri, saved)
+        dao.update(uri) { it.afterSave(saved, newBase, pending) }
+    }
+
+    /** Drops the saved pages' recognised text; whether any is left to save. */
+    private suspend fun pendingRecognizedPages(uri: String, saved: AnnotationDraft): Boolean {
+        if (saved.recognizedPages.isNotEmpty()) recognized.delete(uri, saved.recognizedPages)
+        return recognized.observePages(uri).first().isNotEmpty()
     }
 
     override suspend fun markFailed(uri: String, error: SaveError) {
@@ -71,7 +95,9 @@ class OfflineAnnotationRepository internal constructor(
 
     override suspend fun moveTo(from: String, to: String, saved: AnnotationDraft, newBase: FileStamp) {
         val current = dao.get(from) ?: return
-        dao.upsert(current.afterSave(saved, newBase).copy(uri = to))
+        val pending = pendingRecognizedPages(from, saved)
+        dao.upsert(current.afterSave(saved, newBase, pending).copy(uri = to))
+        recognized.move(from, to)
         dao.delete(from)
     }
 
@@ -83,7 +109,11 @@ class OfflineAnnotationRepository internal constructor(
      * where they did, so both are dropped: a lost deletion is safer than a
      * wrong one.
      */
-    private fun AnnotationDraftEntity.afterSave(saved: AnnotationDraft, newBase: FileStamp): AnnotationDraftEntity {
+    private fun AnnotationDraftEntity.afterSave(
+        saved: AnnotationDraft,
+        newBase: FileStamp,
+        recognizedPending: Boolean,
+    ): AnnotationDraftEntity {
         val annotations = AnnotationCodec.decodeAnnotations(annotations)
         val removed = AnnotationCodec.decodeRefs(removedForeign) - saved.removedForeign
         val kept = removed.filterNot { it.key.startsWith("#") }.toSet()
@@ -92,7 +122,7 @@ class OfflineAnnotationRepository internal constructor(
         return copy(
             removedForeign = AnnotationCodec.encodeRefs(kept),
             formValues = AnnotationCodec.encodeFormValues(pendingValues),
-            dirty = annotations != saved.annotations || kept.isNotEmpty() || pendingValues.isNotEmpty(),
+            dirty = annotations != saved.annotations || kept.isNotEmpty() || pendingValues.isNotEmpty() || recognizedPending,
             baseSize = newBase.size,
             baseModified = newBase.lastModified,
             saveError = null,

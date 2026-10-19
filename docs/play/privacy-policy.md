@@ -1,6 +1,6 @@
 # TilePDF Privacy Policy
 
-*Effective 18 October 2026*
+*Effective 19 October 2026*
 
 TilePDF is a PDF reader for Android. It is built to work entirely on your
 device.
@@ -13,6 +13,10 @@ device.
   system**.
 - The developer **does not collect, store or share** any personal data or
   usage information.
+- **Text recognition** on scanned pages runs on your device with Google ML
+  Kit's built-in model. Your pages are never sent anywhere. ML Kit is made
+  to report usage statistics to Google, but without internet access it
+  can't.
 
 ## What the app stores, and where
 
@@ -22,7 +26,8 @@ Everything below stays in the app's private storage on your device:
   when another app shares them. Some files are copied into private storage
   so they can be reopened later.
 - **Annotations.** Highlights, drawings and notes are saved into the PDF file
-  itself. Until they are saved, a draft stays in the app's private database.
+  itself, as is recognised text. Until they are saved, a draft stays in the
+  app's private database.
 - **Library.** The list of documents you opened, reading positions, favorites
   and bookmarks.
 - **Preferences.** Reading settings, theme and language.

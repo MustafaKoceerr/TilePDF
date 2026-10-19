@@ -64,4 +64,17 @@ class CachingDocumentTextRepositoryTest {
         repository.search(document, "  ").test { awaitComplete() }
         assertEquals(0, document.pageTextCalls)
     }
+
+    @Test
+    fun forgottenPageIsExtractedAgain() = runTest {
+        val document = FakePdfDocument(listOf("bir", "iki"))
+        repository.pageText(document, 0)
+        repository.pageText(document, 1)
+
+        repository.forget(document, 0)
+        repository.pageText(document, 0)
+        repository.pageText(document, 1)
+
+        assertEquals(3, document.pageTextCalls)
+    }
 }

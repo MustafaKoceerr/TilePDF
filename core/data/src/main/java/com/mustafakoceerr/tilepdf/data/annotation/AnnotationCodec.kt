@@ -7,6 +7,7 @@ import com.mustafakoceerr.tilepdf.model.ForeignRef
 import com.mustafakoceerr.tilepdf.model.Ink
 import com.mustafakoceerr.tilepdf.model.MarkupKind
 import com.mustafakoceerr.tilepdf.model.Note
+import com.mustafakoceerr.tilepdf.model.OcrWord
 import com.mustafakoceerr.tilepdf.model.TextMarkup
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
@@ -55,6 +56,15 @@ internal object AnnotationCodec {
 
     fun decodeFormValues(text: String): Map<String, String> = json.decodeFromString(text)
 
+    /** A page's recognised words: each its text and its quad as eight numbers. */
+    fun encodeWords(words: List<OcrWord>): String =
+        json.encodeToString(words.map { word -> WordJson(word.text, word.quad.flatMap { listOf(it.x, it.y) }) })
+
+    fun decodeWords(text: String): List<OcrWord> =
+        json.decodeFromString<List<WordJson>>(text).filter { it.q.size == 8 }.map { word ->
+            OcrWord(word.t, word.q.chunked(2) { (x, y) -> PdfPoint(x, y) })
+        }
+
     private fun Annotation.toJson(): JsonElement {
         val (type, body) = when (this) {
             is TextMarkup -> "markup" to json.encodeToJsonElement(
@@ -87,6 +97,9 @@ internal object AnnotationCodec {
             else -> null
         }
     }
+
+    @Serializable
+    private data class WordJson(val t: String, val q: List<Float>)
 
     @Serializable
     private data class MarkupJson(

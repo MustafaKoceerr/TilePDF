@@ -18,6 +18,7 @@ RAHAT OKU
 • Yapışkan not ekle
 • PDF formlarını doldur: metin alanları, onay kutuları, seçenek düğmeleri ve listeler
 • Parmağınla imzala; imzan bir sonraki sefer için saklanır
+• Taranmış sayfalardaki metni tanı; ara ve kopyala, hepsi telefonunda
 • Geri al ve yinele
 • Açıklamalar PDF'in içine kaydedilir; diğer PDF uygulamaları da görür
 • Değiştirilemeyen dosyalar açıklamalı bir kopya olarak kaydedilir

@@ -46,6 +46,10 @@ minSdk 29
   side by side on wide screens in horizontal layout
 - Fill in AcroForm fields (text, check box, radio button, combo and list
   box) and sign with a drawn signature; both are saved into the PDF
+- Recognise text on scanned pages (OCR), on the device with Google ML Kit:
+  the words go into the page as invisible text, so they can be searched,
+  selected and copied, also in other apps once saved. Works offline; a chip
+  offers it on pages without text
 - Text selection: long-press a word, drag Material-style handles, copy or
   select all from the system text toolbar
 - Vertical scrolling or horizontal single pages (swipe; each page fits the
@@ -333,6 +337,13 @@ rerunning it reproduces them byte for byte.
   classes its C++ code builds through JNI.
 - Signing reads the Play upload key from four environment variables and never
   from the repository; see [docs/RELEASING.md](docs/RELEASING.md).
+- Text recognition uses ML Kit's bundled Latin model (`core:ocr`), so it
+  needs no download and runs offline. ML Kit would send usage metrics to
+  Google when online; without the `INTERNET` permission it can't.
+  Recognised words wait per page in the `recognized_text` table (Room v8)
+  and are saved as invisible text (render mode 3) in the Noto Sans subset,
+  inside `TilePdfOcr` marked content, so a page is never recognised into the
+  file twice.
 - TilePDF stays offline: the manifest removes `INTERNET`, and
   `checkReleasePermissions` fails the release build if the merged manifest
   asks for any permission outside an allowlist.
@@ -346,7 +357,9 @@ rerunning it reproduces them byte for byte.
 
 ## Known limitations
 
-- Scanned (image-only) PDFs have no text, so search finds nothing (no OCR).
+- Text recognition reads Latin script only (Turkish and English included).
+  Search inside a document folds İ/ı/I/i but not other Turkish letters, so
+  "sisli" doesn't find "Şişli" there, unlike the library search.
 - Forms: no JavaScript (calculations, validation), no XFA forms, and multi-
   select list boxes show only their first choice.
 - The signature is a drawing, not a cryptographic (PAdES) signature.

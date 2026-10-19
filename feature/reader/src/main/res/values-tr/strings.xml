@@ -73,6 +73,19 @@
     <string name="signature_clear">Temizle</string>
     <string name="signature_place">Yerleştir</string>
     <string name="signature_hint">İmzalamak için dokunun</string>
+    <string name="reader_recognize_text">Metni tanı</string>
+    <string name="recognize_title">Metni tanı</string>
+    <string name="recognize_explanation">Taranmış sayfalardaki kelimeleri bulur; böylece onları arayabilir, seçebilir ve kopyalayabilirsiniz. Bu cihazda çalışır, hiçbir yere bir şey gönderilmez.</string>
+    <string name="recognize_this_page">Bu sayfa</string>
+    <string name="recognize_all_pages">Metni olmayan tüm sayfalar</string>
+    <string name="recognize_progress">Metin tanınıyor %1$d/%2$d</string>
+    <string name="recognize_no_text_chip">Bu sayfada metin yok · Tanı</string>
+    <plurals name="recognize_done">
+        <item quantity="one">%1$d sayfada metin bulundu</item>
+        <item quantity="other">%1$d sayfada metin bulundu</item>
+    </plurals>
+    <string name="recognize_nothing_found">Metin bulunamadı</string>
+    <string name="recognize_failed">Metin tanınamadı</string>
     <string name="reader_rotate">Sayfaları döndür</string>
     <string name="reader_crop_margins">Kenar boşluklarını kırp</string>
     <string name="reader_print">Yazdır</string>

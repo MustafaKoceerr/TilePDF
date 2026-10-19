@@ -6,6 +6,7 @@ import com.mustafakoceerr.tilepdf.model.Annotation
 import com.mustafakoceerr.tilepdf.model.FileStamp
 import com.mustafakoceerr.tilepdf.model.ForeignRef
 import com.mustafakoceerr.tilepdf.model.Note
+import com.mustafakoceerr.tilepdf.model.OcrWord
 import com.mustafakoceerr.tilepdf.model.SaveError
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -27,7 +28,7 @@ class AnnotationSaverTest {
     private val base = FileStamp(100, 5)
 
     private val files by lazy { FakeAnnotationFiles(tmp.root) }
-    private val repository by lazy { OfflineAnnotationRepository(FakeAnnotationDraftDao(), files, now = { 1L }) }
+    private val repository by lazy { OfflineAnnotationRepository(FakeAnnotationDraftDao(), FakeRecognizedTextDao(), files, now = { 1L }) }
     private val passwords = SessionPasswords()
     private val saver by lazy { AnnotationSaver(repository, files, passwords) }
 
@@ -296,5 +297,56 @@ class AnnotationSaverTest {
         assertTrue(saver.export(uri, target))
 
         assertEquals(mapOf("name" to "Ada"), files.openForReading(target, null).let { (it as FakePdfDocument).form })
+    }
+
+    private fun words(text: String) =
+        listOf(OcrWord(text, listOf(PdfPoint(0f, 0f), PdfPoint(9f, 0f), PdfPoint(9f, 4f), PdfPoint(0f, 4f))))
+
+    @Test
+    fun savesRecognizedText() = runTest {
+        givenDraft(emptyList())
+        repository.setRecognizedText(uri, 1, words("taranmış"))
+
+        assertEquals(SaveResult.Saved(uri), saver.save(uri))
+
+        assertEquals(mapOf(1 to words("taranmış")), files.pdfs.getValue(uri).recognized)
+        assertFalse(draft()!!.dirty)
+        assertEquals(emptySet<Int>(), draft()!!.recognizedPages)
+    }
+
+    @Test
+    fun pageTheFileAlreadyRecognizedIsNotWrittenAgain() = runTest {
+        givenDraft(emptyList(), pdf = FakePdf(recognized = mapOf(1 to words("eski"))))
+        repository.setRecognizedText(uri, 1, words("yeni"))
+
+        assertEquals(SaveResult.Saved(uri), saver.save(uri))
+
+        assertEquals(emptyList<Int>(), files.recognizedAdds)
+        assertEquals(mapOf(1 to words("eski")), files.pdfs.getValue(uri).recognized)
+        assertEquals(emptySet<Int>(), draft()!!.recognizedPages)
+    }
+
+    @Test
+    fun lostRecognizedTextFailsTheSave() = runTest {
+        givenDraft(emptyList())
+        repository.setRecognizedText(uri, 0, words("bir"))
+        files.loseRecognizedOnSave = true
+
+        assertEquals(SaveResult.Failed(SaveError.Failed), saver.save(uri))
+
+        assertEquals(emptyList<String>(), files.replaced)
+        assertEquals(setOf(0), draft()!!.recognizedPages)
+    }
+
+    @Test
+    fun exportIncludesRecognizedText() = runTest {
+        givenDraft(emptyList())
+        repository.setRecognizedText(uri, 2, words("üç"))
+        val target = tmp.newFile("shared.pdf")
+
+        assertTrue(saver.export(uri, target))
+
+        assertTrue(files.openForReading(target, null).hasRecognizedText(2))
+        assertEquals(setOf(2), draft()!!.recognizedPages)
     }
 }

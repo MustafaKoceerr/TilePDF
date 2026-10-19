@@ -67,6 +67,7 @@ sealed interface ReaderUiState {
         val formEditor: FormField? = null,
         /** Adding a signature: drawing it, then a tap places it. */
         val signatureStep: SignatureStep? = null,
+        val recognition: RecognitionUiState = RecognitionUiState(),
     ) : ReaderUiState
 }
 
@@ -135,4 +136,21 @@ sealed interface SignatureStep {
 
     /** Waiting for a tap on the page to put [signature] there. */
     data class Place(val signature: Signature) : SignatureStep
+}
+
+/** Text recognition on scanned pages. */
+data class RecognitionUiState(
+    /** Asking which pages to recognise. */
+    val choosing: Boolean = false,
+    /** How far it got while it runs; null when it isn't running. */
+    val progress: RecognitionProgress? = null,
+    /** The shown page has no text, as a scanned page hasn't. */
+    val currentPageHasNoText: Boolean = false,
+    /** The last run's outcome, until the screen has shown it. */
+    val result: RecognitionResult? = null,
+)
+
+sealed interface RecognitionResult {
+    data class Done(val pagesWithText: Int) : RecognitionResult
+    data object Failed : RecognitionResult
 }

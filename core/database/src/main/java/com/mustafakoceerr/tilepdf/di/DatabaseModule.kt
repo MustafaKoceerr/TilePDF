@@ -3,6 +3,7 @@ package com.mustafakoceerr.tilepdf.di
 import android.content.Context
 import androidx.room.Room
 import com.mustafakoceerr.tilepdf.data.local.AnnotationDraftDao
+import com.mustafakoceerr.tilepdf.data.local.RecognizedTextDao
 import com.mustafakoceerr.tilepdf.data.local.BookmarkDao
 import com.mustafakoceerr.tilepdf.data.local.DocumentDao
 import com.mustafakoceerr.tilepdf.data.local.TilePdfDatabase
@@ -30,4 +31,7 @@ object DatabaseModule {
 
     @Provides
     fun providesAnnotationDraftDao(database: TilePdfDatabase): AnnotationDraftDao = database.annotationDraftDao()
+
+    @Provides
+    fun providesRecognizedTextDao(database: TilePdfDatabase): RecognizedTextDao = database.recognizedTextDao()
 }

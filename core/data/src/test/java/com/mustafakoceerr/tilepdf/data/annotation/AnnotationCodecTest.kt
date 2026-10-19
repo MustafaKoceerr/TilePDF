@@ -7,6 +7,7 @@ import com.mustafakoceerr.tilepdf.model.ForeignRef
 import com.mustafakoceerr.tilepdf.model.Ink
 import com.mustafakoceerr.tilepdf.model.MarkupKind
 import com.mustafakoceerr.tilepdf.model.Note
+import com.mustafakoceerr.tilepdf.model.OcrWord
 import com.mustafakoceerr.tilepdf.model.TextMarkup
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -55,5 +56,15 @@ class AnnotationCodecTest {
         val values = mapOf("name" to "Ada \"Lovelace\"", "city" to "İzmir", "agree" to "Off")
 
         assertEquals(values, AnnotationCodec.decodeFormValues(AnnotationCodec.encodeFormValues(values)))
+    }
+
+    @Test
+    fun recognizedWordsRoundTrip() {
+        val words = listOf(
+            OcrWord("Taranmış", listOf(PdfPoint(10f, 20f), PdfPoint(90.5f, 20f), PdfPoint(90.5f, 32f), PdfPoint(10f, 32f))),
+            OcrWord("\"alıntı\"", listOf(PdfPoint(1f, 2f), PdfPoint(3f, 4f), PdfPoint(5f, 6f), PdfPoint(7f, 8f))),
+        )
+
+        assertEquals(words, AnnotationCodec.decodeWords(AnnotationCodec.encodeWords(words)))
     }
 }

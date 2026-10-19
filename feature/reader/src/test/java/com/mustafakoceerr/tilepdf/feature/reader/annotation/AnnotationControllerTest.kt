@@ -9,6 +9,7 @@ import com.mustafakoceerr.tilepdf.core.pdf.PdfDocument
 import com.mustafakoceerr.tilepdf.core.pdf.PdfLink
 import com.mustafakoceerr.tilepdf.data.annotation.AnnotationRepository
 import com.mustafakoceerr.tilepdf.model.Annotation
+import com.mustafakoceerr.tilepdf.model.OcrWord
 import com.mustafakoceerr.tilepdf.model.AnnotationDraft
 import com.mustafakoceerr.tilepdf.model.FileStamp
 import com.mustafakoceerr.tilepdf.model.ForeignAnnotation
@@ -220,6 +221,19 @@ class FakeAnnotationRepository : AnnotationRepository {
         drafts.value += uri to draft(uri).copy(annotations = annotations, removedForeign = removedForeign, dirty = true)
     }
     override suspend fun setFormValue(uri: String, name: String, value: String) = Unit
+
+    /** Recognised words by uri and page, until saved. */
+    val recognized = MutableStateFlow<Map<Pair<String, Int>, List<OcrWord>>>(emptyMap())
+
+    override suspend fun setRecognizedText(uri: String, pageIndex: Int, words: List<OcrWord>) {
+        recognized.value += (uri to pageIndex) to words
+        drafts.value[uri]?.let { draft ->
+            drafts.value += uri to draft.copy(dirty = true, recognizedPages = draft.recognizedPages + pageIndex)
+        }
+    }
+
+    override suspend fun recognizedText(uri: String, pages: Set<Int>): Map<Int, List<OcrWord>> =
+        recognized.value.filterKeys { (u, page) -> u == uri && page in pages }.mapKeys { it.key.second }
 
     override suspend fun markSaved(uri: String, saved: AnnotationDraft, newBase: FileStamp) = error("unused")
     override suspend fun markFailed(uri: String, error: SaveError) = error("unused")

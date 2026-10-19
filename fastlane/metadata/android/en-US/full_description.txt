@@ -18,6 +18,7 @@ MARK UP, FILL IN AND SIGN
 • Add sticky notes
 • Fill in PDF forms: text fields, check boxes, radio buttons and lists
 • Sign with your finger; your signature is kept for next time
+• Recognise text on scanned pages to search and copy it, right on your phone
 • Undo and redo
 • Annotations are saved into the PDF itself, so other PDF apps show them too
 • Files that can't be changed are saved as an annotated copy

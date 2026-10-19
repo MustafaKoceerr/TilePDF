@@ -13,7 +13,11 @@ import com.mustafakoceerr.tilepdf.core.render.TiledPageImageSource
 import com.mustafakoceerr.tilepdf.core.geometry.PageViewTransform
 import com.mustafakoceerr.tilepdf.core.geometry.PdfPoint
 import com.mustafakoceerr.tilepdf.core.geometry.PdfRect
+import com.mustafakoceerr.tilepdf.core.pdf.addMissingRecognizedText
 import com.mustafakoceerr.tilepdf.core.pdf.fill
+import com.mustafakoceerr.tilepdf.core.ocr.TextRecognizer
+import com.mustafakoceerr.tilepdf.core.ocr.recognizedWords
+import com.mustafakoceerr.tilepdf.model.OcrWord
 import com.mustafakoceerr.tilepdf.model.DocumentView
 import com.mustafakoceerr.tilepdf.model.FormField
 import com.mustafakoceerr.tilepdf.model.FormFieldKind
@@ -90,6 +94,9 @@ private const val SIGNATURE_WIDTH_PT = 160f
 private const val SIGNATURE_PEN_PT = 1.5f
 private const val SIGNATURE_COLOR = 0xFF000000.toInt()
 
+/** Pages flip by quickly while scrolling; only the one the reader stops on is checked for text. */
+private const val TEXT_CHECK_DELAY_MS = 400L
+
 /** Twice the library's 40 dp row picture at most densities, still small as a PNG. */
 private const val THUMBNAIL_WIDTH_PX = 240
 
@@ -109,6 +116,7 @@ class ReaderViewModel @Inject constructor(
     private val sharedDocuments: SharedDocuments,
     private val thumbnailStore: ThumbnailStore,
     private val signatureStore: SignatureStore,
+    private val textRecognizer: TextRecognizer,
     @param:ApplicationScope private val applicationScope: CoroutineScope,
 ) : ViewModel() {
 
@@ -144,6 +152,9 @@ class ReaderViewModel @Inject constructor(
     private val formEditor = MutableStateFlow<FormField?>(null)
 
     private val signatureStep = MutableStateFlow<SignatureStep?>(null)
+
+    private val recognition = MutableStateFlow(RecognitionUiState())
+    private var recognitionJob: Job? = null
 
     /** Reopens the document when a save wrote a new version; one per controller. */
     private var fileSavedJob: Job? = null
@@ -190,11 +201,11 @@ class ReaderViewModel @Inject constructor(
     val uiState: StateFlow<ReaderUiState> = combine(
         documentState,
         preferencesRepository.preferences,
-        combine(searchState, toc, ::Pair),
+        combine(searchState, toc, recognition, ::Triple),
         combine(selection, linkTargets, currentPage, fullScreen, startPosition, ::PageState),
         combine(annotations, editing, combine(saveCopyResult, handOff, ::Pair), jumpHistory, combine(formFields, formEditor, signatureStep, ::Triple), ::Outputs),
     ) { document, preferences, searchAndToc, pageState, annotationUi ->
-        val (search, toc) = searchAndToc
+        val (search, toc, textRecognition) = searchAndToc
         val (selection, links, page, fullScreen, start) = pageState
         val (annotations, editing, results, history, forms) = annotationUi
         val (copyResult, handOff) = results
@@ -227,6 +238,7 @@ class ReaderViewModel @Inject constructor(
                 formFields = forms.first,
                 formEditor = forms.second,
                 signatureStep = forms.third,
+                recognition = textRecognition,
             )
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ReaderUiState.Loading)
@@ -235,6 +247,7 @@ class ReaderViewModel @Inject constructor(
         open(password = null)
         savePositionWhileReading()
         searchAsQueryChanges()
+        watchPagesWithoutText()
     }
 
     /** Tries the document again with [password]; it is not kept afterwards. */
@@ -266,6 +279,13 @@ class ReaderViewModel @Inject constructor(
                 if (documentHasForm) {
                     val pending = annotationRepository.observe(opened.uri).first()?.formValues.orEmpty()
                     runCatchingCancellable { opened.document.fill(pending) }
+                }
+                // Text recognised but not saved yet can be searched already.
+                val recognizedPages = annotationRepository.observe(opened.uri).first()?.recognizedPages.orEmpty()
+                if (recognizedPages.isNotEmpty()) {
+                    runCatchingCancellable {
+                        opened.document.addMissingRecognizedText(annotationRepository.recognizedText(opened.uri, recognizedPages))
+                    }
                 }
                 formFields.value = emptyMap()
                 val view = libraryRepository.documentView(opened.uri)
@@ -734,6 +754,100 @@ class ReaderViewModel @Inject constructor(
         viewModelScope.launch {
             val preferences = preferencesRepository.preferences.first()
             controller.add(Ink(newAnnotationId(), pageIndex, preferences.penColor, preferences.penWidthPt, listOf(points)))
+        }
+    }
+
+    /** Asks which pages to recognise text on. */
+    fun onRecognizeTextRequested() {
+        if (recognitionJob?.isActive == true) return
+        recognition.update { it.copy(choosing = true) }
+    }
+
+    fun onRecognizeChoiceDismissed() {
+        recognition.update { it.copy(choosing = false) }
+    }
+
+    /**
+     * Recognises the current page, or with [allPages] every page without
+     * text, one at a time. Each page's words go into the draft and into the
+     * open document, so they can be searched at once.
+     */
+    fun onRecognizeText(allPages: Boolean) {
+        recognition.update { it.copy(choosing = false) }
+        val state = documentState.value as? DocumentState.Opened ?: return
+        // The draft must exist before words can wait in it.
+        if (recognitionJob?.isActive == true || controller.value?.state?.value?.ready != true) return
+        recognitionJob = viewModelScope.launch {
+            val opened = state.opened
+            var pagesWithText = 0
+            try {
+                val result = try {
+                    val pages = pagesToRecognize(allPages, currentPage.value, opened.document.pageCount) { needsText(opened.document, it) }
+                    recognizePages(
+                        pages = pages,
+                        read = { page -> readPage(state, page) },
+                        keep = { page, words ->
+                            keepRecognized(opened, page, words)
+                            pagesWithText++
+                        },
+                        onProgress = { progress -> recognition.update { it.copy(progress = progress) } },
+                    )
+                    RecognitionResult.Done(pagesWithText)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (_: Exception) {
+                    RecognitionResult.Failed
+                }
+                recognition.update { it.copy(result = result) }
+            } finally {
+                recognition.update { it.copy(progress = null) }
+            }
+        }
+    }
+
+    fun onRecognitionCancelled() {
+        recognitionJob?.cancel()
+    }
+
+    fun onRecognitionResultShown() {
+        recognition.update { it.copy(result = null) }
+    }
+
+    /** Whether [pageIndex] has no text a reader could search. */
+    private suspend fun needsText(document: PdfDocument, pageIndex: Int): Boolean =
+        runCatchingCancellable { documentTextRepository.pageText(document, pageIndex).text.isBlank() }.getOrDefault(false)
+
+    /** [pageIndex]'s words, read from a render shown as the reader turns the page, so the text is upright. */
+    private suspend fun readPage(state: DocumentState.Opened, pageIndex: Int): List<OcrWord> {
+        val document = state.opened.document
+        val view = PageViewTransform.of(document.pageSizes[pageIndex], state.view.rotation)
+        val widthPx = (view.size.widthPt * recognitionScale(view.size)).toInt().coerceAtLeast(1)
+        val bitmap = pageRenderer.renderPage(document, pageIndex, widthPx, view)
+        try {
+            return recognizedWords(textRecognizer.recognize(bitmap), widthPx.toFloat() / view.size.widthPt, view)
+        } finally {
+            bitmap.recycle()
+        }
+    }
+
+    private suspend fun keepRecognized(opened: OpenedDocument, pageIndex: Int, words: List<OcrWord>) {
+        annotationRepository.setRecognizedText(opened.uri, pageIndex, words)
+        opened.document.addRecognizedText(pageIndex, words)
+        documentTextRepository.forget(opened.document, pageIndex)
+        if (pageIndex == currentPage.value) recognition.update { it.copy(currentPageHasNoText = false) }
+    }
+
+    /** Keeps [RecognitionUiState.currentPageHasNoText] up to date as the reader moves. */
+    @OptIn(FlowPreview::class)
+    private fun watchPagesWithoutText() {
+        viewModelScope.launch {
+            combine(currentPage, documentState) { page, state -> page to (state as? DocumentState.Opened)?.opened?.document }
+                .distinctUntilChanged()
+                .debounce(TEXT_CHECK_DELAY_MS)
+                .collectLatest { (page, document) ->
+                    val noText = document != null && page in 0 until document.pageCount && needsText(document, page)
+                    recognition.update { it.copy(currentPageHasNoText = noText) }
+                }
         }
     }
 

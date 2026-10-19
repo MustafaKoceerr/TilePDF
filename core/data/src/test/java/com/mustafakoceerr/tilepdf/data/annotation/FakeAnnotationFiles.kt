@@ -10,16 +10,21 @@ import com.mustafakoceerr.tilepdf.core.pdf.FormEdit
 import com.mustafakoceerr.tilepdf.model.FileStamp
 import com.mustafakoceerr.tilepdf.model.FormField
 import com.mustafakoceerr.tilepdf.model.FormFieldKind
+import com.mustafakoceerr.tilepdf.model.OcrWord
 import com.mustafakoceerr.tilepdf.model.ForeignAnnotation
 import com.mustafakoceerr.tilepdf.core.geometry.PdfRect
 import com.mustafakoceerr.tilepdf.model.PageAnnotations
 import java.io.File
 
-/** A 3-page PDF's annotations: ours, and other apps' keys per page; its text fields on page 0 by name. */
+/**
+ * A 3-page PDF's annotations: ours, and other apps' keys per page; its text
+ * fields on page 0 by name; the words TilePDF recognised, by page.
+ */
 data class FakePdf(
     val own: List<Annotation> = emptyList(),
     val foreign: Map<Int, Set<String>> = emptyMap(),
     val form: Map<String, String> = emptyMap(),
+    val recognized: Map<Int, List<OcrWord>> = emptyMap(),
 )
 
 /** [form] as text field widgets on page 0, in order. */
@@ -55,6 +60,12 @@ class FakeAnnotationFiles(private val tempDir: File) : AnnotationFiles {
     /** Empties this form field when saving, as a broken save would. */
     var loseFormOnSave: String? = null
 
+    /** Drops recognised text when saving, as a broken save would. */
+    var loseRecognizedOnSave = false
+
+    /** Pages recognised text was added to, across every opened document. */
+    val recognizedAdds = mutableListOf<Int>()
+
     override suspend fun stamp(uri: String): FileStamp? = stamps[uri]
 
     override suspend fun openForEditing(uri: String, password: String?): EditablePdfDocument {
@@ -68,6 +79,7 @@ class FakeAnnotationFiles(private val tempDir: File) : AnnotationFiles {
         val pdf = saved.getValue(file)
         return FakePdfDocument(List(PAGES) { "" }).apply {
             form = pdf.form
+            recognized = pdf.recognized.keys
             annotationsByPage = (0 until PAGES).associateWith { page ->
                 PageAnnotations(
                     own = pdf.own.filter { it.pageIndex == page },
@@ -94,7 +106,7 @@ class FakeAnnotationFiles(private val tempDir: File) : AnnotationFiles {
         override suspend fun apply(changes: AnnotationChanges) {
             applied += changes
             val removed = changes.removals.values.flatten().toSet()
-            pdf = FakePdf(
+            pdf = pdf.copy(
                 own = pdf.own.filterNot { it.id in removed } + changes.additions,
                 foreign = pdf.foreign.mapValues { (page, keys) -> keys - changes.foreignRemovals[page].orEmpty() },
             )
@@ -111,10 +123,18 @@ class FakeAnnotationFiles(private val tempDir: File) : AnnotationFiles {
             return true
         }
 
+        override suspend fun hasRecognizedText(pageIndex: Int) = pageIndex in pdf.recognized
+
+        override suspend fun addRecognizedText(pageIndex: Int, words: List<OcrWord>) {
+            recognizedAdds += pageIndex
+            pdf = pdf.copy(recognized = pdf.recognized + (pageIndex to words))
+        }
+
         override suspend fun saveIncremental(target: File) {
             target.writeText("pdf")
             val form = loseFormOnSave?.let { lost -> pdf.form + (lost to "") } ?: pdf.form
-            saved[target] = pdf.copy(own = pdf.own.filterNot { it.id == loseOnSave }, form = form)
+            val recognized = if (loseRecognizedOnSave) emptyMap() else pdf.recognized
+            saved[target] = pdf.copy(own = pdf.own.filterNot { it.id == loseOnSave }, form = form, recognized = recognized)
         }
 
         override fun close() = Unit
