@@ -84,4 +84,24 @@ class PdfiumXfaTest {
             assertEquals("Grace Hopper", document.xfaTap(0, nameField))
         }
     }
+
+    @Test
+    fun aSavedFormLooksTheSameWhenOpenedAgain(): Unit = runBlocking {
+        saved.delete()
+        pdfium.openForEditing(TestAssets.uri("xfa.pdf")).use { document ->
+            document.xfaTap(0, nameField)
+            document.xfaWrite(0, "Grace Hopper")
+            document.saveIncremental(saved)
+        }
+        val before = pdfium.open(TestAssets.uri("xfa.pdf")).use { document ->
+            document.xfaTap(0, nameField)
+            document.xfaWrite(0, "Grace Hopper")
+            render(document)
+        }
+
+        val after = pdfium.open(Uri.fromFile(saved)).use { render(it) }
+
+        // A caption saved as "\nName" moved down a line.
+        assertTrue("the page is drawn as before", before.sameAs(after))
+    }
 }

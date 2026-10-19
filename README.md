@@ -177,7 +177,11 @@ and published as a release. The patches:
 - turn on `AFNumber_Format` and `AFPercent_Format` in form scripts, which
   upstream leaves out on Android;
 - add `FORM_TilePdfGetFocusedXfaWidgetType`, which tells what kind of XFA
-  widget a tap focused.
+  widget a tap focused;
+- write XML text without a line break in front of it. Upstream writes one
+  after every start tag, both in XFA's data and in its saved form state, so a
+  filled-in field saved as "Ada" read back as "\nAda", and captions moved down
+  a line when the file was opened again.
 
 The
 `tilepdf.pdfium` convention plugin downloads the archives into
