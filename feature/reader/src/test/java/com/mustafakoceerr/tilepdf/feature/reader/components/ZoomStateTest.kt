@@ -122,6 +122,45 @@ class ZoomStateTest {
     }
 
     @Test
+    fun pinchingPastTheLargestZoomLeavesTheContentStill() {
+        state.zoomTo(5f, Offset(500f, 400f))
+        // Fingers still spreading, unevenly: the centroid drifts but there's no more zoom.
+        state.onTransform(Offset(530f, 420f), pan = Offset(30f, 20f), zoom = 1.1f)
+
+        assertEquals(1f, state.previewZoom, DELTA)
+        assertEquals(Offset.Zero, state.previewOffset)
+    }
+
+    @Test
+    fun pinchingPastTheSmallestZoomLeavesTheContentStill() {
+        state.onTransform(Offset(500f, 600f), pan = Offset(0f, -40f), zoom = 0.8f)
+
+        assertEquals(1f, state.previewZoom, DELTA)
+        assertEquals(Offset.Zero, state.previewOffset)
+    }
+
+    @Test
+    fun movingBothFingersStillPansAtTheLimit() {
+        state.zoomTo(5f, Offset(500f, 400f))
+        // Two fingers never keep exactly the same distance while dragging.
+        state.onTransform(Offset(500f, 440f), pan = Offset(0f, 40f), zoom = 1.001f)
+
+        assertEquals(40f, state.previewOffset.y, DELTA)
+    }
+
+    @Test
+    fun aPinchHoldsTheListStillUntilItIsCommitted() {
+        // The list's own fling at the end of a pinch would undo the commit's scroll fix.
+        assertEquals(false, state.isPinching)
+
+        state.onTransform(Offset(500f, 400f), Offset.Zero, zoom = 1f)
+        assertEquals(true, state.isPinching)
+
+        state.commit()
+        assertEquals(false, state.isPinching)
+    }
+
+    @Test
     fun commitClampsPanToContent() {
         // Zooming around the right edge would pan past the content end.
         state.onTransform(Offset(1000f, 0f), pan = Offset(-300f, 0f), zoom = 2f)

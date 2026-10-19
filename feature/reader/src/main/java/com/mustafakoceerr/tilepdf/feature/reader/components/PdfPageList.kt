@@ -119,7 +119,8 @@ internal fun PdfPageList(
         LazyColumn(
             state = listState,
             // One finger draws: the list only scrolls with two (pinch-pan).
-            userScrollEnabled = drawingFor == null,
+            // A pinch moves the content itself; the list mustn't fling after it.
+            userScrollEnabled = drawingFor == null && !zoomState.isPinching,
             modifier = Modifier
                 .fillMaxSize()
                 .zoomable(

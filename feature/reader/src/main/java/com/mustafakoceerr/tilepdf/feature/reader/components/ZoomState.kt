@@ -38,6 +38,9 @@ private const val MIN_SCALE = 1f
 private const val MAX_SCALE = 5f
 private const val DOUBLE_TAP_SCALE = 2.5f
 
+/** A two-finger drag changes the finger distance a little; that isn't pinching past a limit. */
+private const val LIMIT_SLOP = 0.002f
+
 /**
  * Document-level zoom for the page list.
  *
@@ -77,6 +80,14 @@ class ZoomState(
     /** True mid-gesture, while the content is only transformed, not laid out. */
     val isPreviewing: Boolean get() = previewZoom != 1f || previewOffset != Offset.Zero
 
+    /**
+     * From a pinch's first frame to its commit. The list must not scroll
+     * meanwhile: its fling on release would replace the commit's scroll fix
+     * with the old layout's position, at the new page sizes.
+     */
+    var isPinching by mutableStateOf(false)
+        private set
+
     /** The last pinch centroid or double tap: the commit keeps the content there. */
     private var focus = Offset.Zero
 
@@ -109,14 +120,19 @@ class ZoomState(
      * are now, [pan] how far they moved since the last frame.
      */
     fun onTransform(centroid: Offset, pan: Offset, zoom: Float) {
-        val newZoom = (scale * previewZoom * zoom).coerceIn(MIN_SCALE, MAX_SCALE) / scale
+        val requested = scale * previewZoom * zoom
+        val clamped = requested.coerceIn(MIN_SCALE, MAX_SCALE)
+        val newZoom = clamped / scale
         val step = newZoom / previewZoom
-        // The content that was under the fingers moves with them.
-        val previousCentroid = centroid - pan
+        // The content that was under the fingers moves with them, except
+        // when they pinch past a limit: then it stays put, as nothing zooms.
+        val pastLimit = abs(requested - clamped) > clamped * LIMIT_SLOP
+        val previousCentroid = if (pastLimit) centroid else centroid - pan
         val offset = centroid - (previousCentroid - previewOffset) * step
         previewOffset = Offset(clampPreviewX(offset.x, newZoom), offset.y)
         previewZoom = newZoom
         focus = centroid
+        isPinching = true
     }
 
     /**
@@ -151,6 +167,7 @@ class ZoomState(
         panX = newPanX.coerceIn(0f, maxPanX)
         previewZoom = 1f
         previewOffset = Offset.Zero
+        isPinching = false
         return ZoomCommit(zoom, focus.y, contentY)
     }
 
