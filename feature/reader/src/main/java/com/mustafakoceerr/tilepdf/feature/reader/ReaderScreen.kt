@@ -953,6 +953,11 @@ private fun RecognitionResultEffect(result: RecognitionResult?, onShown: () -> U
                 }
                 Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
             }
+            is RecognitionResult.AlreadyHasText -> Toast.makeText(
+                context,
+                if (result.allPages) R.string.recognize_all_have_text else R.string.recognize_page_has_text,
+                Toast.LENGTH_SHORT,
+            ).show()
             RecognitionResult.Failed -> Toast.makeText(context, R.string.recognize_failed, Toast.LENGTH_LONG).show()
         }
         onShown()

@@ -100,12 +100,12 @@
     <string name="signature_signed_by">İmzalayan: %1$s</string>
     <string name="signature_reason">Sebep: %1$s</string>
     <string name="signature_issued_by">Sertifikayı veren: %1$s</string>
-    <string name="signature_intact">İmzalanan içerik değişmemiş.</string>
+    <string name="signature_intact">İmzalanan sürüm olduğu gibi duruyor.</string>
     <string name="signature_broken">Belge imzalanan yerde değişmiş ya da imza bozuk.</string>
     <string name="signature_unsupported">Bu tür bir imza denetlenemiyor.</string>
     <string name="signature_trusted">İmzalayanın sertifikası bu cihazca güvenilir.</string>
     <string name="signature_untrusted">İmzalayanın sertifikası bu cihazca güvenilir değil; kimin imzaladığı doğrulanamıyor.</string>
-    <string name="signature_changed_after">Belge imzalandıktan sonra değiştirilmiş, örneğin açıklama eklenmiş.</string>
+    <string name="signature_changed_after">İmzadan sonra belgeye ekleme yapılmış (örneğin açıklama); imzalanan sürümü etkilemez.</string>
     <string name="signatures_revocation_note">Sertifikanın iptal edilip edilmediği denetlenmez: TilePDF çevrimdışı çalışır.</string>
     <string name="script_ok">Tamam</string>
     <string name="script_yes">Evet</string>
@@ -121,6 +121,8 @@
         <item quantity="other">%1$d sayfada metin bulundu</item>
     </plurals>
     <string name="recognize_nothing_found">Metin bulunamadı</string>
+    <string name="recognize_page_has_text">Bu sayfada zaten metin var</string>
+    <string name="recognize_all_have_text">Tüm sayfalarda zaten metin var</string>
     <string name="recognize_failed">Metin tanınamadı</string>
     <string name="reader_rotate">Sayfaları döndür</string>
     <string name="reader_crop_margins">Kenar boşluklarını kırp</string>

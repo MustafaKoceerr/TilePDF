@@ -30,6 +30,10 @@ internal suspend fun pagesToRecognize(
     return candidates.filter { needText(it) }
 }
 
+/** How a run went that recognised [pagesTried] pages, [pagesWithText] of them with words. */
+internal fun recognitionResult(allPages: Boolean, pagesTried: Int, pagesWithText: Int): RecognitionResult =
+    if (pagesTried == 0) RecognitionResult.AlreadyHasText(allPages) else RecognitionResult.Done(pagesWithText)
+
 /** Pixels per point to render [page] at for recognition. */
 internal fun recognitionScale(page: PageSize): Float =
     minOf(RECOGNITION_LONG_SIDE_PX / maxOf(page.widthPt, page.heightPt), RECOGNITION_MAX_SCALE)

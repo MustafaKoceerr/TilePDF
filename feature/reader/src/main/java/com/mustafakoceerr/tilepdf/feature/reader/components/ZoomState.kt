@@ -38,6 +38,9 @@ private const val MIN_SCALE = 1f
 private const val MAX_SCALE = 5f
 private const val DOUBLE_TAP_SCALE = 2.5f
 
+/** A two-finger drag changes the finger distance a little; that isn't pinching past a limit. */
+private const val LIMIT_SLOP = 0.002f
+
 /**
  * Document-level zoom for the page list.
  *
@@ -47,7 +50,7 @@ private const val DOUBLE_TAP_SCALE = 2.5f
  *   Nothing is re-measured or re-rendered, so pinching stays smooth.
  * - **Commit** — when the gesture ends, [scale] is updated so pages are laid
  *   out at their new size, and the scroll position is corrected so the content
- *   under the viewport's top-left corner stays where the preview showed it.
+ *   under the fingers stays where the preview showed it.
  *
  * All positions are in viewport pixels. The preview maps a viewport point `p`
  * to `p * previewZoom + previewOffset` (transform origin at the top-left).
@@ -77,6 +80,17 @@ class ZoomState(
     /** True mid-gesture, while the content is only transformed, not laid out. */
     val isPreviewing: Boolean get() = previewZoom != 1f || previewOffset != Offset.Zero
 
+    /**
+     * From a pinch's first frame to its commit. The list must not scroll
+     * meanwhile: its fling on release would replace the commit's scroll fix
+     * with the old layout's position, at the new page sizes.
+     */
+    var isPinching by mutableStateOf(false)
+        private set
+
+    /** The last pinch centroid or double tap: the commit keeps the content there. */
+    private var focus = Offset.Zero
+
     /** Applied once the viewport width, and so the pan range, is known. */
     private var pendingPanFraction: Float? = initialPanFraction.takeIf { it > 0f }
 
@@ -101,13 +115,36 @@ class ZoomState(
 
     private val maxPanX: Float get() = viewportWidth * (scale - 1f)
 
-    /** Applies one frame of a pinch gesture around [centroid]. */
+    /**
+     * Applies one frame of a pinch gesture: [centroid] is where the fingers
+     * are now, [pan] how far they moved since the last frame.
+     */
     fun onTransform(centroid: Offset, pan: Offset, zoom: Float) {
-        val newZoom = (scale * previewZoom * zoom).coerceIn(MIN_SCALE, MAX_SCALE) / scale
+        val requested = scale * previewZoom * zoom
+        val clamped = requested.coerceIn(MIN_SCALE, MAX_SCALE)
+        val newZoom = clamped / scale
         val step = newZoom / previewZoom
-        // Keep the content under the centroid fixed, then follow the fingers.
-        previewOffset = (previewOffset - centroid) * step + centroid + pan
+        // The content that was under the fingers moves with them, except
+        // when they pinch past a limit: then it stays put, as nothing zooms.
+        val pastLimit = abs(requested - clamped) > clamped * LIMIT_SLOP
+        val previousCentroid = if (pastLimit) centroid else centroid - pan
+        val offset = centroid - (previousCentroid - previewOffset) * step
+        previewOffset = Offset(clampPreviewX(offset.x, newZoom), offset.y)
         previewZoom = newZoom
+        focus = centroid
+        isPinching = true
+    }
+
+    /**
+     * Keeps the zoomed content across the whole width, as the commit will
+     * lay it out; otherwise the content would jump sideways on release.
+     */
+    private fun clampPreviewX(offsetX: Float, zoom: Float): Float {
+        // The laid out content spans viewport x -panX..(width * scale - panX).
+        val showsLeftEdge = panX * zoom
+        val showsRightEdge = viewportWidth - (viewportWidth * scale - panX) * zoom
+        // At exactly 1x both are the same; float error mustn't make coerceIn throw.
+        return maxOf(showsRightEdge, minOf(offsetX, showsLeftEdge))
     }
 
     /** Horizontal drags pan the zoomed content. */
@@ -119,7 +156,8 @@ class ZoomState(
      */
     fun commit(): ZoomCommit {
         val zoom = previewZoom
-        val anchorY = -previewOffset.y / zoom
+        // The content the preview shows under the fingers.
+        val contentY = (focus.y - previewOffset.y) / zoom
         // The viewport x shown at the left edge was `-offset.x / zoom`, i.e.
         // content x `panX - offset.x / zoom`; after scaling by `zoom` that
         // content point must sit at viewport x = 0.
@@ -129,13 +167,15 @@ class ZoomState(
         panX = newPanX.coerceIn(0f, maxPanX)
         previewZoom = 1f
         previewOffset = Offset.Zero
-        return ZoomCommit(zoom, anchorY)
+        isPinching = false
+        return ZoomCommit(zoom, focus.y, contentY)
     }
 
     /** Zooms to [target] around [focus] as if pinched there, then commits. */
     fun zoomTo(target: Float, focus: Offset): ZoomCommit {
         previewZoom = target.coerceIn(MIN_SCALE, MAX_SCALE) / scale
         previewOffset = focus * (1f - previewZoom)
+        this.focus = focus
         return commit()
     }
 
@@ -166,9 +206,31 @@ class ZoomState(
 
 /**
  * Result of a zoom commit: the content grew by [zoom], and the content that was
- * at viewport y [anchorY] (pre-commit layout) should move to the viewport top.
+ * at viewport y [contentY] (pre-commit layout) should move to viewport y [focusY].
  */
-data class ZoomCommit(val zoom: Float, val anchorY: Float)
+data class ZoomCommit(val zoom: Float, val focusY: Float, val contentY: Float)
+
+/** A laid out list item: [offset] from the list's start, [size] long. */
+internal data class ListItemBounds(val index: Int, val offset: Int, val size: Int)
+
+/** Arguments for [LazyListState.requestScrollToItem]. */
+internal data class ScrollTarget(val index: Int, val scrollOffset: Int)
+
+/**
+ * Where to scroll after [commit] so the anchored content lands at its focus.
+ * Item heights scale with the zoom (pages keep their aspect ratio); fixed
+ * spacing between items causes negligible drift. An anchor between items
+ * holds on to the next one, one past the last to its bottom.
+ */
+internal fun anchoredScroll(items: List<ListItemBounds>, viewportStartOffset: Int, commit: ZoomCommit): ScrollTarget? {
+    // Item offsets are measured from the end of the top content padding.
+    val y = commit.contentY + viewportStartOffset
+    val item = items.firstOrNull { it.offset + it.size > y } ?: items.lastOrNull() ?: return null
+    val fraction = ((y - item.offset) / item.size).coerceIn(0f, 1f)
+    // The item's top must sit `fraction` of its new size above the focus.
+    val scrollOffset = fraction * item.size * commit.zoom - commit.focusY - viewportStartOffset
+    return ScrollTarget(item.index, scrollOffset.roundToInt())
+}
 
 @Composable
 fun rememberZoomState(
@@ -251,20 +313,13 @@ fun Modifier.zoomable(
     }
 
 /**
- * Applies the vertical half of a [ZoomCommit]. Item heights scale with the zoom
- * (pages keep their aspect ratio); fixed spacing between items causes
- * negligible drift. Uses [LazyListState.requestScrollToItem] so the scroll fix
- * lands in the same frame as the new scale — no visible jump.
+ * Applies the vertical half of a [ZoomCommit]. Uses
+ * [LazyListState.requestScrollToItem] so the scroll fix lands in the same
+ * frame as the new scale — no visible jump.
  */
 private fun LazyListState.keepAnchor(commit: ZoomCommit) {
-    val (zoom, anchorY) = commit
     val info = layoutInfo
-    // Item offsets are measured from the end of the top content padding.
-    val y = anchorY + info.viewportStartOffset
-    val item = info.visibleItemsInfo.firstOrNull { it.offset + it.size > y } ?: return
-    val fraction = ((y - item.offset) / item.size).coerceIn(0f, 1f)
-    requestScrollToItem(
-        index = item.index,
-        scrollOffset = (fraction * item.size * zoom - info.viewportStartOffset).roundToInt(),
-    )
+    val items = info.visibleItemsInfo.map { ListItemBounds(it.index, it.offset, it.size) }
+    val target = anchoredScroll(items, info.viewportStartOffset, commit) ?: return
+    requestScrollToItem(target.index, target.scrollOffset)
 }

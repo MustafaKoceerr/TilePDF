@@ -165,6 +165,8 @@ data class RecognitionUiState(
 
 sealed interface RecognitionResult {
     data class Done(val pagesWithText: Int) : RecognitionResult
+    /** Every page asked for already had text, so none was recognised. */
+    data class AlreadyHasText(val allPages: Boolean) : RecognitionResult
     data object Failed : RecognitionResult
 }
 
