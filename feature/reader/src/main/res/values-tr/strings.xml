@@ -10,6 +10,9 @@
     <string name="reader_theme_light">Açık</string>
     <string name="reader_theme_night">Gece</string>
     <string name="reader_theme_sepia">Sepya</string>
+    <string name="reader_theme_green">Yeşil</string>
+    <string name="reader_theme_dim">Loş</string>
+    <string name="reader_theme_warm_night">Sıcak gece</string>
     <string name="reader_keep_screen_on">Ekranı açık tut</string>
     <string name="reader_volume_keys">Ses tuşlarıyla sayfa çevir</string>
     <string name="reader_two_page_spreads">Geniş ekranda iki sayfa yan yana</string>

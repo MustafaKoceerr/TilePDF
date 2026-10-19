@@ -1,7 +1,12 @@
 package com.mustafakoceerr.tilepdf.model
 
 /** How pages are coloured: as printed, inverted, or on warm paper. */
-enum class PageTheme { Light, Night, Sepia }
+/**
+ * How pages are coloured. Stored by name, so new themes go at the end.
+ * Green, Dim and WarmNight are the easy-on-the-eyes ones: pale green paper,
+ * and low-contrast dark grey or dark brown for reading in the dark.
+ */
+enum class PageTheme { Light, Night, Sepia, Green, Dim, WarmNight }
 
 /** Pages scroll top to bottom, or show one at a time side by side. */
 enum class ReadingMode { Vertical, Horizontal }

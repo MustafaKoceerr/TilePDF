@@ -11,6 +11,9 @@
     <string name="reader_theme_light">Light</string>
     <string name="reader_theme_night">Night</string>
     <string name="reader_theme_sepia">Sepia</string>
+    <string name="reader_theme_green">Green</string>
+    <string name="reader_theme_dim">Dim</string>
+    <string name="reader_theme_warm_night">Warm night</string>
     <string name="reader_keep_screen_on">Keep screen on</string>
     <string name="reader_volume_keys">Turn pages with volume keys</string>
     <string name="reader_two_page_spreads">Two pages side by side on wide screens</string>

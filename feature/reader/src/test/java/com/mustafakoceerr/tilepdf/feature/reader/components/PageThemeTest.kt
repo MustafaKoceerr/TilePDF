@@ -39,6 +39,38 @@ class PageThemeTest {
     }
 
     @Test
+    fun greenTurnsWhitePaleGreenAndKeepsBlackBlack() {
+        val green = PageTheme.Green.colorMatrix()!!
+        assertArrayEquals(floatArrayOf(204f, 232f, 207f), green.apply(255, 255, 255), 1f)
+        assertArrayEquals(floatArrayOf(0f, 0f, 0f), green.apply(0, 0, 0), 0.5f)
+    }
+
+    @Test
+    fun dimTurnsWhiteDarkGreyAndBlackLightGrey() {
+        // Softer than night: no pure white text on pure black.
+        val dim = PageTheme.Dim.colorMatrix()!!
+        assertArrayEquals(floatArrayOf(43f, 43f, 43f), dim.apply(255, 255, 255), 1f)
+        assertArrayEquals(floatArrayOf(200f, 200f, 200f), dim.apply(0, 0, 0), 1f)
+    }
+
+    @Test
+    fun warmNightTurnsWhiteDarkBrownAndBlackCream() {
+        val warm = PageTheme.WarmNight.colorMatrix()!!
+        assertArrayEquals(floatArrayOf(42f, 33f, 24f), warm.apply(255, 255, 255), 1f)
+        assertArrayEquals(floatArrayOf(232f, 217f, 192f), warm.apply(0, 0, 0), 1f)
+    }
+
+    @Test
+    fun thePaperShownBeforeAPageArrivesIsWhatWhiteBecomes() {
+        // Otherwise a page would flash another colour as its image lands.
+        for (theme in PageTheme.entries) {
+            val white = theme.colorMatrix()?.apply(255, 255, 255) ?: floatArrayOf(255f, 255f, 255f)
+            val paper = theme.paperColor
+            assertArrayEquals(theme.name, white, floatArrayOf(paper.red * 255, paper.green * 255, paper.blue * 255), 1f)
+        }
+    }
+
+    @Test
     fun lightRecolorIsIdentity() {
         assertEquals(0x80FFEB3B.toInt(), PageTheme.Light.recolor(0x80FFEB3B.toInt()))
     }
