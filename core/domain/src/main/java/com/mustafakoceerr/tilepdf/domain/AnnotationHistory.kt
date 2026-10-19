@@ -35,6 +35,14 @@ class AnnotationHistory(initial: AnnotationState, private val limit: Int = 100) 
         AnnotationState(current.annotations.filterNot { it.id in ids }, current.removedForeign + refs)
     }
 
+    /**
+     * Removes [removed] and adds [added] as one step: how a markup is
+     * toggled off part of its text, leaving the rest as new markups.
+     */
+    fun swap(removed: Set<String>, added: List<Annotation>): AnnotationState = edit { current ->
+        current.copy(annotations = current.annotations.filterNot { it.id in removed } + added)
+    }
+
     /** Swaps annotation [old] for [new] in place, as one step: how a note is edited. */
     fun replace(old: String, new: Annotation): AnnotationState = edit { current ->
         current.copy(annotations = current.annotations.map { if (it.id == old) new else it })

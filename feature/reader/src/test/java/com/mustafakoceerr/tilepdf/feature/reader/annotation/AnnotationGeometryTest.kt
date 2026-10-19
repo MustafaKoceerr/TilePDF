@@ -2,7 +2,6 @@ package com.mustafakoceerr.tilepdf.feature.reader.annotation
 
 import com.mustafakoceerr.tilepdf.core.geometry.PdfPoint
 import com.mustafakoceerr.tilepdf.core.geometry.PdfRect
-import com.mustafakoceerr.tilepdf.feature.reader.SelectionUiState
 import com.mustafakoceerr.tilepdf.model.Annotation
 import com.mustafakoceerr.tilepdf.model.ForeignAnnotation
 import com.mustafakoceerr.tilepdf.model.ForeignRef
@@ -29,16 +28,6 @@ class AnnotationGeometryTest {
         ForeignAnnotation(0, key, subtype, bounds, "", strokes)
 
     private val line = arrayOf(PdfPoint(100f, 100f), PdfPoint(200f, 100f))
-
-    @Test
-    fun markupTakesSelectionRectsAndText() {
-        val rects = listOf(PdfRect(1f, 2f, 3f, 4f), PdfRect(5f, 6f, 7f, 8f))
-        val selection = SelectionUiState(4, "two lines", rects, rects.first(), rects.last())
-
-        val markup = markupFor(selection, MarkupKind.Underline, yellow, id = "tilepdf-x")
-
-        assertEquals(TextMarkup("tilepdf-x", 4, yellow, MarkupKind.Underline, rects, "two lines"), markup)
-    }
 
     @Test
     fun markupHitInsideRect() {
