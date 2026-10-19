@@ -18,14 +18,14 @@ class PdfiumConventionPlugin : Plugin<Project> {
 
     private companion object {
         const val RELEASES = "https://github.com/MustafaKoceerr/pdfium-binaries/releases/download"
-        const val RELEASE = "tilepdf-8076-1"
+        const val RELEASE = "tilepdf-8076-2"
 
         /** Android ABI to the release archive and its SHA-256. */
         val ARCHIVES = mapOf(
-            "arm64-v8a" to ("pdfium-v8-android-arm64.tgz" to "cce1dae6504260897c23e160bd8e796fde8f3687db87aa8fb36ce6604fc88154"),
-            "armeabi-v7a" to ("pdfium-v8-android-arm.tgz" to "ee1ec168253df8934ba4a9d0bc072331011b4b8f5984485cd859ab2a8ea15524"),
-            "x86_64" to ("pdfium-v8-android-x64.tgz" to "da4129fb59b7f2d8daa5d2973aa7e39d38bf94889482cfd124ee5109c73ceeb6"),
-            "x86" to ("pdfium-v8-android-x86.tgz" to "c88734d92043c15f159974ad39e258f9504b93ce40ceebf04f820f3166f1d2fe"),
+            "arm64-v8a" to ("pdfium-v8-android-arm64.tgz" to "0853a9625e9d676ff60cc463e212f2dfce13ccc0095476abc1b9086122a59394"),
+            "armeabi-v7a" to ("pdfium-v8-android-arm.tgz" to "18af9f03094552d642b6a9b6a1893afad12b17fd7b62c9734c1be1da122c0df1"),
+            "x86_64" to ("pdfium-v8-android-x64.tgz" to "56099749e4c8df10c8842521d00914d3a85151c8f53a134de580bc44da6fe339"),
+            "x86" to ("pdfium-v8-android-x86.tgz" to "9bbf8358a16a4d626076b69e2cdcda844c1dd0486a718929400888cd96e51e54"),
         )
     }
 
