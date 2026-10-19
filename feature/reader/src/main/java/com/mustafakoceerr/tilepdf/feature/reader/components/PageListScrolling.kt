@@ -19,6 +19,7 @@ import com.mustafakoceerr.tilepdf.model.ReadingPosition
 import com.mustafakoceerr.tilepdf.model.SearchMatch
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterNotNull
 import kotlin.math.roundToInt
@@ -30,6 +31,9 @@ import kotlin.math.roundToInt
 
 /** Wait for scrolling to settle before asking for tiles. */
 private const val TILE_REQUEST_DEBOUNCE_MS = 80L
+
+/** Pages on each side of the screen whose drafts are rendered ahead. */
+private const val DRAFT_PREFETCH_PAGES = 2
 
 /** Leaves a little room above a jump target such as a chapter heading. */
 private val JUMP_MARGIN = 16.dp
@@ -65,8 +69,8 @@ internal fun initialScrollOffset(
 
 /**
  * Keeps [pageImages] told which tiles are on screen. Nothing is requested
- * mid-pinch: the preview only transforms what's already drawn, and tiles for
- * an intermediate zoom would be thrown away a moment later.
+ * mid-pinch: tiles for an intermediate zoom would be thrown away a moment
+ * later, and the last tiles are drawn stretched to the page meanwhile.
  */
 @OptIn(FlowPreview::class)
 internal suspend fun requestVisibleTiles(
@@ -78,7 +82,7 @@ internal suspend fun requestVisibleTiles(
 ) {
     val fitGapPx = with(density) { PAGE_GAP.roundToPx() }
     snapshotFlow {
-        if (zoomState.isPreviewing || zoomState.viewportWidth == 0) return@snapshotFlow null
+        if (zoomState.isPinching || zoomState.viewportWidth == 0) return@snapshotFlow null
         val layout = zoomedPageLayout(zoomState, density)
         val fitWidth = zoomState.viewportWidth - 2 * fitGapPx
         listState.layoutInfo.visiblePages(layout, zoomState.viewportWidth).flatMap { page ->
@@ -90,6 +94,44 @@ internal suspend fun requestVisibleTiles(
         .distinctUntilChanged()
         .debounce(TILE_REQUEST_DEBOUNCE_MS)
         .collect(pageImages::requestTiles)
+}
+
+/**
+ * The pages next to the [visible] ones, nearest first, up to
+ * [DRAFT_PREFETCH_PAGES] on each side: zooming out or scrolling on shows
+ * them before anything else.
+ */
+internal fun draftPrefetchPages(visible: IntRange, pageCount: Int): List<Int> = buildList {
+    for (distance in 1..DRAFT_PREFETCH_PAGES) {
+        (visible.first - distance).takeIf { it >= 0 }?.let(::add)
+        (visible.last + distance).takeIf { it < pageCount }?.let(::add)
+    }
+}
+
+/**
+ * Renders the drafts of the pages next to the screen once it settles, so a
+ * pinch out shows them at once instead of blank paper.
+ */
+@OptIn(FlowPreview::class)
+internal suspend fun prefetchNeighbourDrafts(
+    listState: LazyListState,
+    zoomState: ZoomState,
+    pageCount: Int,
+    pageImages: PageImageSource,
+    draftWidthPx: Int,
+) {
+    snapshotFlow {
+        val visible = listState.layoutInfo.visibleItemsInfo
+        if (zoomState.isPinching || listState.isScrollInProgress || visible.isEmpty()) return@snapshotFlow null
+        visible.first().index..visible.last().index
+    }
+        .filterNotNull()
+        .distinctUntilChanged()
+        .debounce(TILE_REQUEST_DEBOUNCE_MS)
+        .collectLatest { visible ->
+            // Cached drafts come back at once; the rest render one by one.
+            draftPrefetchPages(visible, pageCount).forEach { pageImages.loadDraft(it, draftWidthPx) }
+        }
 }
 
 /**
