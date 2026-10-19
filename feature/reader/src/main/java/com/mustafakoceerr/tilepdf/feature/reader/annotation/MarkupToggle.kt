@@ -14,7 +14,8 @@ private const val COVER_TOLERANCE_PT = 0.5f
 data class MarkupEdit(val removed: Set<String>, val added: List<TextMarkup>)
 
 /**
- * Toggles [kind] over [range] on [page], as a bold button does in an editor.
+ * Toggles [kind] over [selection] on [page], grown to whole words, as a bold
+ * button does in an editor.
  * Only TilePDF's own markups of [kind] on that page take part.
  *
  * - All of the selected text already has it: it comes off the selection. A
@@ -29,12 +30,14 @@ data class MarkupEdit(val removed: Set<String>, val added: List<TextMarkup>)
  */
 fun toggleMarkup(
     page: PageText,
-    range: IntRange,
+    selection: IntRange,
     kind: MarkupKind,
     color: Int,
     own: List<Annotation>,
     newId: () -> String = ::newAnnotationId,
 ): MarkupEdit {
+    // Whole words: a handle one letter short mustn't leave a marked letter behind.
+    val range = TextSelection.wholeWords(page, selection)
     val selected = range.filter(page::isMarkable)
     if (selected.isEmpty()) return MarkupEdit(emptySet(), emptyList())
     val marks = own.asSequence()

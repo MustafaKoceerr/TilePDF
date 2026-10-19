@@ -32,6 +32,18 @@ object TextSelection {
         return start..end
     }
 
+    /**
+     * [range] grown to whole words at both ends: a handle dragged one letter
+     * short or past a word's edge still means the word.
+     */
+    fun wholeWords(page: PageText, range: IntRange): IntRange {
+        var start = range.first
+        while (start > 0 && page.isWordChar(start) && page.isWordChar(start - 1)) start--
+        var end = range.last
+        while (end < page.text.lastIndex && page.isWordChar(end) && page.isWordChar(end + 1)) end++
+        return start..end
+    }
+
     /** The character nearest ([x], [y]), preferring its own line; for dragging handles. */
     fun charAt(page: PageText, x: Float, y: Float): Int? = nearestChar(page, x, y, Float.MAX_VALUE)
 

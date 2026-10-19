@@ -32,6 +32,21 @@ class TextSelectionTest {
     }
 
     @Test
+    fun aRangeEndingInsideAWordGrowsToWholeWords() {
+        // "ile based rend": starts inside "tile", ends inside "render".
+        val range = TextSelection.wholeWords(twoLines, 1..13)
+        assertEquals("tile based render", TextSelection.text(twoLines, range))
+    }
+
+    @Test
+    fun wholeWordsStayAsTheyAre() {
+        // "based" is cols 5..9; punctuation isn't part of a word.
+        assertEquals(5..9, TextSelection.wholeWords(twoLines, 5..9))
+        val cache = twoLines.text.indexOf("cache")
+        assertEquals(cache..cache + 4, TextSelection.wholeWords(twoLines, cache..cache + 4))
+    }
+
+    @Test
     fun punctuationSelectsOnlyItself() {
         // "." is col 12 of line 2.
         val range = TextSelection.wordAt(twoLines, x = 125f, y = 26f)!!

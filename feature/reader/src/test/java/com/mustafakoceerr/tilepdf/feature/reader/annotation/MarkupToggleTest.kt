@@ -127,6 +127,24 @@ class MarkupToggleTest {
     }
 
     @Test
+    fun aSelectionEndingInsideAWordLeavesNoStubOfIt() {
+        // A handle stopped one letter short of "gamma"'s end: no struck "a" may stay behind.
+        val struck = markup("s", StrikeOut, ALPHA.first..GAMMA.last)
+
+        val edit = toggle(ALPHA.first..GAMMA.last - 1, StrikeOut, own = listOf(struck))
+
+        assertEquals(setOf("s"), edit.removed)
+        assertEquals(emptyList<Any>(), edit.added)
+    }
+
+    @Test
+    fun partOfAWordMarksTheWholeWord() {
+        val edit = toggle(BETA.first + 1..GAMMA.first + 1, Underline, own = emptyList())
+
+        assertEquals(listOf(expected(Underline, BETA.first..GAMMA.last)), edit.added.map { it.looks() })
+    }
+
+    @Test
     fun spacesDontCountTowardsWhatIsMarked() {
         // "beta " selected; only "beta" is highlighted, which is all of its text.
         val highlight = markup("h", Highlight, BETA)
