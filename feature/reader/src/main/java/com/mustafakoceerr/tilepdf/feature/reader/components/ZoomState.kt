@@ -124,7 +124,8 @@ class ZoomState(
         // content x `panX - offset.x / zoom`; after scaling by `zoom` that
         // content point must sit at viewport x = 0.
         val newPanX = zoom * panX - previewOffset.x
-        scale *= zoom
+        // Float products can land just outside the range, e.g. 0.99999994.
+        scale = (scale * zoom).coerceIn(MIN_SCALE, MAX_SCALE)
         panX = newPanX.coerceIn(0f, maxPanX)
         previewZoom = 1f
         previewOffset = Offset.Zero
