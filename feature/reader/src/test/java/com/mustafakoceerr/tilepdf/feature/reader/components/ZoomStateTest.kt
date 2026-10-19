@@ -3,6 +3,7 @@ package com.mustafakoceerr.tilepdf.feature.reader.components
 import androidx.compose.animation.core.exponentialDecay
 import androidx.compose.ui.geometry.Offset
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
 
@@ -17,28 +18,38 @@ class ZoomStateTest {
         state = ZoomState(exponentialDecay()).apply { viewportWidth = 1000 }
     }
 
-    /** Where the preview draws viewport point [p]. */
-    private fun ZoomState.preview(p: Offset) = p * previewZoom + previewOffset
-
     @Test
-    fun pinchKeepsCentroidFixed() {
-        val centroid = Offset(300f, 500f)
-        state.onTransform(centroid, pan = Offset.Zero, zoom = 1.5f)
-        state.onTransform(centroid, pan = Offset.Zero, zoom = 1.2f)
+    fun pinchZoomsTheLayoutAroundTheFingers() {
+        val step = state.onTransform(Offset(300f, 500f), pan = Offset.Zero, zoom = 1.5f)!!
 
-        assertEquals(1.8f, state.previewZoom, DELTA)
-        assertEquals(centroid.x, state.preview(centroid).x, DELTA)
-        assertEquals(centroid.y, state.preview(centroid).y, DELTA)
+        // Laid out at the new scale at once: content x 300 stays under the fingers.
+        assertEquals(1.5f, state.scale, DELTA)
+        assertEquals(150f, state.panX, DELTA) // 300 * 1.5 - 300
+        assertEquals(1.5f, step.zoom, DELTA)
+        assertEquals(500f, step.focusY, DELTA)
+        assertEquals(500f, step.contentY, DELTA)
     }
 
     @Test
-    fun pinchIsClampedToScaleRange() {
-        state.onTransform(Offset.Zero, Offset.Zero, zoom = 20f)
-        assertEquals(5f, state.previewZoom, DELTA)
+    fun pinchFollowsTheFingersWhileTheyMove() {
+        state.onTransform(Offset(300f, 500f), pan = Offset.Zero, zoom = 1.5f)
+        val step = state.onTransform(Offset(350f, 540f), pan = Offset(50f, 40f), zoom = 1.2f)!!
 
-        state.commit()
+        // What was under the fingers last frame is under them now.
+        assertEquals(1.8f, state.scale, DELTA)
+        assertEquals(190f, state.panX, DELTA) // (300 + 150) * 1.2 - 350
+        assertEquals(1.2f, step.zoom, DELTA)
+        assertEquals(540f, step.focusY, DELTA)
+        assertEquals(500f, step.contentY, DELTA)
+    }
+
+    @Test
+    fun scaleIsClampedToItsRange() {
+        state.onTransform(Offset.Zero, Offset.Zero, zoom = 20f)
+        assertEquals(5f, state.scale, DELTA)
+
         state.onTransform(Offset.Zero, Offset.Zero, zoom = 0.01f)
-        assertEquals(0.2f, state.previewZoom, DELTA) // back to 1x overall
+        assertEquals(1f, state.scale, DELTA)
     }
 
     @Test
@@ -46,9 +57,7 @@ class ZoomStateTest {
         // 1.7 * (1 / 1.7) is 0.99999994 in floats; the pan range then went
         // negative and clamping the pan threw.
         state.onTransform(Offset.Zero, Offset.Zero, zoom = 1.7f)
-        state.commit()
-        state.onTransform(Offset(500f, 400f), Offset.Zero, zoom = 0.01f)
-        state.commit()
+        state.onTransform(Offset(500f, 400f), Offset.Zero, zoom = 1f / 1.7f)
 
         assertEquals(1f, state.scale)
         assertEquals(0f, state.panX)
@@ -56,126 +65,62 @@ class ZoomStateTest {
     }
 
     @Test
-    fun commitMatchesPreviewAtLeftEdge() {
-        // Zoom 2x around the viewport centre: viewport x 250 moves to x 0.
-        state.onTransform(Offset(500f, 400f), Offset.Zero, zoom = 2f)
-        val result = state.commit()
+    fun panIsKeptWithinThePage() {
+        // Zooming around the right edge while dragging further right.
+        state.onTransform(Offset(1000f, 0f), pan = Offset(-300f, 0f), zoom = 2f)
 
-        assertEquals(2f, state.scale, DELTA)
-        assertEquals(2f, result.zoom, DELTA)
-        assertEquals(500f, state.panX, DELTA) // content x 250 * 2
-        assertEquals(400f, result.focusY, DELTA)
-        assertEquals(400f, result.contentY, DELTA) // the centroid's content stayed under it
-        assertEquals(1f, state.previewZoom, DELTA)
-        assertEquals(Offset.Zero, state.previewOffset)
-    }
-
-    @Test
-    fun pinchFollowsTheFingersWhileTheyMove() {
-        // The content first under the fingers stays under them as they zoom and move.
-        state.onTransform(Offset(300f, 500f), pan = Offset.Zero, zoom = 1.5f)
-        state.onTransform(Offset(350f, 540f), pan = Offset(50f, 40f), zoom = 1.2f)
-
-        val content = state.preview(Offset(300f, 500f))
-        assertEquals(350f, content.x, DELTA)
-        assertEquals(540f, content.y, DELTA)
-    }
-
-    @Test
-    fun pinchingOutPastTheSmallestZoomKeepsThePageAcrossTheScreen() {
-        state.onTransform(Offset(500f, 400f), Offset.Zero, zoom = 1.7f)
-        state.commit()
-        val contentLeft = -state.panX
-
-        // Off-centre and further out than 1x: the page must still span the width.
-        state.onTransform(Offset(800f, 400f), Offset.Zero, zoom = 0.01f)
-        assertEquals(0f, state.preview(Offset(contentLeft, 0f)).x, DELTA)
-
-        state.commit()
-        assertEquals(0f, state.panX, DELTA)
-    }
-
-    @Test
-    fun pinchNeverShowsPastThePageSides() {
-        state.onTransform(Offset(500f, 400f), Offset.Zero, zoom = 2f)
-        state.commit() // content x -500..1500 on screen
-
-        state.onTransform(Offset(500f, 400f), pan = Offset(900f, 0f), zoom = 1f)
-        assertEquals(0f, state.preview(Offset(-500f, 0f)).x, DELTA)
-
-        state.onTransform(Offset(500f, 400f), pan = Offset(-3000f, 0f), zoom = 1f)
-        assertEquals(1000f, state.preview(Offset(1500f, 0f)).x, DELTA)
-    }
-
-    @Test
-    fun commitAnchorsTheContentUnderTheFingers() {
-        state.zoomTo(2f, Offset.Zero)
-        // Pinching out moves the content down; the anchor must still be the
-        // content under the fingers, not something above the screen.
-        state.onTransform(Offset(500f, 600f), Offset.Zero, zoom = 0.75f)
-        state.onTransform(Offset(500f, 630f), pan = Offset(0f, 30f), zoom = 1f)
-        val result = state.commit()
-
-        assertEquals(0.75f, result.zoom, DELTA)
-        assertEquals(630f, result.focusY, DELTA)
-        assertEquals(600f, result.contentY, DELTA)
+        assertEquals(1000f, state.panX, DELTA) // maxPanX = 1000 * (2 - 1)
     }
 
     @Test
     fun pinchingPastTheLargestZoomLeavesTheContentStill() {
         state.zoomTo(5f, Offset(500f, 400f))
+        val panX = state.panX
         // Fingers still spreading, unevenly: the centroid drifts but there's no more zoom.
-        state.onTransform(Offset(530f, 420f), pan = Offset(30f, 20f), zoom = 1.1f)
+        val step = state.onTransform(Offset(530f, 420f), pan = Offset(30f, 20f), zoom = 1.1f)
 
-        assertEquals(1f, state.previewZoom, DELTA)
-        assertEquals(Offset.Zero, state.previewOffset)
+        assertNull(step)
+        assertEquals(5f, state.scale, DELTA)
+        assertEquals(panX, state.panX, DELTA)
     }
 
     @Test
     fun pinchingPastTheSmallestZoomLeavesTheContentStill() {
-        state.onTransform(Offset(500f, 600f), pan = Offset(0f, -40f), zoom = 0.8f)
-
-        assertEquals(1f, state.previewZoom, DELTA)
-        assertEquals(Offset.Zero, state.previewOffset)
+        assertNull(state.onTransform(Offset(500f, 600f), pan = Offset(0f, -40f), zoom = 0.8f))
+        assertEquals(1f, state.scale, DELTA)
     }
 
     @Test
     fun movingBothFingersStillPansAtTheLimit() {
         state.zoomTo(5f, Offset(500f, 400f))
         // Two fingers never keep exactly the same distance while dragging.
-        state.onTransform(Offset(500f, 440f), pan = Offset(0f, 40f), zoom = 1.001f)
+        val step = state.onTransform(Offset(500f, 440f), pan = Offset(0f, 40f), zoom = 1.001f)!!
 
-        assertEquals(40f, state.previewOffset.y, DELTA)
+        assertEquals(5f, state.scale, DELTA)
+        assertEquals(440f, step.focusY, DELTA)
+        assertEquals(400f, step.contentY, DELTA)
     }
 
     @Test
-    fun aPinchHoldsTheListStillUntilItIsCommitted() {
-        // The list's own fling at the end of a pinch would undo the commit's scroll fix.
+    fun aPinchHoldsTheListStillUntilItEnds() {
+        // The list's own fling at the end of a pinch would undo the pinch's scroll.
         assertEquals(false, state.isPinching)
 
         state.onTransform(Offset(500f, 400f), Offset.Zero, zoom = 1f)
         assertEquals(true, state.isPinching)
 
-        state.commit()
+        state.onPinchEnd()
         assertEquals(false, state.isPinching)
-    }
-
-    @Test
-    fun commitClampsPanToContent() {
-        // Zooming around the right edge would pan past the content end.
-        state.onTransform(Offset(1000f, 0f), pan = Offset(-300f, 0f), zoom = 2f)
-        state.commit()
-
-        assertEquals(1000f, state.panX, DELTA) // maxPanX = 1000 * (2 - 1)
     }
 
     @Test
     fun doubleTapTogglesAroundFocus() {
         val zoomIn = state.zoomTo(state.doubleTapTarget, focus = Offset(400f, 300f))
         assertEquals(2.5f, state.scale, DELTA)
+        assertEquals(600f, state.panX, DELTA) // 400 * 2.5 - 400
+        assertEquals(2.5f, zoomIn.zoom, DELTA)
         assertEquals(300f, zoomIn.focusY, DELTA)
         assertEquals(300f, zoomIn.contentY, DELTA)
-        assertEquals(600f, state.panX, DELTA) // 400 * 2.5 - 400
 
         state.zoomTo(state.doubleTapTarget, focus = Offset(400f, 300f))
         assertEquals(1f, state.scale, DELTA)

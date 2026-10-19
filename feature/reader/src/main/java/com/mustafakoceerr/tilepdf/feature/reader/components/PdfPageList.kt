@@ -102,6 +102,10 @@ internal fun PdfPageList(
             requestVisibleTiles(listState, zoomState, pageSizes, pageImages, density)
         }
 
+        LaunchedEffect(listState, zoomState, pageImages, draftWidthPx) {
+            prefetchNeighbourDrafts(listState, zoomState, pageSizes.size, pageImages, draftWidthPx)
+        }
+
         TrimMemoryEffect(pageImages) { uiHidden -> pageImages.trimMemory(uiHidden) }
 
         LaunchedEffect(pageJump) {
