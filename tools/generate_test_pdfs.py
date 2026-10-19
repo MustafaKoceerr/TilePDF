@@ -32,7 +32,8 @@ Writes to core/testing/src/main/assets/:
                  150; form JavaScript.
 - xfa.pdf        A dynamic XFA form (NeedsRendering): a Letter page with a
                  caption "Name" and a text field "name" at 1 in, 1.5 in, 3 in
-                 wide, and a check box "agree" below it. Its PDF page only
+                 wide, and a check box "agree" below it. Its config makes
+                 it dynamic and interactive (fillable). Its PDF page only
                  says "Please wait"; XFA forms.
 - scanned.pdf    1 A4 page that is only a 200 dpi grey image of three lines
                  of text (no text objects); text recognition. Needs Pillow,
@@ -353,10 +354,14 @@ def calc():
     write_pdf(objects, 5, "calc.pdf")
 
 
-XFA_TEMPLATE = """<?xml version="1.0" encoding="UTF-8"?>
-<xdp:xdp xmlns:xdp="http://ns.adobe.com/xdp/">
-<config xmlns="http://www.xfa.org/schema/xci/3.1/"><acrobat><acrobat7><dynamicRender>required</dynamicRender></acrobat7></acrobat></config>
-<template xmlns="http://www.xfa.org/schema/xfa-template/3.3/">
+# The packets of xfa.pdf's XDP, kept apart as Adobe's tools write them:
+# PDFium saves filled-in data only into a separate "datasets" packet.
+XFA_PACKETS = [
+    ("preamble", '<?xml version="1.0" encoding="UTF-8"?>\n<xdp:xdp xmlns:xdp="http://ns.adobe.com/xdp/">'),
+    ("config", '<config xmlns="http://www.xfa.org/schema/xci/3.1/">'
+               '<acrobat><acrobat7><dynamicRender>required</dynamicRender></acrobat7></acrobat>'
+               '<present><pdf><interactive>1</interactive></pdf></present></config>'),
+    ("template", """<template xmlns="http://www.xfa.org/schema/xfa-template/3.3/">
 <subform name="form1" layout="tb" locale="en_US">
 <pageSet><pageArea name="Page1" id="Page1"><contentArea x="0in" y="0in" w="8.5in" h="11in"/>
 <medium stock="letter" short="8.5in" long="11in"/></pageArea></pageSet>
@@ -369,12 +374,16 @@ XFA_TEMPLATE = """<?xml version="1.0" encoding="UTF-8"?>
 <items><integer>1</integer><integer>0</integer></items></field>
 </subform>
 </subform>
-</template>
-<xfa:datasets xmlns:xfa="http://www.xfa.org/schema/xfa-data/1.0/"><xfa:data><form1><main><name/><agree>0</agree></main></form1></xfa:data></xfa:datasets>
-</xdp:xdp>"""
+</template>"""),
+    ("datasets", '<xfa:datasets xmlns:xfa="http://www.xfa.org/schema/xfa-data/1.0/">'
+                 '<xfa:data><form1><main><name/><agree>0</agree></main></form1></xfa:data></xfa:datasets>'),
+    ("postamble", "</xdp:xdp>"),
+]
 
 
 def xfa():
+    first = 7
+    packets = " ".join(f"({name}) {first + i} 0 R" for i, (name, _) in enumerate(XFA_PACKETS))
     objects = [
         FONT,
         stream("BT /F1 18 Tf 72 720 Td (Please wait) Tj ET"),
@@ -382,9 +391,8 @@ def xfa():
         "/Contents 2 0 R >>",
         "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
         "<< /Type /Catalog /Pages 4 0 R /AcroForm 6 0 R /NeedsRendering true >>",
-        "<< /Fields [] /XFA 7 0 R >>",
-        stream(XFA_TEMPLATE),
-    ]
+        f"<< /Fields [] /XFA [{packets}] >>",
+    ] + [stream(body) for _, body in XFA_PACKETS]
     write_pdf(objects, 5, "xfa.pdf")
 
 
