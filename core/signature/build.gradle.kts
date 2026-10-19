@@ -9,5 +9,4 @@ dependencies {
     implementation(libs.bouncycastle.pkix)
     implementation(libs.bouncycastle.prov)
 
-    testImplementation(projects.core.pdfwriter)
 }

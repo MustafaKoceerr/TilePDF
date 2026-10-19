@@ -56,10 +56,6 @@ minSdk 29
   signatures up, and a list of each one: who signed, when, why, whether the
   signed content is intact, whether the signer's certificate is trusted by
   the device, and whether the document changed after signing
-- Sign with a certificate (PAdES): pick one from Android's certificate store
-  or install a .p12/.pfx file there, tap where the signature goes, and a
-  visible signature box with the drawn signature, the signer and the time is
-  signed into the document. Earlier signatures stay intact
 - Recognise text on scanned pages (OCR), on the device with Google ML Kit:
   the words go into the page as invisible text, so they can be searched,
   selected and copied, also in other apps once saved. Works offline; a chip
@@ -377,12 +373,8 @@ rerunning it reproduces them byte for byte.
   against that digest, and the signer's chain is built with PKIX against
   `AndroidCAStore` at the signing time. Signatures and chains use the
   platform's JCA, so no BouncyCastle provider is registered for R8 to
-  break. Signing (`core:pdfwriter`, plain Kotlin): PDFium draws the
-  signature box as a stamp, then `PdfSigner` reads the file (classic and
-  stream xrefs, object streams) and appends an incremental update turning
-  the stamp into a `/FT /Sig` field with an 8 KB `/Contents` hole, and
-  `CmsSigner` makes the CMS with the KeyChain key. The signed file must
-  verify before it replaces the document.
+  break. Certificate signing was removed: on a phone it's rarely needed,
+  and qualified e-signatures need card readers TilePDF can't use.
 - XFA values can't be read or set by name, so an XFA form's draft keeps its
   edits instead: each tap point and the text written there, in order
   (`annotation_drafts.xfaEdits`, Room v9). The engine is deterministic, so
@@ -411,11 +403,9 @@ rerunning it reproduces them byte for byte.
   text, and search finds nothing there; XFA support in PDFium is still
   marked experimental. Scripts can't mail or submit a form (TilePDF is offline), and
   timers and page open/close scripts don't run.
-- Signatures: revocation (OCSP, CRL) isn't checked and no timestamp is
-  added, since TilePDF is offline; so a signature is PAdES B-B. Qualified
-  e-signatures on smart cards or mobile signature services aren't
-  supported, nor certifying (DocMDP) signatures. Password-protected
-  documents can't be signed yet. Trust comes from Android's certificate
+- Signatures: TilePDF checks digital signatures but doesn't make them;
+  certificate signing is a desktop task. Revocation (OCSP, CRL) isn't
+  checked, since TilePDF is offline. Trust comes from Android's certificate
   store: the system's CAs and the ones the user added.
 
 ## Out of scope, on purpose

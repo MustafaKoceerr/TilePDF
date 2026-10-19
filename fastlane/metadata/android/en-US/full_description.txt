@@ -18,7 +18,7 @@ MARK UP, FILL IN AND SIGN
 • Add sticky notes
 • Fill in PDF forms: text fields, check boxes, radio buttons and lists; totals calculate themselves
 • Sign with your finger; your signature is kept for next time
-• Sign with a certificate (PAdES) and check a document's digital signatures
+• Check a document's digital signatures
 • Recognise text on scanned pages to search and copy it, right on your phone
 • Undo and redo
 • Annotations are saved into the PDF itself, so other PDF apps show them too

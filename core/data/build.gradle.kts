@@ -8,7 +8,6 @@ dependencies {
     api(projects.core.model)
     api(projects.core.pdf)
     implementation(projects.core.signature)
-    implementation(projects.core.pdfwriter)
     implementation(libs.bouncycastle.prov)
     implementation(projects.core.common)
     implementation(projects.core.database)

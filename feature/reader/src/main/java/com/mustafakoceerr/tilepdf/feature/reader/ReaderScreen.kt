@@ -74,11 +74,7 @@ import com.mustafakoceerr.tilepdf.feature.reader.components.NoTextChip
 import com.mustafakoceerr.tilepdf.feature.reader.components.RecognitionProgressBar
 import com.mustafakoceerr.tilepdf.feature.reader.components.RecognizeTextDialog
 import com.mustafakoceerr.tilepdf.feature.reader.components.ScriptDialogView
-import com.mustafakoceerr.tilepdf.feature.reader.components.CertificateChoiceDialog
 import com.mustafakoceerr.tilepdf.feature.reader.components.SignatureHint
-import com.mustafakoceerr.tilepdf.feature.reader.components.SigningProgress
-import com.mustafakoceerr.tilepdf.data.signature.SignFailure
-import com.mustafakoceerr.tilepdf.data.signature.SignResult
 import com.mustafakoceerr.tilepdf.feature.reader.components.SignaturesChip
 import com.mustafakoceerr.tilepdf.feature.reader.components.SignaturesSheet
 import com.mustafakoceerr.tilepdf.feature.reader.components.SignaturePadDialog
@@ -192,12 +188,6 @@ fun ReaderScreen(
         onAddSignature = viewModel::onAddSignature,
         onScriptAnswer = viewModel::onScriptAnswer,
         onOpenSignatures = viewModel::onOpenSignatures,
-        certificateActions = CertificateActions(
-            onStart = viewModel::onSignWithCertificate,
-            onChosen = viewModel::onCertificateChosen,
-            onCancel = viewModel::onCertificateCancelled,
-            onResultShown = viewModel::onCertificateResultShown,
-        ),
         onCloseSignatures = viewModel::onCloseSignatures,
         recognitionActions = RecognitionActions(
             onRequest = viewModel::onRecognizeTextRequested,
@@ -324,7 +314,6 @@ internal fun ReaderScreen(
     onAddSignature: () -> Unit = {},
     onScriptAnswer: (ScriptAnswer) -> Unit = {},
     onOpenSignatures: () -> Unit = {},
-    certificateActions: CertificateActions = CertificateActions.None,
     onCloseSignatures: () -> Unit = {},
     recognitionActions: RecognitionActions = RecognitionActions.None,
     onSignatureDrawn: (List<List<PdfPoint>>) -> Unit = {},
@@ -342,11 +331,6 @@ internal fun ReaderScreen(
     SaveCopyResultEffect(ready?.saveCopyResult, onOpenDocument, annotationActions.onSaveCopyResultHandled)
     HandOffEffect(ready?.handOff, annotationActions.onHandOffHandled)
     RecognitionResultEffect(ready?.recognition?.result, recognitionActions.onResultShown)
-    CertificateResultEffect(ready?.certificateResult, certificateActions.onResultShown)
-    if (ready?.certificateStep == CertificateStep.Choose) {
-        CertificateChoiceDialog(onChosen = certificateActions.onChosen, onDismiss = certificateActions.onCancel)
-    }
-    BackHandler(enabled = ready?.certificateStep is CertificateStep.Place, onBack = certificateActions.onCancel)
     if (ready?.signatures?.open == true) {
         SignaturesSheet(ready.signatures.checks, onDismiss = onCloseSignatures)
     }
@@ -463,7 +447,6 @@ internal fun ReaderScreen(
                             recognizing = ready.recognition.progress != null,
                             pagesArePdf = !ready.isXfa,
                             signed = ready.signatures.checks.isNotEmpty(),
-                            onSignWithCertificate = certificateActions.onStart,
                             onOpenSignatures = onOpenSignatures,
                             onRecognizeText = recognitionActions.onRequest,
                             onRotate = onRotate,
@@ -546,15 +529,6 @@ internal fun ReaderScreen(
                 Column(Modifier.align(Alignment.BottomCenter), horizontalAlignment = Alignment.CenterHorizontally) {
                     if (ready?.signatureStep is SignatureStep.Place) {
                         SignatureHint(onCancel = onSignatureCancelled, modifier = Modifier.navigationBarsPadding())
-                    }
-                    when (ready?.certificateStep) {
-                        is CertificateStep.Place -> SignatureHint(
-                            onCancel = certificateActions.onCancel,
-                            text = stringResource(R.string.certificate_place_hint),
-                            modifier = Modifier.navigationBarsPadding(),
-                        )
-                        CertificateStep.Signing -> SigningProgress(Modifier.navigationBarsPadding())
-                        else -> Unit
                     }
                     val recognition = ready?.recognition
                     val signatureSummary = ready?.signatures?.summary
@@ -892,38 +866,6 @@ private fun SaveCopyResultEffect(result: SaveCopyResult?, onOpenDocument: (Strin
 
 private const val PDF_MIME_TYPE = "application/pdf"
 
-/** What signing with a certificate can be asked to do. */
-internal data class CertificateActions(
-    val onStart: () -> Unit,
-    val onChosen: (alias: String?) -> Unit,
-    val onCancel: () -> Unit,
-    val onResultShown: () -> Unit,
-) {
-    companion object {
-        val None = CertificateActions({}, {}, {}, {})
-    }
-}
-
-/** Tells how signing with a certificate went; then forgets it. */
-@Composable
-private fun CertificateResultEffect(result: SignResult?, onShown: () -> Unit) {
-    val context = LocalContext.current
-    LaunchedEffect(result) {
-        val message = when (result) {
-            null -> return@LaunchedEffect
-            SignResult.Signed -> R.string.certificate_signed
-            is SignResult.Failed -> when (result.reason) {
-                SignFailure.KeyUnavailable -> R.string.certificate_key_unavailable
-                SignFailure.NoWritePermission -> R.string.certificate_no_write
-                SignFailure.Encrypted -> R.string.certificate_encrypted
-                SignFailure.Failed -> R.string.certificate_failed
-            }
-        }
-        Toast.makeText(context, message, if (result == SignResult.Signed) Toast.LENGTH_SHORT else Toast.LENGTH_LONG).show()
-        onShown()
-    }
-}
-
 /** What text recognition on scanned pages can be asked to do. */
 internal data class RecognitionActions(
     val onRequest: () -> Unit,
@@ -1113,7 +1055,6 @@ private fun OverflowMenu(
     pagesArePdf: Boolean,
     signed: Boolean,
     onOpenSignatures: () -> Unit,
-    onSignWithCertificate: () -> Unit,
     onRecognizeText: () -> Unit,
     onRotate: () -> Unit,
     onCropMarginsChange: (Boolean) -> Unit,
@@ -1175,15 +1116,6 @@ private fun OverflowMenu(
                 onClick = {
                     onExpandedChange(false)
                     onRecognizeText()
-                },
-            )
-            DropdownMenuItem(
-                text = { Text(stringResource(R.string.reader_sign_certificate)) },
-                leadingIcon = { Icon(painterResource(TilePdfIcons.Verified), contentDescription = null) },
-                enabled = pagesArePdf,
-                onClick = {
-                    onExpandedChange(false)
-                    onSignWithCertificate()
                 },
             )
             DropdownMenuItem(

@@ -186,25 +186,6 @@ internal object PdfiumNative {
     @JvmStatic
     external fun nativeSetScriptHost(document: Long, host: FormScriptHost?, openAction: Boolean)
 
-    /**
-     * Adds a stamp named [name] that looks like a signature box: a frame
-     * around [rect] (left, top, right, bottom), [texts] at [textPlaces]
-     * (x, baseline, size each) and strokes ([strokeSizes] points each), all
-     * in top-left points.
-     */
-    @JvmStatic
-    external fun nativeAddSignatureStamp(
-        document: Long,
-        index: Int,
-        rect: FloatArray,
-        name: String,
-        texts: Array<String>,
-        textPlaces: FloatArray,
-        strokes: FloatArray,
-        strokeSizes: IntArray,
-        strokeWidth: Float,
-    ): Boolean
-
     /** The document's digital signatures; empty without any. */
     @JvmStatic
     external fun nativeSignatures(document: Long): Array<NativeSignature?>?

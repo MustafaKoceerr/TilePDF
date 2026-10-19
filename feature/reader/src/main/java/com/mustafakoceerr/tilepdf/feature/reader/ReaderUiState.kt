@@ -10,7 +10,6 @@ import com.mustafakoceerr.tilepdf.core.geometry.PdfRect
 import com.mustafakoceerr.tilepdf.model.DocumentView
 import com.mustafakoceerr.tilepdf.model.FormField
 import com.mustafakoceerr.tilepdf.model.Signature
-import com.mustafakoceerr.tilepdf.data.signature.SignResult
 import com.mustafakoceerr.tilepdf.model.SignatureCheck
 import com.mustafakoceerr.tilepdf.core.pdf.PageSize
 import com.mustafakoceerr.tilepdf.core.render.PageImageSource
@@ -77,10 +76,6 @@ sealed interface ReaderUiState {
         /** A dialog the document's form scripts are waiting on. */
         val scriptDialog: ScriptDialog? = null,
         val signatures: SignaturesUiState = SignaturesUiState(),
-        /** Signing with a certificate: choosing it, placing the box, signing. */
-        val certificateStep: CertificateStep? = null,
-        /** How the last certificate signing went, until the screen has told it. */
-        val certificateResult: SignResult? = null,
     ) : ReaderUiState
 }
 
@@ -175,15 +170,4 @@ data class SignaturesUiState(
     val open: Boolean = false,
 ) {
     val summary: SignatureSummary? get() = signatureSummary(checks)
-}
-
-/** Where signing with a certificate is. */
-sealed interface CertificateStep {
-    /** Choosing the certificate, or installing one. */
-    data object Choose : CertificateStep
-
-    /** Waiting for a tap where the signature box goes. */
-    data class Place(val alias: String) : CertificateStep
-
-    data object Signing : CertificateStep
 }

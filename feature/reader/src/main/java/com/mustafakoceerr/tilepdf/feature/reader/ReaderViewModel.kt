@@ -24,11 +24,7 @@ import com.mustafakoceerr.tilepdf.model.DocumentView
 import com.mustafakoceerr.tilepdf.model.FormField
 import com.mustafakoceerr.tilepdf.model.FormFieldKind
 import com.mustafakoceerr.tilepdf.data.document.SharedDocuments
-import com.mustafakoceerr.tilepdf.data.signature.CertificateSigning
 import com.mustafakoceerr.tilepdf.data.signature.DocumentSignatures
-import com.mustafakoceerr.tilepdf.data.signature.SignResult
-import java.time.format.DateTimeFormatter
-import java.time.format.FormatStyle
 import com.mustafakoceerr.tilepdf.data.signature.SignatureStore
 import com.mustafakoceerr.tilepdf.data.thumbnail.ThumbnailStore
 import com.mustafakoceerr.tilepdf.model.Signature
@@ -101,10 +97,6 @@ private const val SIGNATURE_WIDTH_PT = 160f
 private const val SIGNATURE_PEN_PT = 1.5f
 private const val SIGNATURE_COLOR = 0xFF000000.toInt()
 
-/** A certificate signature box: room for a drawn signature and two lines of text. */
-private const val CERTIFICATE_BOX_WIDTH_PT = 180f
-private const val CERTIFICATE_BOX_HEIGHT_PT = 60f
-
 /** The widget index of an XFA field in the text dialog: XFA fields aren't widgets. */
 private const val XFA_FIELD = -1
 
@@ -132,7 +124,6 @@ class ReaderViewModel @Inject constructor(
     private val signatureStore: SignatureStore,
     private val textRecognizer: TextRecognizer,
     private val documentSignatures: DocumentSignatures,
-    private val certificateSigning: CertificateSigning,
     @param:ApplicationScope private val applicationScope: CoroutineScope,
 ) : ViewModel() {
 
@@ -183,9 +174,6 @@ class ReaderViewModel @Inject constructor(
 
     @OptIn(ExperimentalCoroutinesApi::class)
     private val scriptDialog = scriptHost.flatMapLatest { it?.dialog ?: flowOf(null) }
-
-    private val certificateStep = MutableStateFlow<CertificateStep?>(null)
-    private val certificateResult = MutableStateFlow<SignResult?>(null)
 
     private val signatures = MutableStateFlow(SignaturesUiState())
     private var signaturesJob: Job? = null
@@ -240,7 +228,7 @@ class ReaderViewModel @Inject constructor(
         preferencesRepository.preferences,
         combine(searchState, toc, recognition, signatures, ::Panels),
         combine(selection, linkTargets, currentPage, fullScreen, startPosition, ::PageState),
-        combine(annotations, editing, combine(saveCopyResult, handOff, ::Pair), jumpHistory, combine(formFields, formEditor, signatureStep, scriptDialog, combine(certificateStep, certificateResult, ::Pair), ::FormState), ::Outputs),
+        combine(annotations, editing, combine(saveCopyResult, handOff, ::Pair), jumpHistory, combine(formFields, formEditor, signatureStep, scriptDialog, ::FormState), ::Outputs),
     ) { document, preferences, searchAndToc, pageState, annotationUi ->
         val (search, toc, textRecognition, signatureState) = searchAndToc
         val (selection, links, page, fullScreen, start) = pageState
@@ -278,8 +266,6 @@ class ReaderViewModel @Inject constructor(
                 formEditor = forms.editor,
                 signatureStep = forms.signatureStep,
                 scriptDialog = forms.scriptDialog,
-                certificateStep = forms.certificate.first,
-                certificateResult = forms.certificate.second,
                 recognition = textRecognition,
                 signatures = signatureState,
             )
@@ -678,10 +664,6 @@ class ReaderViewModel @Inject constructor(
      * toggles full screen, in that order. Pen and eraser handle their own taps.
      */
     fun onTap(pageIndex: Int, x: Float, y: Float) {
-        (certificateStep.value as? CertificateStep.Place)?.let { step ->
-            signWithCertificate(step.alias, pageIndex, PdfPoint(x, y))
-            return
-        }
         (signatureStep.value as? SignatureStep.Place)?.let { step ->
             placeSignature(step.signature, pageIndex, PdfPoint(x, y))
             return
@@ -1011,47 +993,6 @@ class ReaderViewModel @Inject constructor(
         }
     }
 
-    fun onSignWithCertificate() {
-        if (documentIsXfa || controller.value?.state?.value?.ready != true) return
-        certificateStep.value = CertificateStep.Choose
-    }
-
-    /** The system's certificate dialog answered, on its own thread; null when nothing was chosen. */
-    fun onCertificateChosen(alias: String?) {
-        certificateStep.value = alias?.let(CertificateStep::Place)
-    }
-
-    fun onCertificateCancelled() {
-        if (certificateStep.value != CertificateStep.Signing) certificateStep.value = null
-    }
-
-    fun onCertificateResultShown() {
-        certificateResult.value = null
-    }
-
-    /** Signs with [alias] in a box centred on [at], kept on the page; the signed file then reopens. */
-    private fun signWithCertificate(alias: String, pageIndex: Int, at: PdfPoint) {
-        val state = documentState.value as? DocumentState.Opened ?: return
-        val page = state.opened.document.pageSizes.getOrNull(pageIndex) ?: return
-        val width = minOf(CERTIFICATE_BOX_WIDTH_PT, page.widthPt.toFloat())
-        val height = minOf(CERTIFICATE_BOX_HEIGHT_PT, page.heightPt.toFloat())
-        val left = (at.x - width / 2).coerceIn(0f, page.widthPt - width)
-        val top = (at.y - height / 2).coerceIn(0f, page.heightPt - height)
-        certificateStep.value = CertificateStep.Signing
-        viewModelScope.launch {
-            // Pending edits reach the draft first, so the save before signing has them.
-            controller.value?.flush()
-            val drawing = signatureStore.load()
-            val formatter = DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM, FormatStyle.SHORT)
-            val result = certificateSigning.sign(
-                state.opened.uri, alias, pageIndex, PdfRect(left, top, left + width, top + height), drawing,
-            ) { signer, time -> listOf(signer, time.format(formatter)) }
-            certificateStep.value = null
-            certificateResult.value = result
-            if (result == SignResult.Signed) stateOf(state.opened)?.let(::reopenAfterSave)
-        }
-    }
-
     /** Opens the signature pad, with the saved signature when there is one. */
     fun onAddSignature() {
         if (documentIsXfa || controller.value?.state?.value?.ready != true) return
@@ -1250,7 +1191,6 @@ class ReaderViewModel @Inject constructor(
         val editor: FormField?,
         val signatureStep: SignatureStep?,
         val scriptDialog: ScriptDialog?,
-        val certificate: Pair<CertificateStep?, SignResult?>,
     )
 
     /** Where a tapped link leads, until the screen has acted on it. */
