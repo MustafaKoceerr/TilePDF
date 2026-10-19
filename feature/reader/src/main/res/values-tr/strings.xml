@@ -126,6 +126,7 @@
     <string name="recognize_failed">Metin tanınamadı</string>
     <string name="reader_rotate">Sayfaları döndür</string>
     <string name="reader_crop_margins">Kenar boşluklarını kırp</string>
+    <string name="reader_crop_margins_recommended">Önerilen</string>
     <string name="reader_print">Yazdır</string>
     <string name="reader_hand_off_failed">Belge hazırlanamadı.</string>
     <string name="reader_no_app_for_share">Bu belgeyi alabilecek uygulama yok</string>

@@ -1211,7 +1211,16 @@ private fun OverflowMenu(
                 },
             )
             DropdownMenuItem(
-                text = { Text(stringResource(R.string.reader_crop_margins)) },
+                text = {
+                    Column {
+                        Text(stringResource(R.string.reader_crop_margins))
+                        Text(
+                            stringResource(R.string.reader_crop_margins_recommended),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                },
                 leadingIcon = { Icon(painterResource(TilePdfIcons.Crop), contentDescription = null) },
                 trailingIcon = { Checkbox(checked = cropMargins, onCheckedChange = null) },
                 onClick = {
