@@ -15,23 +15,41 @@ import java.io.File
 /**
  * An [EditablePdfDocument] on PDFium. Shares [document]'s dispatcher, mutex
  * and lifetime; [document] was opened without hiding anything.
+ *
+ * PDFium's incremental save writes out every page loaded into [document],
+ * changed or not. So until annotations, form values or recognised text are
+ * first changed, reading them loads pages into a second copy of the file,
+ * opened by [openOriginal] when first needed; from then on they are read
+ * from [document], which holds the change.
  */
 class PdfiumEditableDocument internal constructor(
     /** Draws the file as any viewer would: nothing is hidden. */
     @get:VisibleForTesting internal val document: PdfiumDocument,
+    private val openOriginal: suspend () -> PdfiumDocument,
 ) : EditablePdfDocument {
+
+    private var original: PdfiumDocument? = null
+
+    private var annotationsChanged = false
+    private var formChanged = false
+    private var textChanged = false
+
+    /** [document] once it holds a change of the kind read, else the file as it was opened. */
+    private suspend fun readFrom(changed: Boolean): PdfiumDocument =
+        if (changed) document else original ?: openOriginal().also { original = it }
 
     override val pageCount: Int get() = document.pageCount
 
     override suspend fun ownAnnotationIds(pageIndex: Int): Set<String> =
-        document.withDocument(pageIndex) { PdfiumNative.nativeOwnAnnotationIds(it, pageIndex) }
+        readFrom(annotationsChanged).withDocument(pageIndex) { PdfiumNative.nativeOwnAnnotationIds(it, pageIndex) }
             ?.toSet() ?: throw PdfCorruptException("Page $pageIndex could not be loaded")
 
     override suspend fun foreignKeys(pageIndex: Int): Set<String> =
-        document.withDocument(pageIndex) { PdfiumNative.nativeForeignKeys(it, pageIndex) }
+        readFrom(annotationsChanged).withDocument(pageIndex) { PdfiumNative.nativeForeignKeys(it, pageIndex) }
             ?.toSet() ?: throw PdfCorruptException("Page $pageIndex could not be loaded")
 
     override suspend fun apply(changes: AnnotationChanges) {
+        annotationsChanged = true
         val touched = sortedSetOf<Int>()
         for (page in changes.removals.keys + changes.foreignRemovals.keys) {
             val own = changes.removals[page].orEmpty().toTypedArray()
@@ -69,9 +87,12 @@ class PdfiumEditableDocument internal constructor(
 
     override suspend fun hasForm(): Boolean = document.hasForm()
 
-    override suspend fun formFields(pageIndex: Int): List<FormField> = document.formFields(pageIndex)
+    override suspend fun formFields(pageIndex: Int): List<FormField> = readFrom(formChanged).formFields(pageIndex)
 
-    override suspend fun applyFormEdits(edits: List<FormEdit>): Boolean = document.applyFormEdits(edits)
+    override suspend fun applyFormEdits(edits: List<FormEdit>): Boolean {
+        formChanged = true
+        return document.applyFormEdits(edits)
+    }
 
     override suspend fun setScriptHost(host: FormScriptHost?, openAction: Boolean) = document.setScriptHost(host, openAction)
 
@@ -81,11 +102,15 @@ class PdfiumEditableDocument internal constructor(
 
     override suspend fun xfaWrite(pageIndex: Int, text: String) = document.xfaWrite(pageIndex, text)
 
-    override suspend fun hasRecognizedText(pageIndex: Int): Boolean = document.hasRecognizedText(pageIndex)
+    override suspend fun hasRecognizedText(pageIndex: Int): Boolean = readFrom(textChanged).hasRecognizedText(pageIndex)
 
-    override suspend fun addRecognizedText(pageIndex: Int, words: List<OcrWord>) = document.addRecognizedText(pageIndex, words)
+    override suspend fun addRecognizedText(pageIndex: Int, words: List<OcrWord>) {
+        textChanged = true
+        document.addRecognizedText(pageIndex, words)
+    }
 
     override suspend fun addSignatureStamp(pageIndex: Int, name: String, appearance: SignatureAppearance) {
+        annotationsChanged = true
         val rect = appearance.rect
         val added = document.withDocument(pageIndex) { handle ->
             PdfiumNative.nativeAddSignatureStamp(
@@ -110,7 +135,10 @@ class PdfiumEditableDocument internal constructor(
         if (!saved) throw PdfWriteException("Could not save to $target")
     }
 
-    override fun close() = document.close()
+    override fun close() {
+        original?.close()
+        document.close()
+    }
 }
 
 private val MarkupKind.subtype: Int

@@ -28,7 +28,7 @@ class Pdfium @Inject constructor(
     override suspend fun open(uri: Uri, password: String?): PdfiumDocument = open(uri, password, hideOwn = true)
 
     override suspend fun openForEditing(uri: Uri, password: String?): PdfiumEditableDocument =
-        PdfiumEditableDocument(open(uri, password, hideOwn = false))
+        PdfiumEditableDocument(open(uri, password, hideOwn = false)) { open(uri, password, hideOwn = false) }
 
     private suspend fun open(uri: Uri, password: String?, hideOwn: Boolean): PdfiumDocument {
         // Not cancellable midway: a cancelled withContext would drop a document
