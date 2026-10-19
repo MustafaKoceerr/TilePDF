@@ -55,7 +55,7 @@ import com.mustafakoceerr.tilepdf.feature.reader.annotation.AnnotationsUiState
 import com.mustafakoceerr.tilepdf.feature.reader.annotation.Erased
 import com.mustafakoceerr.tilepdf.feature.reader.annotation.NoteEditor
 import com.mustafakoceerr.tilepdf.feature.reader.annotation.annotationAt
-import com.mustafakoceerr.tilepdf.feature.reader.annotation.markupFor
+import com.mustafakoceerr.tilepdf.feature.reader.annotation.toggleMarkup
 import com.mustafakoceerr.tilepdf.feature.reader.components.PageJump
 import com.mustafakoceerr.tilepdf.feature.reader.navigation.ReaderRoute
 import com.mustafakoceerr.tilepdf.model.Ink
@@ -833,12 +833,18 @@ class ReaderViewModel @Inject constructor(
     }
 
     /** Marks up the selected text and clears the selection. */
+    /**
+     * Toggles [kind] over the selection: it comes off text that has it all
+     * through, and covers the whole selection otherwise. One undo step.
+     */
     fun onMarkup(kind: MarkupKind) {
-        val selected = selection.value?.toUiState() ?: return
+        val selected = selection.value ?: return
         val controller = controller.value?.takeIf { it.state.value.ready } ?: return
         selection.value = null
         viewModelScope.launch {
-            controller.add(markupFor(selected, kind, preferencesRepository.preferences.first().markupColor))
+            val color = preferencesRepository.preferences.first().markupColor
+            val edit = toggleMarkup(selected.page, selected.range, kind, color, controller.state.value.own)
+            controller.swap(edit.removed, edit.added)
         }
     }
 

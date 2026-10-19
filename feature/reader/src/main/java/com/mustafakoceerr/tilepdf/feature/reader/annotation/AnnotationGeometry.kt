@@ -2,15 +2,12 @@ package com.mustafakoceerr.tilepdf.feature.reader.annotation
 
 import com.mustafakoceerr.tilepdf.core.geometry.PdfPoint
 import com.mustafakoceerr.tilepdf.core.geometry.PdfRect
-import com.mustafakoceerr.tilepdf.feature.reader.SelectionUiState
 import com.mustafakoceerr.tilepdf.model.Annotation
 import com.mustafakoceerr.tilepdf.model.ForeignAnnotation
 import com.mustafakoceerr.tilepdf.model.ForeignRef
 import com.mustafakoceerr.tilepdf.model.Ink
-import com.mustafakoceerr.tilepdf.model.MarkupKind
 import com.mustafakoceerr.tilepdf.model.Note
 import com.mustafakoceerr.tilepdf.model.TextMarkup
-import com.mustafakoceerr.tilepdf.model.newAnnotationId
 import kotlin.math.hypot
 
 /*
@@ -40,10 +37,6 @@ data class Erased(val ids: Set<String>, val refs: Set<ForeignRef>) {
         val None = Erased(emptySet(), emptySet())
     }
 }
-
-/** A highlight, underline or strikeout over [selection]. */
-fun markupFor(selection: SelectionUiState, kind: MarkupKind, color: Int, id: String = newAnnotationId()): TextMarkup =
-    TextMarkup(id, selection.pageIndex, color, kind, selection.rects, selection.text)
 
 /** The topmost annotation at [point] on [pageIndex]: the newest of ours first, then other apps'. */
 fun annotationAt(

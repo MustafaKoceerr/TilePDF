@@ -53,6 +53,25 @@ class AnnotationHistoryTest {
     }
 
     @Test
+    fun swapIsOneStep() {
+        // Toggling a markup off part of a line removes it and adds back the rest.
+        val history = AnnotationHistory(AnnotationState(listOf(note("a"), note("b")), emptySet()))
+        history.swap(removed = setOf("a"), added = listOf(note("c"), note("d")))
+        assertEquals(listOf("b", "c", "d"), history.ids())
+
+        history.undo()
+        assertEquals(listOf("a", "b"), history.ids())
+        assertFalse(history.canUndo)
+    }
+
+    @Test
+    fun aSwapThatChangesNothingIsNotRecorded() {
+        val history = AnnotationHistory(AnnotationState(listOf(note("a")), emptySet()))
+        history.swap(removed = emptySet(), added = emptyList())
+        assertFalse(history.canUndo)
+    }
+
+    @Test
     fun replaceIsOneStep() {
         val history = AnnotationHistory(AnnotationState(listOf(note("a", "old")), emptySet()))
         history.replace("a", note("a2", "new"))

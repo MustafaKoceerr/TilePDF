@@ -102,6 +102,9 @@ class AnnotationController(
     /** Swaps [old] for [new] as one step: how a note is edited. */
     fun replace(old: String, new: Annotation) = change { it.replace(old, new) }
 
+    /** Removes [removed] and adds [added] as one step: a markup toggled over a selection. */
+    fun swap(removed: Set<String>, added: List<Annotation>) = change { it.swap(removed, added) }
+
     /** Everything one eraser gesture removed, as one step. */
     fun removeAll(ids: Set<String>, refs: Set<ForeignRef>) = change { it.removeAll(ids, refs) }
 
