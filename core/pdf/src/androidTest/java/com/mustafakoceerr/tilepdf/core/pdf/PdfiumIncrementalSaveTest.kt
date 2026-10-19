@@ -25,8 +25,10 @@ class PdfiumIncrementalSaveTest {
 
     private fun streamsIn(bytes: ByteArray): Int = Regex("\\bstream\\r?\\n").findAll(String(bytes, Charsets.ISO_8859_1)).count()
 
-    @Test
-    fun aNoteOnOnePageWritesOnlyThatPage(): Unit = runBlocking {
+    private fun pagesIn(bytes: ByteArray): Int = Regex("/Type\\s*/Page\\b").findAll(String(bytes, Charsets.ISO_8859_1)).count()
+
+    /** The bytes a note on page 40 adds to text-dense.pdf. */
+    private fun noteUpdate(): ByteArray = runBlocking {
         val uri = TestAssets.uri("text-dense.pdf")
         val original = File(uri.path!!).length().toInt()
         saved.delete()
@@ -35,9 +37,23 @@ class PdfiumIncrementalSaveTest {
             assertTrue(document.write(listOf(note), emptySet()))
             document.saveIncremental(saved)
         }
+        saved.readBytes().copyOfRange(original, saved.length().toInt())
+    }
 
-        val update = saved.readBytes().copyOfRange(original, saved.length().toInt())
-        // The note's appearance, and maybe its popup's: not 80 content streams.
+    @Test
+    fun aNoteOnOnePageWritesOnlyThatPage() {
+        val update = noteUpdate()
+
+        // The note's appearance, the page's contents and maybe a popup's: not 80 content streams.
         assertTrue("${streamsIn(update)} streams in the update", streamsIn(update) <= 3)
+    }
+
+    @Test
+    fun aNoteOnOnePageLeavesTheLaterPageDictionariesOut() {
+        val update = noteUpdate()
+
+        // PDFium reaches page 40 by loading the page dictionaries before it;
+        // the 39 after it, which reading page sizes used to load, stay out.
+        assertTrue("${pagesIn(update)} pages in the update", pagesIn(update) <= 41)
     }
 }

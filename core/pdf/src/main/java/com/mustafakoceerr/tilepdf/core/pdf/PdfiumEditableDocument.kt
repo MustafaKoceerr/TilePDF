@@ -18,25 +18,22 @@ import java.io.File
  *
  * PDFium's incremental save writes out every page loaded into [document],
  * changed or not. So until annotations, form values or recognised text are
- * first changed, reading them loads pages into a second copy of the file,
- * opened by [openOriginal] when first needed; from then on they are read
- * from [document], which holds the change.
+ * first changed, reading them loads pages into [original], a second copy of
+ * the file; from then on they are read from [document], which holds the
+ * change. Both share the dispatcher and close together.
  */
 class PdfiumEditableDocument internal constructor(
     /** Draws the file as any viewer would: nothing is hidden. */
     @get:VisibleForTesting internal val document: PdfiumDocument,
-    private val openOriginal: suspend () -> PdfiumDocument,
+    private val original: PdfiumDocument,
 ) : EditablePdfDocument {
-
-    private var original: PdfiumDocument? = null
 
     private var annotationsChanged = false
     private var formChanged = false
     private var textChanged = false
 
     /** [document] once it holds a change of the kind read, else the file as it was opened. */
-    private suspend fun readFrom(changed: Boolean): PdfiumDocument =
-        if (changed) document else original ?: openOriginal().also { original = it }
+    private fun readFrom(changed: Boolean): PdfiumDocument = if (changed) document else original
 
     override val pageCount: Int get() = document.pageCount
 
@@ -136,7 +133,7 @@ class PdfiumEditableDocument internal constructor(
     }
 
     override fun close() {
-        original?.close()
+        original.close()
         document.close()
     }
 }
