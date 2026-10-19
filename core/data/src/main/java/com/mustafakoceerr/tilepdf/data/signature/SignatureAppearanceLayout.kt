@@ -30,12 +30,18 @@ fun signatureAppearance(rect: PdfRect, lines: List<String>, drawing: Signature?)
 
     val lineHeight = inner.height / lines.size.coerceAtLeast(1)
     val textWidth = inner.right - textLeft
-    val laidOut = lines.mapIndexed { i, text ->
+    val laidOut = lines.map(::plainSpaces).mapIndexed { i, text ->
         val size = minOf(MAX_TEXT_PT, lineHeight * TEXT_OF_LINE, textWidth / (CHAR_WIDTH_EM * text.length.coerceAtLeast(1)))
         AppearanceLine(text, textLeft, inner.top + lineHeight * i + lineHeight / 2 + size * 0.35f, size)
     }
     return SignatureAppearance(rect, laidOut, strokes)
 }
+
+/**
+ * [text] with every kind of space as a plain one: Android writes times with
+ * a narrow no-break space, which the stamp's font has no glyph for.
+ */
+private fun plainSpaces(text: String): String = text.map { if (it.isWhitespace()) ' ' else it }.joinToString("")
 
 /** [signature] as large as fits in [area], centred. */
 private fun fit(signature: Signature, area: PdfRect): List<List<PdfPoint>> {

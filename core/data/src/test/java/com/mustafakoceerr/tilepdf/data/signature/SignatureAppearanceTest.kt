@@ -48,4 +48,12 @@ class SignatureAppearanceTest {
         assertTrue("$line", line.x + line.size * 0.6f * name.length <= box.right + 0.5f)
         assertTrue(line.size >= 4f)
     }
+
+    @Test
+    fun unusualSpacesBecomePlainOnes() {
+        // Android writes "7:12\u202FAM"; the font has no narrow no-break space.
+        val appearance = signatureAppearance(box, listOf("Oct 19, 2026, 7:12\u202FAM", "A\u00A0B"), drawing = null)
+
+        assertEquals(listOf("Oct 19, 2026, 7:12 AM", "A B"), appearance.lines.map { it.text })
+    }
 }
