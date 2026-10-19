@@ -38,6 +38,11 @@ android {
 
     buildTypes {
         release {
+            // Symbols of our native code go into the bundle, so Play shows
+            // readable stack traces for PDFium crashes.
+            ndk {
+                debugSymbolLevel = "SYMBOL_TABLE"
+            }
             optimization {
                 enable = true
                 keepRules {
