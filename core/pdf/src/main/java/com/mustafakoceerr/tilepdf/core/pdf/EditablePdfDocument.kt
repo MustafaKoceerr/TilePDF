@@ -28,6 +28,13 @@ interface EditablePdfDocument : Closeable, FillableForm, RecognizedTextPages {
     suspend fun apply(changes: AnnotationChanges)
 
     /**
+     * Adds a stamp annotation named [name] on [pageIndex] that shows
+     * [appearance]; signing turns it into the signature field.
+     * @throws PdfWriteException if the engine refused it.
+     */
+    suspend fun addSignatureStamp(pageIndex: Int, name: String, appearance: SignatureAppearance)
+
+    /**
      * Writes the original bytes followed by the changes to [target].
      * @throws PdfWriteException if writing fails.
      */
