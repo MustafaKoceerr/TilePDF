@@ -11,7 +11,7 @@ class PdfiumNativeTest {
     fun initializesLibrary() {
         // Loads libtilepdf_pdfium.so and libpdfium.so for this ABI; a second
         // call must be a no-op rather than re-initializing PDFium.
-        PdfiumNative.nativeInit()
-        PdfiumNative.nativeInit()
+        PdfiumNative.nativeInit(null)
+        PdfiumNative.nativeInit(null)
     }
 }

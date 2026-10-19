@@ -1,0 +1,15 @@
+{
+  "uniqueId": "com.google.fonts:noto-sans",
+  "artifactVersion": "2.015",
+  "name": "Noto Sans",
+  "description": "A Latin, Greek and Cyrillic subset, drawn into form fields whose own font lacks a letter.",
+  "website": "https://github.com/notofonts/latin-greek-cyrillic",
+  "developers": [
+    {
+      "name": "The Noto Project Authors"
+    }
+  ],
+  "licenses": [
+    "OFL-1.1"
+  ]
+}

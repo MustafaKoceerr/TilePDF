@@ -17,6 +17,7 @@
 
 #include "fpdf_annot.h"
 #include "fpdf_doc.h"
+#include "fpdf_edit.h"
 #include "fpdf_formfill.h"
 #include "fpdf_save.h"
 #include "fpdf_text.h"
@@ -558,11 +559,20 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void*) {
 }
 
 JNIEXPORT void JNICALL
-Java_com_mustafakoceerr_tilepdf_core_pdf_PdfiumNative_nativeInit(JNIEnv*, jclass) {
+Java_com_mustafakoceerr_tilepdf_core_pdf_PdfiumNative_nativeInit(JNIEnv* env, jclass, jbyteArray formFallbackFont) {
     if (g_initialized) return;
     FPDF_LIBRARY_CONFIG config{};
     config.version = 2;
     FPDF_InitLibraryWithConfig(&config);
+    if (formFallbackFont) {
+        // PDFium copies the bytes; ours are released right after.
+        const jsize size = env->GetArrayLength(formFallbackFont);
+        jbyte* bytes = env->GetByteArrayElements(formFallbackFont, nullptr);
+        if (bytes) {
+            FPDF_TilePdfSetFormFallbackFont(reinterpret_cast<const uint8_t*>(bytes), static_cast<uint32_t>(size));
+            env->ReleaseByteArrayElements(formFallbackFont, bytes, JNI_ABORT);
+        }
+    }
     g_initialized = true;
 }
 
@@ -593,7 +603,10 @@ Java_com_mustafakoceerr_tilepdf_core_pdf_PdfiumNative_nativeOpen(
         return 0;
     }
     if (FPDF_GetFormType(native->document) != FORMTYPE_NONE) {
-        native->formInfo.version = 1;
+        // Version 2 is the only one our XFA-enabled PDFium accepts. XFA itself
+        // stays off until the reader can drive XFA forms.
+        native->formInfo.version = 2;
+        native->formInfo.xfa_disabled = 1;
         native->form = FPDFDOC_InitFormFillEnvironment(native->document, &native->formInfo);
     }
     return reinterpret_cast<jlong>(native);

@@ -152,12 +152,20 @@ popup), adds highlights, underlines, strikeouts, ink and notes, lets PDFium
 write their appearance streams, and saves incrementally: the original bytes
 followed by the changes.
 
-The prebuilt libraries come from
-[bblanchon/pdfium-binaries](https://github.com/bblanchon/pdfium-binaries) for
-arm64-v8a, armeabi-v7a, x86_64 and x86. The `tilepdf.pdfium` convention plugin
-downloads them into `.gradle/pdfium/`, and the build fails if an archive's
-SHA-256 differs from the pinned one; no binaries are committed. To update
-PDFium, change `RELEASE` and the four hashes in
+TilePDF uses its own PDFium build: PDFium with V8 and XFA, and with TilePDF's
+patch (`patches/tilepdf/` on the `tilepdf` branch of
+[MustafaKoceerr/pdfium-binaries](https://github.com/MustafaKoceerr/pdfium-binaries),
+a fork of [bblanchon/pdfium-binaries](https://github.com/bblanchon/pdfium-binaries)).
+It is built there by GitHub Actions for arm64-v8a, armeabi-v7a, x86_64 and x86
+and published as a release. The patch adds
+`FPDF_TilePdfSetFormFallbackFont`: a font form fields use for letters their
+own font lacks. Upstream PDFium finds such fonts only on Windows. TilePDF hands
+it a 40 KB Noto Sans subset (Latin, Greek, Cyrillic), so Turkish İ, ş and ğ
+show in Helvetica fields, and the font is embedded once per document. The
+`tilepdf.pdfium` convention plugin downloads the archives into
+`.gradle/pdfium/`, and the build fails if an archive's SHA-256 differs from the
+pinned one; no binaries are committed. To update PDFium, rebuild on the fork,
+then change `RELEASE` and the four hashes in
 `build-logic/convention/src/main/kotlin/PdfiumConventionPlugin.kt`.
 
 Each document keeps its two most recently used pages loaded natively, so a
@@ -331,7 +339,7 @@ rerunning it reproduces them byte for byte.
 - Android backup keeps preferences only (reading settings, theme, language).
 - Settings → About shows the version and every third-party license: PDFium's
   components, copied from the pinned pdfium-binaries archive at build time,
-  and the Maven libraries, collected by AboutLibraries.
+  the Maven libraries, collected by AboutLibraries, and Noto Sans (OFL).
 - Store material lives in `fastlane/metadata/android/` (EN and TR texts, with
   length limits checked by `StoreListingTest`). The Data safety answers and
   privacy policy are in [docs/play/](docs/play/).
@@ -340,9 +348,7 @@ rerunning it reproduces them byte for byte.
 
 - Scanned (image-only) PDFs have no text, so search finds nothing (no OCR).
 - Forms: no JavaScript (calculations, validation), no XFA forms, and multi-
-  select list boxes show only their first choice. Letters a field's own font
-  lacks (often Turkish İ, ı, ş, ğ in Helvetica fields) are saved in the value
-  but missing from the appearance PDFium draws for it.
+  select list boxes show only their first choice.
 - The signature is a drawing, not a cryptographic (PAdES) signature.
 
 ## Out of scope, on purpose

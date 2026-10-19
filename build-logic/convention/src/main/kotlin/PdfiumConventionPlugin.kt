@@ -8,20 +8,24 @@ import org.gradle.kotlin.dsl.configure
 import org.gradle.kotlin.dsl.register
 
 /**
- * Links the prebuilt PDFium from bblanchon/pdfium-binaries into a module's
- * CMake build. To update PDFium, change [RELEASE] and every hash in [ARCHIVES].
+ * Links TilePDF's own PDFium build into a module's CMake build: PDFium with
+ * V8, XFA and TilePDF's patches, built from the `tilepdf` branch of
+ * MustafaKoceerr/pdfium-binaries (a fork of bblanchon/pdfium-binaries). To
+ * update PDFium, rebuild there, then change [RELEASE] and every hash in
+ * [ARCHIVES].
  */
 class PdfiumConventionPlugin : Plugin<Project> {
 
     private companion object {
-        const val RELEASE = "chromium/8076"
+        const val RELEASES = "https://github.com/MustafaKoceerr/pdfium-binaries/releases/download"
+        const val RELEASE = "tilepdf-8076-1"
 
         /** Android ABI to the release archive and its SHA-256. */
         val ARCHIVES = mapOf(
-            "arm64-v8a" to ("pdfium-android-arm64.tgz" to "b7a6919dc130dfdf7e409bd1762ed2a306408c4faee1173668837fc446217bf7"),
-            "armeabi-v7a" to ("pdfium-android-arm.tgz" to "4cabe64372ec9a8f9a7e023ae1c2802068abdb5ed79d4ef5cd42f2bbde80927a"),
-            "x86_64" to ("pdfium-android-x64.tgz" to "9d043689096c7cdd4ca98fff95599be115b2a38feba0c68d2a79ba5eedbda415"),
-            "x86" to ("pdfium-android-x86.tgz" to "eb0aa52696094f66c86994220d45b00b63cd90b13b8e76bd9b201d7f89825214"),
+            "arm64-v8a" to ("pdfium-v8-android-arm64.tgz" to "cce1dae6504260897c23e160bd8e796fde8f3687db87aa8fb36ce6604fc88154"),
+            "armeabi-v7a" to ("pdfium-v8-android-arm.tgz" to "ee1ec168253df8934ba4a9d0bc072331011b4b8f5984485cd859ab2a8ea15524"),
+            "x86_64" to ("pdfium-v8-android-x64.tgz" to "da4129fb59b7f2d8daa5d2973aa7e39d38bf94889482cfd124ee5109c73ceeb6"),
+            "x86" to ("pdfium-v8-android-x86.tgz" to "c88734d92043c15f159974ad39e258f9504b93ce40ceebf04f820f3166f1d2fe"),
         )
     }
 
@@ -32,7 +36,7 @@ class PdfiumConventionPlugin : Plugin<Project> {
             val downloads = ARCHIVES.map { (abi, archive) ->
                 val (fileName, hash) = archive
                 tasks.register<DownloadPdfiumTask>("downloadPdfium" + abi.split('-', '_').joinToString("") { it.replaceFirstChar(Char::uppercase) }) {
-                    url.set("https://github.com/bblanchon/pdfium-binaries/releases/download/${RELEASE.replace("/", "%2F")}/$fileName")
+                    url.set("$RELEASES/$RELEASE/$fileName")
                     sha256.set(hash)
                     outputDir.set(pdfiumDir.dir(abi))
                 }
