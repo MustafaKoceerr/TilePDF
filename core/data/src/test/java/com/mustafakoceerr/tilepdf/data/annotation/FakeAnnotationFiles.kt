@@ -5,7 +5,6 @@ import com.mustafakoceerr.tilepdf.core.pdf.EditablePdfDocument
 import com.mustafakoceerr.tilepdf.core.pdf.PdfDocument
 import com.mustafakoceerr.tilepdf.core.pdf.PdfPasswordException
 import com.mustafakoceerr.tilepdf.core.pdf.PdfWriteException
-import com.mustafakoceerr.tilepdf.core.pdf.SignatureAppearance
 import com.mustafakoceerr.tilepdf.data.text.FakePdfDocument
 import com.mustafakoceerr.tilepdf.model.Annotation
 import com.mustafakoceerr.tilepdf.core.pdf.FormEdit
@@ -153,7 +152,6 @@ class FakeAnnotationFiles(private val tempDir: File) : AnnotationFiles {
             pdf = pdf.copy(recognized = pdf.recognized + (pageIndex to words))
         }
 
-        override suspend fun addSignatureStamp(pageIndex: Int, name: String, appearance: SignatureAppearance) = Unit
 
         override suspend fun saveIncremental(target: File) {
             target.writeText("pdf")

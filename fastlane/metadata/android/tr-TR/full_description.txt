@@ -18,7 +18,7 @@ RAHAT OKU
 • Yapışkan not ekle
 • PDF formlarını doldur: metin alanları, onay kutuları, seçenek düğmeleri ve listeler; toplamlar kendiliğinden hesaplanır
 • Parmağınla imzala; imzan bir sonraki sefer için saklanır
-• Sertifikayla imzala (PAdES), belgedeki dijital imzaları denetle
+• Belgedeki dijital imzaları denetle
 • Taranmış sayfalardaki metni tanı; ara ve kopyala, hepsi telefonunda
 • Geri al ve yinele
 • Açıklamalar PDF'in içine kaydedilir; diğer PDF uygulamaları da görür

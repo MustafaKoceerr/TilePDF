@@ -24,8 +24,6 @@ import com.mustafakoceerr.tilepdf.data.text.CachingDocumentTextRepository
 import com.mustafakoceerr.tilepdf.data.text.DocumentTextRepository
 import com.mustafakoceerr.tilepdf.data.bookmark.BookmarkRepository
 import com.mustafakoceerr.tilepdf.data.bookmark.OfflineBookmarkRepository
-import com.mustafakoceerr.tilepdf.data.signature.KeyChainSigningKeys
-import com.mustafakoceerr.tilepdf.data.signature.SigningKeys
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -42,9 +40,6 @@ interface DataModule {
 
     @Binds
     fun bindsFileStamps(impl: SafAnnotationFiles): FileStamps
-
-    @Binds
-    fun bindsSigningKeys(impl: KeyChainSigningKeys): SigningKeys
 
     @Binds
     fun bindsAnnotationSaving(impl: AnnotationSaver): AnnotationSaving

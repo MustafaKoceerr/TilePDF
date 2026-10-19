@@ -131,14 +131,14 @@ private fun Signature.inPad(padWidth: Float, padHeight: Float): List<List<Offset
 
 /** Shown while a signature waits for a tap on the page. */
 @Composable
-internal fun SignatureHint(onCancel: () -> Unit, modifier: Modifier = Modifier, text: String = stringResource(R.string.signature_hint)) {
+internal fun SignatureHint(onCancel: () -> Unit, modifier: Modifier = Modifier) {
     Surface(
         shape = RoundedCornerShape(16.dp),
         color = MaterialTheme.colorScheme.inverseSurface,
         modifier = modifier.padding(16.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 16.dp, end = 8.dp)) {
-            Text(text, color = MaterialTheme.colorScheme.inverseOnSurface)
+            Text(stringResource(R.string.signature_hint), color = MaterialTheme.colorScheme.inverseOnSurface)
             TextButton(onClick = onCancel) {
                 Text(stringResource(R.string.cancel), color = MaterialTheme.colorScheme.inversePrimary)
             }
