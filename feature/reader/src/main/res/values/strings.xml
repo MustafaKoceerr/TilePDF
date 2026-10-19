@@ -103,12 +103,12 @@
     <string name="signature_signed_by">Signed by %1$s</string>
     <string name="signature_reason">Reason: %1$s</string>
     <string name="signature_issued_by">Certificate from %1$s</string>
-    <string name="signature_intact">The signed content hasn\'t changed.</string>
+    <string name="signature_intact">The signed version is intact.</string>
     <string name="signature_broken">The document changed where it was signed, or the signature is damaged.</string>
     <string name="signature_unsupported">This kind of signature can\'t be checked.</string>
     <string name="signature_trusted">The signer\'s certificate is trusted by this device.</string>
     <string name="signature_untrusted">The signer\'s certificate isn\'t trusted by this device, so who signed can\'t be confirmed.</string>
-    <string name="signature_changed_after">The document was changed after signing, for example annotations were added.</string>
+    <string name="signature_changed_after">Something was added after signing, such as an annotation; the signed version is unaffected.</string>
     <string name="signatures_revocation_note">Whether a certificate was revoked isn\'t checked: TilePDF works offline.</string>
     <string name="script_ok">OK</string>
     <string name="script_yes">Yes</string>
@@ -124,6 +124,8 @@
         <item quantity="other">Text found on %1$d pages</item>
     </plurals>
     <string name="recognize_nothing_found">No text found</string>
+    <string name="recognize_page_has_text">This page already has text</string>
+    <string name="recognize_all_have_text">Every page already has text</string>
     <string name="recognize_failed">Couldn\'t recognise text</string>
     <string name="reader_rotate">Rotate pages</string>
     <string name="reader_crop_margins">Crop margins</string>

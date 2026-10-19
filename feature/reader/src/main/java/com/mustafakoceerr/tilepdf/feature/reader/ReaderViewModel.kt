@@ -952,7 +952,7 @@ class ReaderViewModel @Inject constructor(
                         },
                         onProgress = { progress -> recognition.update { it.copy(progress = progress) } },
                     )
-                    RecognitionResult.Done(pagesWithText)
+                    recognitionResult(allPages, pages.size, pagesWithText)
                 } catch (e: CancellationException) {
                     throw e
                 } catch (_: Exception) {

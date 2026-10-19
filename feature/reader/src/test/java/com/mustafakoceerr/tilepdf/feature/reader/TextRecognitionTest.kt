@@ -31,6 +31,19 @@ class TextRecognitionTest {
     }
 
     @Test
+    fun nothingToRecognizeSaysTheTextIsAlreadyThere() {
+        // Not "no text found": nothing was looked at, the pages have text.
+        assertEquals(RecognitionResult.AlreadyHasText(allPages = false), recognitionResult(allPages = false, pagesTried = 0, pagesWithText = 0))
+        assertEquals(RecognitionResult.AlreadyHasText(allPages = true), recognitionResult(allPages = true, pagesTried = 0, pagesWithText = 0))
+    }
+
+    @Test
+    fun recognizedPagesAreCounted() {
+        assertEquals(RecognitionResult.Done(pagesWithText = 2), recognitionResult(allPages = true, pagesTried = 3, pagesWithText = 2))
+        assertEquals(RecognitionResult.Done(pagesWithText = 0), recognitionResult(allPages = false, pagesTried = 1, pagesWithText = 0))
+    }
+
+    @Test
     fun scaleKeepsTheLongSideAt2500PixelsAtMost4PerPoint() {
         assertEquals(2500f / 842f, recognitionScale(PageSize(595, 842)), 0.0001f)
         assertEquals(4f, recognitionScale(PageSize(200, 300)), 0.0001f)
