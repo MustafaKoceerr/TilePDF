@@ -114,6 +114,59 @@ class ZoomStateTest {
     }
 
     @Test
+    fun aPinchKeepsTheFingerLeftBehindUntilEveryFingerLifts() {
+        // Otherwise the horizontal drag takes it over and jumps by all the
+        // movement it saw during the pinch.
+        assertEquals(false, state.handles(pressedPointers = 1))
+        assertEquals(true, state.handles(pressedPointers = 2))
+
+        state.onTransform(Offset(500f, 400f), Offset.Zero, zoom = 1.2f)
+        assertEquals(true, state.handles(pressedPointers = 1))
+
+        state.onPinchEnd()
+        assertEquals(false, state.handles(pressedPointers = 1))
+    }
+
+    @Test
+    fun theFingerLeftBehindPansOnlyAsItMoves() {
+        state.onTransform(Offset(500f, 400f), Offset.Zero, zoom = 2f)
+        val panX = state.panX
+
+        // One finger lifted; the other stays where it is.
+        assertNull(state.onTransform(Offset(700f, 600f), pan = Offset.Zero, zoom = 1f, pressedPointers = 1))
+        assertEquals(panX, state.panX, DELTA)
+
+        // Then it slides 30 px left: the content follows it.
+        state.onTransform(Offset(670f, 600f), pan = Offset(-30f, 0f), zoom = 1f, pressedPointers = 1)
+        assertEquals(panX + 30f, state.panX, DELTA)
+    }
+
+    @Test
+    fun theFingerLeftBehindPansOnlyOnceItReallySlides() {
+        state.touchSlop = 20f
+        state.onTransform(Offset(500f, 400f), Offset.Zero, zoom = 2f)
+        val panX = state.panX
+
+        // A lifting hand rolls the other finger a little: that isn't a drag.
+        assertNull(state.onTransform(Offset(705f, 600f), pan = Offset(5f, 0f), zoom = 1f, pressedPointers = 1))
+        assertNull(state.onTransform(Offset(710f, 600f), pan = Offset(5f, 0f), zoom = 1f, pressedPointers = 1))
+        assertEquals(panX, state.panX, DELTA)
+
+        // 25 px in all: it pans by what lies past the slop, then follows 1:1.
+        state.onTransform(Offset(725f, 600f), pan = Offset(15f, 0f), zoom = 1f, pressedPointers = 1)
+        assertEquals(panX - 5f, state.panX, DELTA)
+        state.onTransform(Offset(735f, 600f), pan = Offset(10f, 0f), zoom = 1f, pressedPointers = 1)
+        assertEquals(panX - 15f, state.panX, DELTA)
+    }
+
+    @Test
+    fun aSidewaysPanNeedsNoVerticalScroll() {
+        state.zoomTo(2f, Offset(500f, 400f))
+        assertNull(state.onTransform(Offset(530f, 400f), pan = Offset(30f, 0f), zoom = 1f))
+        assertEquals(470f, state.panX, DELTA) // 500 - 30
+    }
+
+    @Test
     fun doubleTapTogglesAroundFocus() {
         val zoomIn = state.zoomTo(state.doubleTapTarget, focus = Offset(400f, 300f))
         assertEquals(2.5f, state.scale, DELTA)

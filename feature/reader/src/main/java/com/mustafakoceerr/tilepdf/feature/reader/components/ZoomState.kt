@@ -77,6 +77,15 @@ class ZoomState(
     var isPinching by mutableStateOf(false)
         private set
 
+    /** How far a finger left behind by a pinch moves before it pans; from the view configuration. */
+    var touchSlop = 0f
+
+    /**
+     * How far the finger left behind by a pinch has moved, until it passes
+     * [touchSlop]; null once it pans.
+     */
+    private var leftBehindDrag: Offset? = Offset.Zero
+
     /** Applied once the viewport width, and so the pan range, is known. */
     private var pendingPanFraction: Float? = initialPanFraction.takeIf { it > 0f }
 
@@ -105,10 +114,12 @@ class ZoomState(
      * Applies one frame of a pinch: [centroid] is where the fingers are now,
      * [pan] how far they moved since the last frame. Returns how to scroll
      * the list so the content under the fingers stays under them, or null
-     * when nothing moved.
+     * when it needn't scroll.
      */
-    fun onTransform(centroid: Offset, pan: Offset, zoom: Float): ZoomCommit? {
+    fun onTransform(centroid: Offset, pan: Offset, zoom: Float, pressedPointers: Int = 2): ZoomCommit? {
         isPinching = true
+        if (pressedPointers < 2) return leftBehindPan(centroid, pan)
+        leftBehindDrag = Offset.Zero
         val requested = scale * zoom
         val newScale = snapToLimits(requested.coerceIn(MIN_SCALE, MAX_SCALE))
         // The content moves with the fingers, except when they pinch past a
@@ -116,12 +127,44 @@ class ZoomState(
         val pastLimit = abs(requested - newScale) > newScale * LIMIT_SLOP
         val previousCentroid = if (pastLimit) centroid else centroid - pan
         if (newScale == scale && previousCentroid == centroid) return null
-        return scaleAround(newScale, from = previousCentroid, to = centroid)
+        return scaleAround(newScale, from = previousCentroid, to = centroid).takeIf { it.scrolls }
+    }
+
+    /**
+     * The finger left behind when the others lift pans only once it really
+     * slides, as a drag does: a lifting hand rolls it a little.
+     */
+    private fun leftBehindPan(centroid: Offset, pan: Offset): ZoomCommit? {
+        val held = leftBehindDrag
+        val move = if (held == null) {
+            pan
+        } else {
+            val total = held + pan
+            val distance = total.getDistance()
+            if (distance <= touchSlop) {
+                leftBehindDrag = total
+                return null
+            }
+            leftBehindDrag = null
+            // Only what lies past the slop, so passing it doesn't jump.
+            total * (1f - touchSlop / distance)
+        }
+        return scaleAround(scale, from = centroid - move, to = centroid).takeIf { it.scrolls }
     }
 
     fun onPinchEnd() {
         isPinching = false
     }
+
+    /**
+     * Whether an event with [pressedPointers] fingers down belongs to the
+     * pinch: two or more start one, and once started it keeps every finger
+     * until all have lifted. A finger left behind then pans only as it moves;
+     * passed on, the horizontal drag would take it over and jump by all the
+     * movement it saw during the pinch.
+     */
+    fun handles(pressedPointers: Int): Boolean =
+        pressedPointers >= 2 || isPinching && pressedPointers >= 1
 
     /** Horizontal drags pan the zoomed content. */
     val draggableState = DraggableState { delta -> panBy(delta) }
@@ -174,7 +217,10 @@ class ZoomState(
  * One zoom step: the content grew by [zoom], and the content that was at
  * viewport y [contentY] in the last layout should move to viewport y [focusY].
  */
-data class ZoomCommit(val zoom: Float, val focusY: Float, val contentY: Float)
+data class ZoomCommit(val zoom: Float, val focusY: Float, val contentY: Float) {
+    /** Whether the list must scroll for it: a sideways pan at the same zoom needn't. */
+    val scrolls: Boolean get() = zoom != 1f || focusY != contentY
+}
 
 /** A laid out list item: [offset] from the list's start, [size] long. */
 internal data class ListItemBounds(val index: Int, val offset: Int, val size: Int)
@@ -225,6 +271,7 @@ fun Modifier.zoomable(
     .clipToBounds()
     .onSizeChanged { zoomState.viewportWidth = it.width }
     .pointerInput(zoomState) {
+        zoomState.touchSlop = viewConfiguration.touchSlop
         awaitEachGesture {
             awaitFirstDown(requireUnconsumed = false)
             var pinched = false
@@ -233,13 +280,15 @@ fun Modifier.zoomable(
                     // Initial pass: see multi-touch before the list does, and
                     // consume it so the list doesn't scroll during a pinch.
                     val event = awaitPointerEvent(PointerEventPass.Initial)
-                    if (event.changes.count { it.pressed } >= 2) {
+                    val pressed = event.changes.count { it.pressed }
+                    if (zoomState.handles(pressed)) {
                         // Input arrives once a frame, so the list's layout
                         // already shows the previous step.
                         zoomState.onTransform(
                             centroid = event.calculateCentroid(useCurrent = true),
                             pan = event.calculatePan(),
                             zoom = event.calculateZoom(),
+                            pressedPointers = pressed,
                         )?.let { listState.keepAnchor(it) }
                         event.changes.fastForEach { it.consume() }
                         pinched = true
