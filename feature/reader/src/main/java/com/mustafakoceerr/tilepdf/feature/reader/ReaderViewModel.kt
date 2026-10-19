@@ -153,6 +153,15 @@ class ReaderViewModel @Inject constructor(
 
     private val signatureStep = MutableStateFlow<SignatureStep?>(null)
 
+    /** Answers the open document's form scripts; one per opened document. */
+    private val scriptHost = MutableStateFlow<ScriptDialogs?>(null)
+
+    /** The document's open action runs once per reader, not again on each reopen after a save. */
+    private var openActionRun = false
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private val scriptDialog = scriptHost.flatMapLatest { it?.dialog ?: flowOf(null) }
+
     private val recognition = MutableStateFlow(RecognitionUiState())
     private var recognitionJob: Job? = null
 
@@ -203,7 +212,7 @@ class ReaderViewModel @Inject constructor(
         preferencesRepository.preferences,
         combine(searchState, toc, recognition, ::Triple),
         combine(selection, linkTargets, currentPage, fullScreen, startPosition, ::PageState),
-        combine(annotations, editing, combine(saveCopyResult, handOff, ::Pair), jumpHistory, combine(formFields, formEditor, signatureStep, ::Triple), ::Outputs),
+        combine(annotations, editing, combine(saveCopyResult, handOff, ::Pair), jumpHistory, combine(formFields, formEditor, signatureStep, scriptDialog, ::FormState), ::Outputs),
     ) { document, preferences, searchAndToc, pageState, annotationUi ->
         val (search, toc, textRecognition) = searchAndToc
         val (selection, links, page, fullScreen, start) = pageState
@@ -235,9 +244,10 @@ class ReaderViewModel @Inject constructor(
                 editing = editing,
                 saveCopyResult = copyResult,
                 handOff = handOff,
-                formFields = forms.first,
-                formEditor = forms.second,
-                signatureStep = forms.third,
+                formFields = forms.fields,
+                formEditor = forms.editor,
+                signatureStep = forms.signatureStep,
+                scriptDialog = forms.scriptDialog,
                 recognition = textRecognition,
             )
         }
@@ -258,6 +268,8 @@ class ReaderViewModel @Inject constructor(
 
     private fun open(password: String?) {
         openJob?.cancel()
+        // The old document's scripts must not hold up its replacement.
+        scriptHost.value?.close()
         documentState.value = DocumentState.Loading
         openJob = viewModelScope.launch {
             documentState.value = try {
@@ -301,7 +313,33 @@ class ReaderViewModel @Inject constructor(
                 }
             }
             loadFormFields(currentPage.value)
+            (documentState.value as? DocumentState.Opened)?.let { attachScripts(it.opened) }
         }
+    }
+
+    /**
+     * Lets the reader answer [opened]'s form scripts. Set once the document
+     * shows, as its open action may already ask something.
+     */
+    private suspend fun attachScripts(opened: OpenedDocument) {
+        scriptHost.value?.close()
+        if (!documentHasForm) {
+            scriptHost.value = null
+            return
+        }
+        val dialogs = ScriptDialogs(
+            onPrint = { viewModelScope.launch { onPrint() } },
+            onGoToPage = { page ->
+                if (page in 0 until opened.document.pageCount) linkTargets.update { it.copy(jump = PageJump(page)) }
+            },
+        )
+        scriptHost.value = dialogs
+        runCatchingCancellable { opened.document.setScriptHost(dialogs, openAction = !openActionRun) }
+        openActionRun = true
+    }
+
+    fun onScriptAnswer(answer: ScriptAnswer) {
+        scriptHost.value?.answer(answer)
     }
 
     /** Loads the form fields of [around] and its neighbours, the pages a tap can reach. */
@@ -350,14 +388,17 @@ class ReaderViewModel @Inject constructor(
         viewModelScope.launch {
             annotationRepository.setFormValue(opened.uri, name, value)
             val pages = runCatchingCancellable { opened.document.fill(mapOf(name to value)) }.getOrDefault(emptySet())
-            stateOf(opened)?.let { shown ->
-                pages.forEach { page ->
-                    shown.pageImages.invalidate(page)
-                    shown.thumbnails.invalidate(page)
+            // The form's scripts may have changed fields anywhere, such as a total on the last page.
+            if (pages.isNotEmpty()) {
+                stateOf(opened)?.let { shown ->
+                    for (page in 0 until opened.document.pageCount) {
+                        shown.pageImages.invalidate(page)
+                        shown.thumbnails.invalidate(page)
+                    }
                 }
             }
-            val reloaded = pages.associateWith { page -> fieldsOf(opened.document, page) }
-            formFields.update { it + reloaded }
+            val reloaded = (formFields.value.keys + pages).associateWith { page -> fieldsOf(opened.document, page) }
+            formFields.value = reloaded
             // The field may keep less than it was given (a length limit, say): the draft
             // holds what the file will hold, or every save would fail to verify.
             val kept = reloaded.values.flatten().firstOrNull { it.name == name }?.value
@@ -1004,6 +1045,8 @@ class ReaderViewModel @Inject constructor(
     }
 
     override fun onCleared() {
+        // A script waiting for an answer holds the PDF thread, and the close waits for it.
+        scriptHost.value?.close()
         // Writes and the save request run on the application scope: they outlive this screen.
         controller.value?.let {
             it.requestSave()
@@ -1032,7 +1075,14 @@ class ReaderViewModel @Inject constructor(
         val editing: AnnotationEditing,
         val results: Pair<SaveCopyResult?, HandOff?>,
         val jumpHistory: JumpHistory,
-        val forms: Triple<Map<Int, List<FormField>>, FormField?, SignatureStep?>,
+        val forms: FormState,
+    )
+
+    private data class FormState(
+        val fields: Map<Int, List<FormField>>,
+        val editor: FormField?,
+        val signatureStep: SignatureStep?,
+        val scriptDialog: ScriptDialog?,
     )
 
     /** Where a tapped link leads, until the screen has acted on it. */

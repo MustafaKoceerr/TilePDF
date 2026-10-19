@@ -5,6 +5,7 @@ import androidx.room.Room
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.mustafakoceerr.tilepdf.core.geometry.PdfPoint
+import com.mustafakoceerr.tilepdf.core.pdf.PdfThread
 import com.mustafakoceerr.tilepdf.core.pdf.Pdfium
 import com.mustafakoceerr.tilepdf.data.local.TilePdfDatabase
 import com.mustafakoceerr.tilepdf.model.Note
@@ -25,7 +26,7 @@ import org.junit.runner.RunWith
 class AnnotationSaveFlowTest {
 
     private val context = InstrumentationRegistry.getInstrumentation().targetContext
-    private val pdfium = Pdfium(context, Dispatchers.IO.limitedParallelism(1))
+    private val pdfium = Pdfium(context, PdfThread.dispatcher)
     private val database = Room.inMemoryDatabaseBuilder(context, TilePdfDatabase::class.java).build()
     private val files = SafAnnotationFiles(context, Dispatchers.IO, pdfium)
     private val repository = OfflineAnnotationRepository(database.annotationDraftDao(), database.recognizedTextDao(), files)

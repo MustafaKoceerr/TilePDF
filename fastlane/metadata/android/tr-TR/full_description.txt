@@ -16,7 +16,7 @@ RAHAT OKU
 • Metni vurgula, altını ya da üstünü çiz
 • Farklı renk ve kalınlıklarda kalemle çiz, çizgileri sil
 • Yapışkan not ekle
-• PDF formlarını doldur: metin alanları, onay kutuları, seçenek düğmeleri ve listeler
+• PDF formlarını doldur: metin alanları, onay kutuları, seçenek düğmeleri ve listeler; toplamlar kendiliğinden hesaplanır
 • Parmağınla imzala; imzan bir sonraki sefer için saklanır
 • Taranmış sayfalardaki metni tanı; ara ve kopyala, hepsi telefonunda
 • Geri al ve yinele

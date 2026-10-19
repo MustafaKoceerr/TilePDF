@@ -68,6 +68,8 @@ sealed interface ReaderUiState {
         /** Adding a signature: drawing it, then a tap places it. */
         val signatureStep: SignatureStep? = null,
         val recognition: RecognitionUiState = RecognitionUiState(),
+        /** A dialog the document's form scripts are waiting on. */
+        val scriptDialog: ScriptDialog? = null,
     ) : ReaderUiState
 }
 

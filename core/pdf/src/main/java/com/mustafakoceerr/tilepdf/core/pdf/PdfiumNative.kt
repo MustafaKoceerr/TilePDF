@@ -179,6 +179,13 @@ internal object PdfiumNative {
     @JvmStatic
     external fun nativeAddRecognizedText(document: Long, index: Int, texts: Array<String>, quads: FloatArray): Boolean
 
+    /**
+     * Lets [host] answer the document's form scripts (null: default answers).
+     * With [openAction], the document's open action runs then, once.
+     */
+    @JvmStatic
+    external fun nativeSetScriptHost(document: Long, host: FormScriptHost?, openAction: Boolean)
+
     /** Whether page [index] has text TilePDF recognised. */
     @JvmStatic
     external fun nativeHasRecognizedText(document: Long, index: Int): Boolean

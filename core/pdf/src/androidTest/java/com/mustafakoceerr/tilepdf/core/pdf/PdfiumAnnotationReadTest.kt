@@ -9,7 +9,6 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.mustafakoceerr.tilepdf.core.geometry.PdfPoint
 import com.mustafakoceerr.tilepdf.model.Ink
 import com.mustafakoceerr.tilepdf.testing.TestAssets
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -28,7 +27,7 @@ class PdfiumAnnotationReadTest {
 
     private val pdfium = Pdfium(
         InstrumentationRegistry.getInstrumentation().targetContext,
-        Dispatchers.IO.limitedParallelism(1),
+        PdfThread.dispatcher,
     )
     private lateinit var document: PdfiumDocument
 

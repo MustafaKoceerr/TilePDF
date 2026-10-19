@@ -24,7 +24,7 @@ class PdfDocumentTest {
 
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private val targetContext = instrumentation.targetContext
-    private val pdfium = Pdfium(targetContext, Dispatchers.IO.limitedParallelism(1))
+    private val pdfium = Pdfium(targetContext, PdfThread.dispatcher)
     private val pageRenderer = PageRenderer(Dispatchers.IO)
     private lateinit var document: PdfDocument
 

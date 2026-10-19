@@ -77,6 +77,10 @@
     <string name="signature_place">Place</string>
     <string name="signature_hint">Tap where to sign</string>
     <string name="reader_recognize_text">Recognise text</string>
+    <string name="script_title">This document says</string>
+    <string name="script_ok">OK</string>
+    <string name="script_yes">Yes</string>
+    <string name="script_no">No</string>
     <string name="recognize_title">Recognise text</string>
     <string name="recognize_explanation">Finds the words on scanned pages, so you can search, select and copy them. It runs on this device; nothing is sent anywhere.</string>
     <string name="recognize_this_page">This page</string>

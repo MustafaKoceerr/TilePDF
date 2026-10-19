@@ -3,8 +3,8 @@ package com.mustafakoceerr.tilepdf.testing
 import android.net.Uri
 import androidx.test.platform.app.InstrumentationRegistry
 import com.mustafakoceerr.tilepdf.core.pdf.PdfDocument
+import com.mustafakoceerr.tilepdf.core.pdf.PdfThread
 import com.mustafakoceerr.tilepdf.core.pdf.Pdfium
-import kotlinx.coroutines.Dispatchers
 import java.io.File
 
 /**
@@ -29,5 +29,5 @@ object TestAssets {
 
     /** Opens [name] for rendering; the caller must close it. */
     suspend fun openDocument(name: String): PdfDocument =
-        Pdfium(instrumentation.targetContext, Dispatchers.IO.limitedParallelism(1)).open(uri(name))
+        Pdfium(instrumentation.targetContext, PdfThread.dispatcher).open(uri(name))
 }

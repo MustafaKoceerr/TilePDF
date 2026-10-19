@@ -45,7 +45,10 @@ minSdk 29
 - Rotate pages and crop their empty margins, kept per document; two pages
   side by side on wide screens in horizontal layout
 - Fill in AcroForm fields (text, check box, radio button, combo and list
-  box) and sign with a drawn signature; both are saved into the PDF
+  box) and sign with a drawn signature; both are saved into the PDF. The
+  form's own scripts run: totals calculate themselves, number and percent
+  formats apply, validation rejects bad values with the form's message, and
+  `app.alert` / `app.response` show as dialogs
 - Recognise text on scanned pages (OCR), on the device with Google ML Kit:
   the words go into the page as invisible text, so they can be searched,
   selected and copied, also in other apps once saved. Works offline; a chip
@@ -243,8 +246,10 @@ killed process left unsaved are saved at the next start.
   without recomposition. Tile edges are rounded independently so neighbours
   share edges exactly (no hairline seams).
 - **One PDF thread.** PDFium isn't thread-safe and its state is global, so
-  every document goes through one single-threaded dispatcher, plus a mutex per
-  document so closing waits for in-flight work.
+  every document goes through one dispatcher, plus a mutex per document so
+  closing waits for in-flight work. It is one dedicated thread (`PdfThread`),
+  not just one call at a time: V8, which runs form scripts, is bound to the
+  thread that started it, and scripts fail silently on any other.
 
 ## Memory strategy
 
@@ -360,8 +365,9 @@ rerunning it reproduces them byte for byte.
 - Text recognition reads Latin script only (Turkish and English included).
   Search inside a document folds İ/ı/I/i but not other Turkish letters, so
   "sisli" doesn't find "Şişli" there, unlike the library search.
-- Forms: no JavaScript (calculations, validation), no XFA forms, and multi-
-  select list boxes show only their first choice.
+- Forms: no XFA forms, and multi-select list boxes show only their first
+  choice. Scripts can't mail or submit a form (TilePDF is offline), and
+  timers and page open/close scripts don't run.
 - The signature is a drawing, not a cryptographic (PAdES) signature.
 
 ## Out of scope, on purpose
