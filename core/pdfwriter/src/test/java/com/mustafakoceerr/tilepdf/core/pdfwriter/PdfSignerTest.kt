@@ -136,4 +136,28 @@ class PdfSignerTest {
         } catch (_: PdfEncryptedException) {
         }
     }
+
+    @Test
+    fun aStampWrittenInsideTheAnnotsArrayBecomesAnObjectOfItsOwn() {
+        // As PDFium writes a new annotation: a dictionary inside the page's /Annots.
+        val pdf = TestPdf()
+            .obj(1, "<< /Type /Catalog /Pages 2 0 R >>")
+            .obj(2, "<< /Type /Pages /Kids [3 0 R] /Count 1 >>")
+            .obj(3, "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Annots [5 0 R << /Type /Annot /Subtype /Stamp /NM (stamp-a) /Rect [100 100 280 160] /AP << /N 4 0 R >> >>] >>")
+            .obj(4, "<< /Type /XObject /Subtype /Form /BBox [0 0 180 60] /Length 0 >>\nstream\n\nendstream")
+            .obj(5, "<< /Type /Annot /Subtype /Text /Rect [0 0 20 20] >>")
+        pdf.xrefTable(listOf(1, 2, 3, 4, 5), "/Size 6 /Root 1 0 R")
+
+        val file = PdfFile(sign(pdf.bytes()))
+
+        val annots = (file.dict(PdfRef(3))["Annots"] as PdfArray).items
+        assertEquals(PdfRef(5), annots[0])
+        val widgetRef = annots[1] as PdfRef
+        val widget = file.dict(widgetRef)
+        assertEquals(PdfName("Sig"), widget["FT"])
+        assertEquals(PdfRef(3), widget["P"])
+        assertEquals(PdfRef(4), (widget["AP"] as PdfDict)["N"])
+        val acroForm = file.dict(file.dict(file.trailer["Root"])["AcroForm"])
+        assertEquals(PdfArray(listOf(widgetRef)), acroForm["Fields"])
+    }
 }

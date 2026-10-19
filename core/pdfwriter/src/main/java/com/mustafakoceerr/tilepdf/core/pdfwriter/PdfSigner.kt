@@ -30,8 +30,7 @@ class PdfSigner {
         if (file.trailer["Encrypt"] != null) throw PdfEncryptedException()
         val rootRef = file.trailer["Root"] as? PdfRef ?: throw PdfFormatException("No catalog")
         val catalog = file.resolve(rootRef) as? PdfDict ?: throw PdfFormatException("No catalog")
-        val stampRef = findStamp(file, catalog, stampName) ?: throw PdfFormatException("No stamp $stampName")
-        val stamp = file.resolve(stampRef) as PdfDict
+        val found = findStamp(file, catalog, stampName) ?: throw PdfFormatException("No stamp $stampName")
 
         val update = IncrementalUpdate(file)
         val signatureRef = update.add(
@@ -51,15 +50,16 @@ class PdfSigner {
         val acroFormValue = catalog["AcroForm"]
         val acroForm = acroFormValue?.let { file.resolve(it) as? PdfDict } ?: PdfDict(emptyMap())
         val fields = (acroForm["Fields"]?.let { file.resolve(it) } as? PdfArray)?.items.orEmpty()
-        val widget = stamp
+        val widget = found.stamp
             .with("Subtype", PdfName("Widget"))
             .with("FT", PdfName("Sig"))
             .with("T", textString("Signature${fields.size + 1}"))
             .with("V", signatureRef)
             // Printed, and locked so it isn't moved or deleted.
             .with("F", PdfNumber(132))
-        update.set(stampRef, widget)
-        val newAcroForm = acroForm.with("Fields", PdfArray(fields + stampRef)).with("SigFlags", PdfNumber(3))
+            .with("P", found.page)
+        val widgetRef = placeWidget(update, file, found, widget)
+        val newAcroForm = acroForm.with("Fields", PdfArray(fields + widgetRef)).with("SigFlags", PdfNumber(3))
         when (acroFormValue) {
             is PdfRef -> update.set(acroFormValue, newAcroForm)
             is PdfDict -> update.set(rootRef, catalog.with("AcroForm", newAcroForm))
@@ -80,8 +80,35 @@ class PdfSigner {
         return written
     }
 
+    /**
+     * Where a stamp was: on [page], at [index] of its /Annots, which may be an
+     * object of its own ([annots]). [ref] is null when the stamp is written
+     * inside the array, as PDFium writes new annotations.
+     */
+    private class FoundStamp(val page: PdfRef, val annots: PdfRef?, val items: List<PdfObject>, val index: Int, val ref: PdfRef?, val stamp: PdfDict)
+
+    /**
+     * Writes [widget] where the stamp was. A field must be an object of its
+     * own for the AcroForm to point at it, so one written inside the page's
+     * /Annots gets an object, and the array points at that.
+     */
+    private fun placeWidget(update: IncrementalUpdate, file: PdfFile, found: FoundStamp, widget: PdfDict): PdfRef {
+        found.ref?.let { ref ->
+            update.set(ref, widget)
+            return ref
+        }
+        val ref = update.add(widget)
+        val annots = PdfArray(found.items.toMutableList().apply { set(found.index, ref) })
+        if (found.annots != null) {
+            update.set(found.annots, annots)
+        } else {
+            update.set(found.page, (file.resolve(found.page) as PdfDict).with("Annots", annots))
+        }
+        return ref
+    }
+
     /** The stamp annotation named [name] on any page, walking the page tree. */
-    private fun findStamp(file: PdfFile, catalog: PdfDict, name: String): PdfRef? {
+    private fun findStamp(file: PdfFile, catalog: PdfDict, name: String): FoundStamp? {
         val wanted = PdfString(name.toByteArray(Charsets.ISO_8859_1))
         val pending = ArrayDeque<PdfObject>().apply { catalog["Pages"]?.let(::add) }
         val seen = HashSet<PdfObject>()
@@ -90,11 +117,14 @@ class PdfSigner {
             if (!seen.add(node)) continue
             val dict = file.resolve(node) as? PdfDict ?: continue
             (dict["Kids"]?.let { file.resolve(it) } as? PdfArray)?.items?.forEach(pending::add)
-            val annots = (dict["Annots"]?.let { file.resolve(it) } as? PdfArray)?.items.orEmpty()
-            for (annot in annots) {
-                val ref = annot as? PdfRef ?: continue
-                val value = file.resolve(ref) as? PdfDict ?: continue
-                if (value["Subtype"] == PdfName("Stamp") && value["NM"] == wanted) return ref
+            val page = node as? PdfRef ?: continue
+            val annotsValue = dict["Annots"]
+            val annots = (annotsValue?.let { file.resolve(it) } as? PdfArray)?.items.orEmpty()
+            annots.forEachIndexed { index, annot ->
+                val value = file.resolve(annot) as? PdfDict ?: return@forEachIndexed
+                if (value["Subtype"] == PdfName("Stamp") && value["NM"] == wanted) {
+                    return FoundStamp(page, annotsValue as? PdfRef, annots, index, annot as? PdfRef, value)
+                }
             }
         }
         return null
