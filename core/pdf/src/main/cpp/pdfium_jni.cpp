@@ -1514,7 +1514,7 @@ Java_com_mustafakoceerr_tilepdf_core_pdf_PdfiumNative_nativeSignatures(JNIEnv* e
         if (!signature) continue;
         std::vector<uint8_t> contents(FPDFSignatureObj_GetContents(signature, nullptr, 0));
         if (!contents.empty()) FPDFSignatureObj_GetContents(signature, contents.data(), contents.size());
-        std::vector<int> range(static_cast<size_t>(std::max(FPDFSignatureObj_GetByteRange(signature, nullptr, 0), 0)));
+        std::vector<int> range(static_cast<size_t>(FPDFSignatureObj_GetByteRange(signature, nullptr, 0)));
         if (!range.empty()) FPDFSignatureObj_GetByteRange(signature, range.data(), range.size());
         auto ascii = [&](unsigned long (*get)(FPDF_SIGNATURE, char*, unsigned long)) {
             std::string value(get(signature, nullptr, 0), '\0');
