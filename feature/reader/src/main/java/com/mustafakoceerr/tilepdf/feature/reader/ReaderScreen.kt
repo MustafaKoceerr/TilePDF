@@ -69,6 +69,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.mustafakoceerr.tilepdf.feature.reader.components.FormFieldDialog
+import com.mustafakoceerr.tilepdf.feature.reader.components.LinkConfirmDialog
 import com.mustafakoceerr.tilepdf.feature.reader.components.NoTextChip
 import com.mustafakoceerr.tilepdf.feature.reader.components.RecognitionProgressBar
 import com.mustafakoceerr.tilepdf.feature.reader.components.RecognizeTextDialog
@@ -178,6 +179,8 @@ fun ReaderScreen(
         onJumpBack = viewModel::onJumpBack,
         onJumpHandled = viewModel::onJumpHandled,
         onExternalLinkHandled = viewModel::onExternalLinkHandled,
+        onLinkConfirmed = viewModel::onLinkConfirmed,
+        onLinkDismissed = viewModel::onLinkDismissed,
         onToggleBookmark = viewModel::onToggleBookmark,
         onPageThemeSelected = viewModel::onPageThemeSelected,
         onReadingModeSelected = viewModel::onReadingModeSelected,
@@ -308,6 +311,8 @@ internal fun ReaderScreen(
     onJumpBack: () -> Unit = {},
     onJumpHandled: () -> Unit = {},
     onExternalLinkHandled: () -> Unit = {},
+    onLinkConfirmed: () -> Unit = {},
+    onLinkDismissed: () -> Unit = {},
     onToggleBookmark: () -> Unit = {},
     onPageThemeSelected: (PageTheme) -> Unit = {},
     onReadingModeSelected: (ReadingMode) -> Unit = {},
@@ -348,6 +353,9 @@ internal fun ReaderScreen(
     ready?.scriptDialog?.let { dialog ->
         // A new dialog starts afresh, even with the same text.
         key(dialog) { ScriptDialogView(dialog, onAnswer = onScriptAnswer) }
+    }
+    ready?.linkToConfirm?.let { link ->
+        LinkConfirmDialog(link, onOpen = onLinkConfirmed, onDismiss = onLinkDismissed)
     }
     if (ready?.recognition?.choosing == true) {
         RecognizeTextDialog(onRecognize = recognitionActions.onRecognize, onDismiss = recognitionActions.onDismissChoice)

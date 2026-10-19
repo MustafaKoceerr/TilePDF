@@ -45,6 +45,8 @@ sealed interface ReaderUiState {
         val jump: PageJump? = null,
         /** The page the last jump left; offered as a way back while reading near its target. */
         val backToPage: Int? = null,
+        /** A web or mail link the reader is asked about before it leaves the app. */
+        val linkToConfirm: String? = null,
         /** A web or mail link to hand to another app. */
         val externalLink: String? = null,
         /** The page at the top of the screen. */

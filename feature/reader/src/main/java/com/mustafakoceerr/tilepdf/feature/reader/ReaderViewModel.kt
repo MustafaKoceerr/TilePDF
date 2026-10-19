@@ -265,6 +265,7 @@ class ReaderViewModel @Inject constructor(
                 selection = selection?.toUiState(),
                 jump = links.jump,
                 backToPage = history.origin?.pageIndex,
+                linkToConfirm = links.linkToConfirm,
                 externalLink = links.externalLink,
                 currentPage = page,
                 isCurrentPageBookmarked = toc.bookmarks.any { it.pageIndex == page },
@@ -720,7 +721,7 @@ class ReaderViewModel @Inject constructor(
             val link = runCatchingCancellable { document.linkAt(pageIndex, x, y) }.getOrNull()
             when (val action = linkAction(link, document.pageCount)) {
                 is LinkAction.Jump -> onJump(action.jump)
-                is LinkAction.Open -> linkTargets.update { it.copy(externalLink = action.uri) }
+                is LinkAction.Open -> linkTargets.update { it.tapped(action.uri) }
                 LinkAction.Ignore -> Unit
                 LinkAction.NoLink -> toggleFullScreen()
             }
@@ -773,6 +774,10 @@ class ReaderViewModel @Inject constructor(
     fun onJumpHandled() = linkTargets.update { it.copy(jump = null) }
 
     fun onExternalLinkHandled() = linkTargets.update { it.copy(externalLink = null) }
+
+    fun onLinkConfirmed() = linkTargets.update { it.confirmed() }
+
+    fun onLinkDismissed() = linkTargets.update { it.dismissed() }
 
     fun onPositionChanged(position: ReadingPosition) {
         this.position = position
@@ -1249,7 +1254,6 @@ class ReaderViewModel @Inject constructor(
     )
 
     /** Where a tapped link leads, until the screen has acted on it. */
-    private data class LinkTargets(val jump: PageJump? = null, val externalLink: String? = null)
 
     /** The page's text is kept so dragging handles needs no reload. */
     private data class Selection(val page: PageText, val range: IntRange) {
