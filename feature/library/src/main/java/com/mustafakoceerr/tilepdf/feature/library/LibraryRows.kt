@@ -44,3 +44,12 @@ fun libraryRows(
         .sortedWith(order)
         .map { LibraryItem(it, it.uri in accessible) }
 }
+
+/**
+ * Whether the list should scroll back to its top after the first row became
+ * [newTop]: a lazy list keeps its old first row in place, so the document
+ * just read, now on top, would sit hidden above the screen. Only when the
+ * list was at the top; a list scrolled away stays where it is.
+ */
+fun revealsNewTopRow(previousTop: String?, newTop: String?, firstVisibleIndex: Int): Boolean =
+    previousTop != null && newTop != previousTop && firstVisibleIndex <= 1

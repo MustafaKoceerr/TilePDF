@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
@@ -291,8 +292,15 @@ private fun EmptyText(@StringRes text: Int, modifier: Modifier = Modifier) {
 
 @Composable
 private fun DocumentList(items: List<LibraryItem>, actions: LibraryActions) {
+    val gridState = rememberLazyGridState()
+    val top = items.firstOrNull()?.document?.uri
+    var shownTop by remember { mutableStateOf(top) }
+    LaunchedEffect(top) {
+        if (revealsNewTopRow(shownTop, top, gridState.firstVisibleItemIndex)) gridState.scrollToItem(0)
+        shownTop = top
+    }
     // One column on phones; wide screens fit several rows side by side.
-    LazyVerticalGrid(columns = GridCells.Adaptive(MinRowWidth), modifier = Modifier.fillMaxSize()) {
+    LazyVerticalGrid(columns = GridCells.Adaptive(MinRowWidth), state = gridState, modifier = Modifier.fillMaxSize()) {
         items(items, key = { it.document.uri }) { item ->
             val document = item.document
             ListItem(

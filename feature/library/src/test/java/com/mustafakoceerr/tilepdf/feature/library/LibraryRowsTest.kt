@@ -80,4 +80,18 @@ class LibraryRowsTest {
         val items = rows(accessible = setOf("content://Kalem.pdf"))
         assertEquals(listOf(false, false, true, false), items.map { it.isAccessible })
     }
+
+    @Test
+    fun aDocumentJustReadIsShownAtTheTopWhenTheListWasThere() {
+        // The list keeps its old first row in place, which pushes the new one off the top.
+        assertTrue(revealsNewTopRow(previousTop = "content://a", newTop = "content://b", firstVisibleIndex = 1))
+        assertTrue(revealsNewTopRow(previousTop = "content://a", newTop = "content://b", firstVisibleIndex = 0))
+    }
+
+    @Test
+    fun theListStaysPutWhenNothingNewIsOnTopOrTheReaderScrolledAway() {
+        assertFalse(revealsNewTopRow(previousTop = "content://a", newTop = "content://a", firstVisibleIndex = 0))
+        assertFalse(revealsNewTopRow(previousTop = "content://a", newTop = "content://b", firstVisibleIndex = 7))
+        assertFalse(revealsNewTopRow(previousTop = null, newTop = "content://b", firstVisibleIndex = 1))
+    }
 }
