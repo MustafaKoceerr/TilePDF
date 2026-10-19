@@ -1179,6 +1179,7 @@ private fun OverflowMenu(
             )
             DropdownMenuItem(
                 text = { Text(stringResource(R.string.reader_save_copy)) },
+                leadingIcon = { Icon(painterResource(TilePdfIcons.FileCopy), contentDescription = null) },
                 onClick = {
                     onExpandedChange(false)
                     onSaveCopy()

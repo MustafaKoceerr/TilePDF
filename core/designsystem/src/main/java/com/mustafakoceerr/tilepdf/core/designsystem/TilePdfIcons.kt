@@ -16,6 +16,7 @@ object TilePdfIcons {
     @DrawableRes val Document = R.drawable.ic_document
     @DrawableRes val Edit = R.drawable.ic_edit
     @DrawableRes val ErrorOutline = R.drawable.ic_error_outline
+    @DrawableRes val FileCopy = R.drawable.ic_file_copy
     @DrawableRes val Grid = R.drawable.ic_grid
     @DrawableRes val InkEraser = R.drawable.ic_ink_eraser
     @DrawableRes val KeyboardArrowDown = R.drawable.ic_keyboard_arrow_down
