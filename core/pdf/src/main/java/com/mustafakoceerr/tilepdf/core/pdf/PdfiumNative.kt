@@ -186,6 +186,10 @@ internal object PdfiumNative {
     @JvmStatic
     external fun nativeSetScriptHost(document: Long, host: FormScriptHost?, openAction: Boolean)
 
+    /** The document's digital signatures; empty without any. */
+    @JvmStatic
+    external fun nativeSignatures(document: Long): Array<NativeSignature?>?
+
     /** Whether the document is an XFA form whose pages PDFium lays out itself. */
     @JvmStatic
     external fun nativeIsXfa(document: Long): Boolean

@@ -22,6 +22,8 @@ internal fun configureKotlinAndroid(extension: CommonExtension) = with(extension
     defaultConfig.testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     compileOptions.sourceCompatibility = JAVA_VERSION
     compileOptions.targetCompatibility = JAVA_VERSION
+    // BouncyCastle's jars each carry one; the About screen shows its license from Maven.
+    packaging.resources.excludes += "META-INF/LICENSE.md"
 }
 
 /** Compose compiler plus the BOM-managed UI libraries every Compose module uses. */

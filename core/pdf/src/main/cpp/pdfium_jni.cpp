@@ -20,6 +20,7 @@
 #include "fpdf_edit.h"
 #include "fpdf_formfill.h"
 #include "fpdf_save.h"
+#include "fpdf_signature.h"
 #include "fpdf_text.h"
 #include "fpdfview.h"
 
@@ -29,6 +30,10 @@ bool g_initialized = false;
 
 // For calls from PDFium back into Java, which come on the PDF thread.
 JavaVM* g_vm = nullptr;
+
+// NativeSignature(byte[], int[], String, String, String).
+jclass g_signatureClass = nullptr;
+jmethodID g_signatureConstructor = nullptr;
 
 // FormScriptHost's methods, resolved once in JNI_OnLoad.
 jmethodID g_hostAlert = nullptr;
@@ -728,6 +733,13 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void*) {
     g_hostPrint = env->GetMethodID(host, "print", "()V");
     g_hostGoToPage = env->GetMethodID(host, "goToPage", "(I)V");
     env->DeleteLocalRef(host);
+    jclass signature = env->FindClass("com/mustafakoceerr/tilepdf/core/pdf/NativeSignature");
+    if (!signature) return JNI_ERR;
+    g_signatureClass = static_cast<jclass>(env->NewGlobalRef(signature));
+    env->DeleteLocalRef(signature);
+    g_signatureConstructor = env->GetMethodID(
+            g_signatureClass, "<init>", "([B[ILjava/lang/String;Ljava/lang/String;Ljava/lang/String;)V");
+    if (!g_signatureConstructor) return JNI_ERR;
     if (!g_hostAlert || !g_hostResponse || !g_hostPrint || !g_hostGoToPage) return JNI_ERR;
     jclass local = env->FindClass("com/mustafakoceerr/tilepdf/core/pdf/NativePageText");
     if (!local) return JNI_ERR;
@@ -1488,6 +1500,48 @@ Java_com_mustafakoceerr_tilepdf_core_pdf_PdfiumNative_nativeFormReplaceText(
     FORM_SelectAllText(document->form, page);
     FORM_ReplaceSelection(document->form, page, reinterpret_cast<FPDF_WIDESTRING>(chars.data()));
     return FORM_ForceToKillFocus(document->form) ? JNI_TRUE : JNI_FALSE;
+}
+
+// The document's digital signatures, as NativeSignature objects.
+JNIEXPORT jobjectArray JNICALL
+Java_com_mustafakoceerr_tilepdf_core_pdf_PdfiumNative_nativeSignatures(JNIEnv* env, jclass, jlong handle) {
+    FPDF_DOCUMENT document = FromHandle(handle)->document;
+    const int count = std::max(FPDF_GetSignatureCount(document), 0);
+    jobjectArray result = env->NewObjectArray(count, g_signatureClass, nullptr);
+    if (!result) return nullptr;
+    for (int i = 0; i < count; ++i) {
+        FPDF_SIGNATURE signature = FPDF_GetSignatureObject(document, i);
+        if (!signature) continue;
+        std::vector<uint8_t> contents(FPDFSignatureObj_GetContents(signature, nullptr, 0));
+        if (!contents.empty()) FPDFSignatureObj_GetContents(signature, contents.data(), contents.size());
+        std::vector<int> range(static_cast<size_t>(FPDFSignatureObj_GetByteRange(signature, nullptr, 0)));
+        if (!range.empty()) FPDFSignatureObj_GetByteRange(signature, range.data(), range.size());
+        auto ascii = [&](unsigned long (*get)(FPDF_SIGNATURE, char*, unsigned long)) {
+            std::string value(get(signature, nullptr, 0), '\0');
+            if (!value.empty()) {
+                get(signature, value.data(), value.size());
+                value.pop_back();
+            }
+            return env->NewStringUTF(value.c_str());
+        };
+        const std::vector<jchar> reason = Utf16([&](FPDF_WCHAR* buffer, unsigned long length) {
+            return FPDFSignatureObj_GetReason(signature, buffer, length);
+        });
+        jbyteArray jContents = env->NewByteArray(static_cast<jsize>(contents.size()));
+        env->SetByteArrayRegion(jContents, 0, static_cast<jsize>(contents.size()), reinterpret_cast<const jbyte*>(contents.data()));
+        jintArray jRange = env->NewIntArray(static_cast<jsize>(range.size()));
+        env->SetIntArrayRegion(jRange, 0, static_cast<jsize>(range.size()), reinterpret_cast<const jint*>(range.data()));
+        jstring subFilter = ascii(FPDFSignatureObj_GetSubFilter);
+        jstring time = ascii(FPDFSignatureObj_GetTime);
+        jstring jReason = env->NewString(reason.data(), static_cast<jsize>(reason.size()));
+        jobject item = env->NewObject(g_signatureClass, g_signatureConstructor, jContents, jRange, subFilter, jReason, time);
+        env->SetObjectArrayElement(result, i, item);
+        for (jobject local : {static_cast<jobject>(jContents), static_cast<jobject>(jRange), static_cast<jobject>(subFilter),
+                              static_cast<jobject>(time), static_cast<jobject>(jReason), item}) {
+            env->DeleteLocalRef(local);
+        }
+    }
+    return result;
 }
 
 }  // extern "C"

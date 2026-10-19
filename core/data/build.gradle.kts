@@ -7,6 +7,7 @@ plugins {
 dependencies {
     api(projects.core.model)
     api(projects.core.pdf)
+    implementation(projects.core.signature)
     implementation(projects.core.common)
     implementation(projects.core.database)
     implementation(projects.core.datastore)
