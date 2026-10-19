@@ -15,6 +15,7 @@ import com.mustafakoceerr.thememanager.settingsOrDefault
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.mustafakoceerr.tilepdf.core.common.KeyEventHost
+import com.mustafakoceerr.tilepdf.model.AppPalette
 import com.mustafakoceerr.tilepdf.navigation.TilePdfNavHost
 import com.mustafakoceerr.tilepdf.ui.theme.TilePDFTheme
 import dagger.hilt.android.AndroidEntryPoint
@@ -35,13 +36,16 @@ class MainActivity : AppCompatActivity(), KeyEventHost {
         super.onCreate(savedInstanceState)
         // Reading the stored theme takes a few milliseconds; drawing before it
         // would flash the system's theme first.
-        splashScreen.setKeepOnScreenCondition { viewModel.themeState.value is ThemeState.Loading }
+        splashScreen.setKeepOnScreenCondition {
+            viewModel.themeState.value is ThemeState.Loading || viewModel.palette.value == null
+        }
         enableEdgeToEdge()
         // After recreation the reader is already on the restored back stack.
         if (savedInstanceState == null) pendingDocument = intent.incomingDocumentUri()
         setContent {
             val themeState by viewModel.themeState.collectAsStateWithLifecycle()
-            TilePDFTheme(themeState.settingsOrDefault) {
+            val palette by viewModel.palette.collectAsStateWithLifecycle()
+            TilePDFTheme(themeState.settingsOrDefault, palette ?: AppPalette.Violet) {
                 TilePdfNavHost(
                     openDocument = pendingDocument,
                     onDocumentOpened = { pendingDocument = null },

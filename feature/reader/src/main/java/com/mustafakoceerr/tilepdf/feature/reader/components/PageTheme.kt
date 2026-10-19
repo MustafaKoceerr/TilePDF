@@ -6,6 +6,11 @@ import androidx.compose.ui.graphics.ColorMatrix
 import com.mustafakoceerr.tilepdf.model.PageTheme
 
 private val SepiaPaper = Color(0xFFF4ECD8)
+private val GreenPaper = Color(0xFFCCE8CF)
+private val DimPaper = Color(0xFF2B2B2B)
+private val DimInk = Color(0xFFC8C8C8)
+private val WarmNightPaper = Color(0xFF2A2118)
+private val WarmNightInk = Color(0xFFE8D9C0)
 
 /** Inverts colours without re-rendering: white paper becomes black. */
 private val NightMatrix = floatArrayOf(
@@ -15,11 +20,22 @@ private val NightMatrix = floatArrayOf(
     0f, 0f, 0f, 1f, 0f,
 )
 
-/** Multiplies each channel by the paper colour: white becomes paper, black stays black. */
-private val SepiaMatrix = floatArrayOf(
-    SepiaPaper.red, 0f, 0f, 0f, 0f,
-    0f, SepiaPaper.green, 0f, 0f, 0f,
-    0f, 0f, SepiaPaper.blue, 0f, 0f,
+/** Multiplies each channel by [paper]: white becomes paper, black stays black. */
+private fun tintMatrix(paper: Color) = floatArrayOf(
+    paper.red, 0f, 0f, 0f, 0f,
+    0f, paper.green, 0f, 0f, 0f,
+    0f, 0f, paper.blue, 0f, 0f,
+    0f, 0f, 0f, 1f, 0f,
+)
+
+/**
+ * Inverts into a dark [paper] with [ink] for text: white becomes paper and
+ * black becomes ink, so text is never pure white on pure black.
+ */
+private fun darkMatrix(paper: Color, ink: Color) = floatArrayOf(
+    paper.red - ink.red, 0f, 0f, 0f, ink.red * 255,
+    0f, paper.green - ink.green, 0f, 0f, ink.green * 255,
+    0f, 0f, paper.blue - ink.blue, 0f, ink.blue * 255,
     0f, 0f, 0f, 1f, 0f,
 )
 
@@ -27,7 +43,10 @@ private val SepiaMatrix = floatArrayOf(
 internal fun PageTheme.colorMatrix(): ColorMatrix? = when (this) {
     PageTheme.Light -> null
     PageTheme.Night -> ColorMatrix(NightMatrix.copyOf())
-    PageTheme.Sepia -> ColorMatrix(SepiaMatrix.copyOf())
+    PageTheme.Sepia -> ColorMatrix(tintMatrix(SepiaPaper))
+    PageTheme.Green -> ColorMatrix(tintMatrix(GreenPaper))
+    PageTheme.Dim -> ColorMatrix(darkMatrix(DimPaper, DimInk))
+    PageTheme.WarmNight -> ColorMatrix(darkMatrix(WarmNightPaper, WarmNightInk))
 }
 
 internal fun PageTheme.colorFilter(): ColorFilter? = colorMatrix()?.let(ColorFilter::colorMatrix)
@@ -49,4 +68,7 @@ internal val PageTheme.paperColor: Color
         PageTheme.Light -> Color.White
         PageTheme.Night -> Color.Black
         PageTheme.Sepia -> SepiaPaper
+        PageTheme.Green -> GreenPaper
+        PageTheme.Dim -> DimPaper
+        PageTheme.WarmNight -> WarmNightPaper
     }

@@ -220,6 +220,7 @@ class ReaderViewModel @Inject constructor(
      * pages are the same, and the reader is still where the jump took them.
      */
     private val jumpHistory = MutableStateFlow(JumpHistory())
+    private val jumpBackTimer = JumpBackTimer(viewModelScope)
     private val currentPage = MutableStateFlow(0)
     private val fullScreen = MutableStateFlow(false)
 
@@ -758,6 +759,7 @@ class ReaderViewModel @Inject constructor(
     fun onJump(jump: PageJump) {
         val from = position ?: ReadingPosition(pageIndex = currentPage.value)
         jumpHistory.update { it.jumped(from, jump.pageIndex) }
+        if (jumpHistory.value.origin != null) jumpBackTimer.restart { jumpHistory.value = JumpHistory() }
         linkTargets.update { it.copy(jump = jump) }
     }
 
@@ -767,6 +769,7 @@ class ReaderViewModel @Inject constructor(
         val pageCount = openedDocument()?.pageCount ?: return
         val page = origin.pageIndex.coerceIn(0, pageCount - 1)
         jumpHistory.value = JumpHistory()
+        jumpBackTimer.cancel()
         // A fraction of the page as laid out: right however the pages are turned or cropped.
         linkTargets.update { it.copy(jump = PageJump(page, offsetFraction = origin.pageOffsetFraction)) }
     }

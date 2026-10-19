@@ -15,6 +15,8 @@ import com.mustafakoceerr.tilepdf.data.document.SafDocumentRepository
 import com.mustafakoceerr.tilepdf.data.library.LibraryRepository
 import com.mustafakoceerr.tilepdf.data.library.OfflineLibraryRepository
 import com.mustafakoceerr.tilepdf.data.preferences.DataStoreLibraryPreferencesRepository
+import com.mustafakoceerr.tilepdf.data.preferences.AppPaletteRepository
+import com.mustafakoceerr.tilepdf.data.preferences.DataStoreAppPaletteRepository
 import com.mustafakoceerr.tilepdf.data.preferences.DataStoreReaderPreferencesRepository
 import com.mustafakoceerr.tilepdf.data.preferences.LibraryPreferencesRepository
 import com.mustafakoceerr.tilepdf.data.preferences.ReaderPreferencesRepository
@@ -69,6 +71,9 @@ interface DataModule {
     fun bindsReaderPreferencesRepository(
         impl: DataStoreReaderPreferencesRepository,
     ): ReaderPreferencesRepository
+
+    @Binds
+    fun bindsAppPaletteRepository(impl: DataStoreAppPaletteRepository): AppPaletteRepository
 
     @Binds
     fun bindsDocumentTextRepository(impl: CachingDocumentTextRepository): DocumentTextRepository

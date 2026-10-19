@@ -1,17 +1,23 @@
 package com.mustafakoceerr.tilepdf.feature.settings
 
 import androidx.annotation.StringRes
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -29,6 +35,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -42,7 +50,9 @@ import com.mustafakoceerr.thememanager.ThemeMode
 import com.mustafakoceerr.thememanager.ThemeSettings
 import com.mustafakoceerr.tilepdf.core.designsystem.TilePdfIcons
 import com.mustafakoceerr.tilepdf.model.AppLanguage
+import com.mustafakoceerr.tilepdf.model.AppPalette
 import com.mustafakoceerr.tilepdf.ui.theme.TilePDFTheme
+import com.mustafakoceerr.tilepdf.ui.theme.swatch
 
 @Composable
 fun SettingsScreen(
@@ -56,6 +66,7 @@ fun SettingsScreen(
         onBack = onBack,
         onThemeModeSelected = viewModel::onThemeModeSelected,
         onDynamicColorChanged = viewModel::onDynamicColorChanged,
+        onPaletteSelected = viewModel::onPaletteSelected,
         onLanguageSelected = viewModel::onLanguageSelected,
         onOpenAbout = onOpenAbout,
     )
@@ -68,6 +79,7 @@ internal fun SettingsScreen(
     onBack: () -> Unit,
     onThemeModeSelected: (ThemeMode) -> Unit = {},
     onDynamicColorChanged: (Boolean) -> Unit = {},
+    onPaletteSelected: (AppPalette) -> Unit = {},
     onLanguageSelected: (AppLanguage) -> Unit = {},
     onOpenAbout: () -> Unit = {},
 ) {
@@ -101,6 +113,12 @@ internal fun SettingsScreen(
                         )
                     }
                 }
+                PaletteRow(
+                    selected = uiState.palette,
+                    // Material You covers the palette; picking one turns it off.
+                    covered = uiState.dynamicColorAvailable && uiState.theme.useDynamicColor,
+                    onSelect = onPaletteSelected,
+                )
                 if (uiState.dynamicColorAvailable) {
                     SwitchRow(
                         title = stringResource(R.string.settings_dynamic_color),
@@ -176,6 +194,60 @@ private fun SwitchRow(title: String, summary: String, checked: Boolean, onChecke
     }
 }
 
+/** The palettes as coloured dots, each with its name; faded while Material You covers them. */
+@Composable
+private fun PaletteRow(selected: AppPalette, covered: Boolean, onSelect: (AppPalette) -> Unit) {
+    Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+        Text(stringResource(R.string.settings_palette), style = MaterialTheme.typography.bodyLarge)
+        Row(
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp)
+                .selectableGroup()
+                .alpha(if (covered) 0.5f else 1f),
+        ) {
+            AppPalette.entries.forEach { palette ->
+                val isSelected = palette == selected && !covered
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier
+                        .selectable(selected = isSelected, role = Role.RadioButton, onClick = { onSelect(palette) })
+                        .padding(8.dp),
+                ) {
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .size(40.dp)
+                            .background(palette.swatch, CircleShape)
+                            .border(
+                                width = if (isSelected) 3.dp else 1.dp,
+                                color = if (isSelected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outline,
+                                shape = CircleShape,
+                            ),
+                    ) {
+                        if (isSelected) Icon(painterResource(TilePdfIcons.Check), contentDescription = null, tint = Color.White)
+                    }
+                    Text(
+                        stringResource(palette.labelRes),
+                        style = MaterialTheme.typography.labelMedium,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@get:StringRes
+private val AppPalette.labelRes: Int
+    get() = when (this) {
+        AppPalette.Violet -> R.string.palette_violet
+        AppPalette.Ocean -> R.string.palette_ocean
+        AppPalette.Forest -> R.string.palette_forest
+        AppPalette.Sand -> R.string.palette_sand
+    }
+
 @get:StringRes
 private val ThemeMode.labelRes: Int
     get() = when (this) {
@@ -197,7 +269,12 @@ private val AppLanguage.labelRes: Int
 private fun SettingsScreenPreview() {
     TilePDFTheme {
         SettingsScreen(
-            uiState = SettingsUiState.Success(ThemeSettings(mode = ThemeMode.DARK), AppLanguage.Turkish, dynamicColorAvailable = true),
+            uiState = SettingsUiState.Success(
+                ThemeSettings(mode = ThemeMode.DARK),
+                AppLanguage.Turkish,
+                AppPalette.Sand,
+                dynamicColorAvailable = true,
+            ),
             onBack = {},
         )
     }

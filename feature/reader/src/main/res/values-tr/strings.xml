@@ -10,6 +10,9 @@
     <string name="reader_theme_light">Açık</string>
     <string name="reader_theme_night">Gece</string>
     <string name="reader_theme_sepia">Sepya</string>
+    <string name="reader_theme_green">Yeşil</string>
+    <string name="reader_theme_dim">Loş</string>
+    <string name="reader_theme_warm_night">Sıcak gece</string>
     <string name="reader_keep_screen_on">Ekranı açık tut</string>
     <string name="reader_volume_keys">Ses tuşlarıyla sayfa çevir</string>
     <string name="reader_two_page_spreads">Geniş ekranda iki sayfa yan yana</string>
@@ -126,6 +129,7 @@
     <string name="recognize_failed">Metin tanınamadı</string>
     <string name="reader_rotate">Sayfaları döndür</string>
     <string name="reader_crop_margins">Kenar boşluklarını kırp</string>
+    <string name="reader_crop_margins_recommended">Önerilen</string>
     <string name="reader_print">Yazdır</string>
     <string name="reader_hand_off_failed">Belge hazırlanamadı.</string>
     <string name="reader_no_app_for_share">Bu belgeyi alabilecek uygulama yok</string>

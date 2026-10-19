@@ -7,7 +7,9 @@ import com.mustafakoceerr.thememanager.ThemeManager
 import com.mustafakoceerr.thememanager.ThemeMode
 import com.mustafakoceerr.thememanager.ThemeState
 import com.mustafakoceerr.thememanager.isDynamicColorAvailable
+import com.mustafakoceerr.tilepdf.data.preferences.AppPaletteRepository
 import com.mustafakoceerr.tilepdf.model.AppLanguage
+import com.mustafakoceerr.tilepdf.model.AppPalette
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -20,18 +22,21 @@ import javax.inject.Inject
 class SettingsViewModel @Inject constructor(
     private val themeManager: ThemeManager,
     private val languageManager: LanguageManager,
+    private val paletteRepository: AppPaletteRepository,
 ) : ViewModel() {
 
     /** The language follows the platform, so a change in system settings shows up too. */
     val uiState: StateFlow<SettingsUiState> = combine(
         themeManager.themeState,
         languageManager.languageMode,
-    ) { theme, language ->
+        paletteRepository.palette,
+    ) { theme, language, palette ->
         when (theme) {
             ThemeState.Loading -> SettingsUiState.Loading
             is ThemeState.Ready -> SettingsUiState.Success(
                 theme = theme.settings,
                 language = language.toAppLanguage(),
+                palette = palette,
                 dynamicColorAvailable = isDynamicColorAvailable,
             )
         }
@@ -47,6 +52,14 @@ class SettingsViewModel @Inject constructor(
 
     fun onDynamicColorChanged(enabled: Boolean) {
         viewModelScope.launch { themeManager.setUseDynamicColor(enabled) }
+    }
+
+    /** Material You would cover the palette, so choosing one turns it off. */
+    fun onPaletteSelected(palette: AppPalette) {
+        viewModelScope.launch {
+            paletteRepository.setPalette(palette)
+            themeManager.setUseDynamicColor(false)
+        }
     }
 
     /** The activity is recreated in the new language. Main thread only. */

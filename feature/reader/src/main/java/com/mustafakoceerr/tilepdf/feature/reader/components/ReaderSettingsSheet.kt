@@ -1,13 +1,20 @@
 package com.mustafakoceerr.tilepdf.feature.reader.components
 
 import androidx.annotation.StringRes
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SegmentedButton
@@ -50,13 +57,7 @@ internal fun ReaderSettingsSheet(
                 label = ReadingMode::labelRes,
                 onSelect = onReadingModeSelected,
             )
-            ChoiceRow(
-                title = R.string.reader_theme,
-                options = PageTheme.entries,
-                selected = preferences.pageTheme,
-                label = PageTheme::labelRes,
-                onSelect = onPageThemeSelected,
-            )
+            ThemeChoice(selected = preferences.pageTheme, onSelect = onPageThemeSelected)
             SwitchRow(R.string.reader_keep_screen_on, preferences.keepScreenOn, onKeepScreenOnChange)
             SwitchRow(R.string.reader_volume_keys, preferences.volumeKeysTurnPages, onVolumeKeysChange)
             // Spreads are a horizontal-layout thing.
@@ -109,6 +110,36 @@ private fun <T> ChoiceRow(
     }
 }
 
+/** Day themes first, then the dark ones, darkest last. */
+private val ThemeOrder = listOf(
+    PageTheme.Light, PageTheme.Sepia, PageTheme.Green, PageTheme.Dim, PageTheme.WarmNight, PageTheme.Night,
+)
+
+/** The page themes as chips, each with a dot of its paper colour; too many for one segmented row. */
+@Composable
+private fun ThemeChoice(selected: PageTheme, onSelect: (PageTheme) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(stringResource(R.string.reader_theme), style = MaterialTheme.typography.titleSmall)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            ThemeOrder.forEach { theme ->
+                FilterChip(
+                    selected = theme == selected,
+                    onClick = { onSelect(theme) },
+                    label = { Text(stringResource(theme.labelRes)) },
+                    leadingIcon = {
+                        Box(
+                            Modifier
+                                .size(16.dp)
+                                .background(theme.paperColor, CircleShape)
+                                .border(1.dp, MaterialTheme.colorScheme.outline, CircleShape),
+                        )
+                    },
+                )
+            }
+        }
+    }
+}
+
 @get:StringRes
 private val ReadingMode.labelRes: Int
     get() = when (this) {
@@ -122,4 +153,7 @@ private val PageTheme.labelRes: Int
         PageTheme.Light -> R.string.reader_theme_light
         PageTheme.Night -> R.string.reader_theme_night
         PageTheme.Sepia -> R.string.reader_theme_sepia
+        PageTheme.Green -> R.string.reader_theme_green
+        PageTheme.Dim -> R.string.reader_theme_dim
+        PageTheme.WarmNight -> R.string.reader_theme_warm_night
     }
