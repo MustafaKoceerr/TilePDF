@@ -27,6 +27,8 @@ IMAGES = HERE.parent / "metadata" / "android" / "en-US" / "images"
 SLIDES = json.loads((HERE / "slides.json").read_text(encoding="utf-8"))
 FONTS = (HERE / "fonts").as_uri()
 ICONS = HERE / "icons"
+# Both tablet folders get the same frames; the suffix tells the copies apart.
+SUFFIX = {"sevenInchScreenshots": "-7in", "tenInchScreenshots": "-10in"}
 
 # The raw screenshot size per device kind, and the frame drawn around it.
 KINDS = {
@@ -242,7 +244,7 @@ def render_set(kind_name: str, folders: list[str]) -> None:
         for old in target.glob("*.png"):
             old.unlink()
         for i, s in enumerate(slides):
-            out = target / f"{s['file']}.png"
+            out = target / f"{s['file']}{SUFFIX.get(folder, '')}.png"
             panorama.crop((i * cw, 0, (i + 1) * cw, ch)).save(out, optimize=True)
             print("wrote", out.relative_to(HERE.parent.parent))
 

@@ -26,7 +26,7 @@ a tile renderer written from scratch on top.
   </tr>
 </table>
 <p align="center">
-  <img src="fastlane/metadata/android/en-US/images/tenInchScreenshots/02_spread.png" alt="Two pages side by side on a tablet" width="820">
+  <img src="fastlane/metadata/android/en-US/images/tenInchScreenshots/02_spread-10in.png" alt="Two pages side by side on a tablet" width="820">
 </p>
 
 ## Under the hood
