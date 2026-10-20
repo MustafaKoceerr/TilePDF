@@ -66,6 +66,8 @@ internal fun PdfPageList(
     drawingFor: ((pageIndex: Int) -> PageDrawing)? = null,
     /** Fillable form widgets by page. */
     formFields: Map<Int, List<FormField>> = emptyMap(),
+    /** Keeps the page number showing, not only while scrolling. */
+    pinPageIndicator: Boolean = false,
 ) {
     val matchesByPage = remember(matches) { matches.groupBy { it.pageIndex } }
 
@@ -174,6 +176,7 @@ internal fun PdfPageList(
         PageNavigationOverlay(
             listState = listState,
             pageCount = pageSizes.size,
+            pinned = pinPageIndicator,
             onRequestGoToPage = { onGoToPageOpenChange(true) },
             modifier = Modifier.fillMaxSize().padding(chromePadding),
         )

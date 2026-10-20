@@ -53,3 +53,11 @@ fun libraryRows(
  */
 fun revealsNewTopRow(previousTop: String?, newTop: String?, firstVisibleIndex: Int): Boolean =
     previousTop != null && newTop != previousTop && firstVisibleIndex <= 1
+
+/**
+ * How far through its pages a document was read, `0..1`, counting the page
+ * it was left on; `null` before reading past the first page or when the
+ * length isn't known, so a row only shows progress that means something.
+ */
+fun readingProgress(pageIndex: Int, pageCount: Int): Float? =
+    if (pageIndex <= 0 || pageCount <= 0) null else ((pageIndex + 1).toFloat() / pageCount).coerceAtMost(1f)

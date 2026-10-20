@@ -70,6 +70,7 @@
     <string name="annotation_kind_other">Açıklama</string>
     <string name="annotation_page">Sayfa %1$d</string>
     <string name="reader_save_copy">Kopya olarak kaydet</string>
+    <string name="reader_copy_name">%1$s (açıklamalı).pdf</string>
     <string name="reader_share">Paylaş</string>
     <string name="reader_add_signature">İmza ekle</string>
     <string name="signature_title">İmzanız</string>

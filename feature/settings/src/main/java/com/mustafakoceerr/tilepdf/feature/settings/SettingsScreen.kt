@@ -49,6 +49,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mustafakoceerr.thememanager.ThemeMode
 import com.mustafakoceerr.thememanager.ThemeSettings
 import com.mustafakoceerr.tilepdf.core.designsystem.TilePdfIcons
+import com.mustafakoceerr.tilepdf.core.designsystem.readableWidth
 import com.mustafakoceerr.tilepdf.model.AppLanguage
 import com.mustafakoceerr.tilepdf.model.AppPalette
 import com.mustafakoceerr.tilepdf.ui.theme.TilePDFTheme
@@ -97,53 +98,57 @@ internal fun SettingsScreen(
     ) { innerPadding ->
         when (uiState) {
             SettingsUiState.Loading -> CircularProgressIndicator(Modifier.padding(innerPadding).padding(24.dp))
+            // The whole screen scrolls; the rows sit in a readable column in the middle.
             is SettingsUiState.Success -> Column(
-                Modifier
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding)
                     .verticalScroll(rememberScrollState()),
             ) {
-                SectionTitle(R.string.settings_theme)
-                Column(Modifier.selectableGroup()) {
-                    ThemeMode.entries.forEach { mode ->
-                        RadioRow(
-                            label = stringResource(mode.labelRes),
-                            selected = uiState.theme.mode == mode,
-                            onClick = { onThemeModeSelected(mode) },
+                Column(Modifier.readableWidth()) {
+                    SectionTitle(R.string.settings_theme)
+                    Column(Modifier.selectableGroup()) {
+                        ThemeMode.entries.forEach { mode ->
+                            RadioRow(
+                                label = stringResource(mode.labelRes),
+                                selected = uiState.theme.mode == mode,
+                                onClick = { onThemeModeSelected(mode) },
+                            )
+                        }
+                    }
+                    PaletteRow(
+                        selected = uiState.palette,
+                        // Material You covers the palette; picking one turns it off.
+                        covered = uiState.dynamicColorAvailable && uiState.theme.useDynamicColor,
+                        onSelect = onPaletteSelected,
+                    )
+                    if (uiState.dynamicColorAvailable) {
+                        SwitchRow(
+                            title = stringResource(R.string.settings_dynamic_color),
+                            summary = stringResource(R.string.settings_dynamic_color_summary),
+                            checked = uiState.theme.useDynamicColor,
+                            onCheckedChange = onDynamicColorChanged,
                         )
                     }
-                }
-                PaletteRow(
-                    selected = uiState.palette,
-                    // Material You covers the palette; picking one turns it off.
-                    covered = uiState.dynamicColorAvailable && uiState.theme.useDynamicColor,
-                    onSelect = onPaletteSelected,
-                )
-                if (uiState.dynamicColorAvailable) {
-                    SwitchRow(
-                        title = stringResource(R.string.settings_dynamic_color),
-                        summary = stringResource(R.string.settings_dynamic_color_summary),
-                        checked = uiState.theme.useDynamicColor,
-                        onCheckedChange = onDynamicColorChanged,
+                    HorizontalDivider(Modifier.padding(vertical = 8.dp))
+                    SectionTitle(R.string.settings_language)
+                    // Language names are written in their own language, so anyone can find theirs.
+                    Column(Modifier.selectableGroup()) {
+                        AppLanguage.entries.forEach { language ->
+                            RadioRow(
+                                label = stringResource(language.labelRes),
+                                selected = uiState.language == language,
+                                onClick = { onLanguageSelected(language) },
+                            )
+                        }
+                    }
+                    HorizontalDivider(Modifier.padding(vertical = 8.dp))
+                    ListItem(
+                        headlineContent = { Text(stringResource(R.string.settings_about)) },
+                        modifier = Modifier.clickable(onClick = onOpenAbout),
                     )
                 }
-                HorizontalDivider(Modifier.padding(vertical = 8.dp))
-                SectionTitle(R.string.settings_language)
-                // Language names are written in their own language, so anyone can find theirs.
-                Column(Modifier.selectableGroup()) {
-                    AppLanguage.entries.forEach { language ->
-                        RadioRow(
-                            label = stringResource(language.labelRes),
-                            selected = uiState.language == language,
-                            onClick = { onLanguageSelected(language) },
-                        )
-                    }
-                }
-                HorizontalDivider(Modifier.padding(vertical = 8.dp))
-                ListItem(
-                    headlineContent = { Text(stringResource(R.string.settings_about)) },
-                    modifier = Modifier.clickable(onClick = onOpenAbout),
-                )
             }
         }
     }

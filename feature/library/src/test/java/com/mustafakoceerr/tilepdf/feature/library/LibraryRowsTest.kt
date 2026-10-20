@@ -94,4 +94,16 @@ class LibraryRowsTest {
         assertFalse(revealsNewTopRow(previousTop = "content://a", newTop = "content://b", firstVisibleIndex = 7))
         assertFalse(revealsNewTopRow(previousTop = null, newTop = "content://b", firstVisibleIndex = 1))
     }
+
+    @Test
+    fun progressIsHowFarThroughTheDocumentTheReaderGot() {
+        assertEquals(0.5f, readingProgress(pageIndex = 49, pageCount = 100)!!, 0.0001f)
+        assertEquals(1f, readingProgress(pageIndex = 99, pageCount = 100)!!, 0.0001f)
+    }
+
+    @Test
+    fun noProgressIsShownBeforeReadingStartedOrForAnUnknownLength() {
+        assertEquals(null, readingProgress(pageIndex = 0, pageCount = 100))
+        assertEquals(null, readingProgress(pageIndex = 3, pageCount = 0))
+    }
 }

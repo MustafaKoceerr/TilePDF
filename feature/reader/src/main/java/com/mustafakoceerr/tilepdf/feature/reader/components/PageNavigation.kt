@@ -93,12 +93,13 @@ internal fun parsePageNumber(text: String, pageCount: Int): Int? =
 /**
  * Overlays for moving through a long document: a draggable scrollbar thumb
  * and a "12 / 300" page indicator, both shown while scrolling; tapping the
- * indicator asks for a page number.
+ * indicator asks for a page number. While [pinned], the indicator stays.
  */
 @Composable
 internal fun PageNavigationOverlay(
     listState: LazyListState,
     pageCount: Int,
+    pinned: Boolean,
     onRequestGoToPage: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -129,7 +130,7 @@ internal fun PageNavigationOverlay(
             )
         }
         AnimatedVisibility(
-            visible = visible,
+            visible = visible || pinned,
             enter = fadeIn(),
             exit = fadeOut(),
             modifier = Modifier

@@ -23,4 +23,7 @@
     <string name="library_no_results">Sonuç yok</string>
     <string name="library_row_options">%1$s seçenekleri</string>
     <string name="library_settings">Ayarlar</string>
+    <string name="library_empty_title">Kütüphanen boş</string>
+    <string name="library_no_favorites_hint">Bir PDF\'i burada tutmak için yıldızına dokun.</string>
+    <string name="library_no_results_hint">Başka bir kelime ya da dosya adının bir kısmını dene.</string>
 </resources>

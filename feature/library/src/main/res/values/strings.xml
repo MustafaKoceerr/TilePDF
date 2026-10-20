@@ -23,4 +23,7 @@
     <string name="library_no_results">No results</string>
     <string name="library_row_options">Options for %1$s</string>
     <string name="library_settings">Settings</string>
+    <string name="library_empty_title">Your library is empty</string>
+    <string name="library_no_favorites_hint">Tap the star on a PDF to keep it here.</string>
+    <string name="library_no_results_hint">Try another word, or part of the file name.</string>
 </resources>

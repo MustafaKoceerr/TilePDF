@@ -103,7 +103,7 @@ private const val XFA_FIELD = -1
 /** Pages flip by quickly while scrolling; only the one the reader stops on is checked for text. */
 private const val TEXT_CHECK_DELAY_MS = 400L
 
-/** Twice the library's 40 dp row picture at most densities, still small as a PNG. */
+/** Room for the library's 48 dp row picture up to xxxhdpi, still small as a PNG. */
 private const val THUMBNAIL_WIDTH_PX = 240
 
 @HiltViewModel

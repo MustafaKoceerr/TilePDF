@@ -73,6 +73,8 @@
     <string name="annotation_kind_other">Annotation</string>
     <string name="annotation_page">Page %1$d</string>
     <string name="reader_save_copy">Save as copy</string>
+    <!-- The file name offered for the copy; %1$s is the document's name without ".pdf". -->
+    <string name="reader_copy_name">%1$s (annotated).pdf</string>
     <string name="reader_share">Share</string>
     <string name="reader_add_signature">Add signature</string>
     <string name="signature_title">Your signature</string>
