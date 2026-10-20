@@ -10,6 +10,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -85,6 +86,9 @@ private const val PDF_MIME_TYPE = "application/pdf"
 /** A library row needs about this much width; wider screens get more columns. */
 private val MinRowWidth = 360.dp
 
+/** The floating button's height and margin, with a little air. */
+private val FabClearance = 88.dp
+
 @Composable
 fun LibraryScreen(
     onOpenDocument: (uri: String) -> Unit,
@@ -142,8 +146,12 @@ internal fun LibraryScreen(uiState: LibraryUiState, actions: LibraryActions) {
     // The bar steps aside while scrolling down and comes back on the way up.
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
     val gridState = rememberLazyGridState()
+    val showingList = success?.items?.isNotEmpty() == true
+    // With no list to drag, a bar that stepped aside could never be brought back.
+    LaunchedEffect(showingList) { if (!showingList) scrollBehavior.state.heightOffset = 0f }
     // At the top, or heading back up, the button says what it does; otherwise it's just the icon.
-    val fabExpanded by remember { derivedStateOf { gridState.firstVisibleItemIndex == 0 || gridState.lastScrolledBackward } }
+    val scrolledDown by remember { derivedStateOf { gridState.firstVisibleItemIndex > 0 && !gridState.lastScrolledBackward } }
+    val fabExpanded = !showingList || !scrolledDown
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
@@ -357,7 +365,13 @@ private fun DocumentList(items: List<LibraryItem>, gridState: LazyGridState, act
         shownTop = top
     }
     // One column on phones; wide screens fit several rows side by side.
-    LazyVerticalGrid(columns = GridCells.Adaptive(MinRowWidth), state = gridState, modifier = Modifier.fillMaxSize()) {
+    LazyVerticalGrid(
+        columns = GridCells.Adaptive(MinRowWidth),
+        state = gridState,
+        // Room to scroll the last row out from under the Open PDF button.
+        contentPadding = PaddingValues(bottom = FabClearance),
+        modifier = Modifier.fillMaxSize(),
+    ) {
         items(items, key = { it.document.uri }) { item ->
             val document = item.document
             ListItem(
