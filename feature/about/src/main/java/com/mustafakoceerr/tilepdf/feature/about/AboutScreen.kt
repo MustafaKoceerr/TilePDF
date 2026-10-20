@@ -30,6 +30,7 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -41,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import com.mikepenz.aboutlibraries.ui.compose.m3.LibrariesContainer
 import com.mikepenz.aboutlibraries.ui.compose.android.produceLibraries
 import com.mustafakoceerr.tilepdf.core.designsystem.TilePdfIcons
+import com.mustafakoceerr.tilepdf.core.designsystem.readableWidth
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -84,33 +86,38 @@ private fun AboutContent(onOpenLibraries: () -> Unit, modifier: Modifier = Modif
     }
     var open by rememberSaveable { mutableStateOf<String?>(null) }
 
-    LazyColumn(modifier.fillMaxSize()) {
+    // The whole screen scrolls; each row keeps to a readable width in the middle.
+    LazyColumn(modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
         item {
-            Column(Modifier.padding(16.dp)) {
-                Text("TilePDF", style = MaterialTheme.typography.headlineMedium)
-                Text(stringResource(R.string.about_version, version), style = MaterialTheme.typography.bodyMedium)
-                Text(
-                    text = stringResource(R.string.about_offline),
-                    style = MaterialTheme.typography.bodyLarge,
-                    modifier = Modifier.padding(top = 16.dp),
-                )
+            Column(Modifier.readableWidth()) {
+                Column(Modifier.padding(16.dp)) {
+                    Text("TilePDF", style = MaterialTheme.typography.headlineMedium)
+                    Text(stringResource(R.string.about_version, version), style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        text = stringResource(R.string.about_offline),
+                        style = MaterialTheme.typography.bodyLarge,
+                        modifier = Modifier.padding(top = 16.dp),
+                    )
+                }
+                HorizontalDivider()
             }
-            HorizontalDivider()
         }
         item { SectionTitle(R.string.about_pdfium) }
         items(files, key = { it }) { file ->
             ListItem(
                 headlineContent = { Text(componentName(file)) },
-                modifier = Modifier.clickable { open = file },
+                modifier = Modifier.readableWidth().clickable { open = file },
             )
         }
         item {
-            HorizontalDivider()
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.about_libraries)) },
-                supportingContent = { Text(stringResource(R.string.about_libraries_summary)) },
-                modifier = Modifier.clickable(onClick = onOpenLibraries),
-            )
+            Column(Modifier.readableWidth()) {
+                HorizontalDivider()
+                ListItem(
+                    headlineContent = { Text(stringResource(R.string.about_libraries)) },
+                    supportingContent = { Text(stringResource(R.string.about_libraries_summary)) },
+                    modifier = Modifier.clickable(onClick = onOpenLibraries),
+                )
+            }
         }
     }
 
@@ -124,6 +131,7 @@ private fun SectionTitle(@StringRes text: Int) {
         style = MaterialTheme.typography.titleSmall,
         color = MaterialTheme.colorScheme.primary,
         modifier = Modifier
+            .readableWidth()
             .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 8.dp)
             .semantics { heading() },
     )
