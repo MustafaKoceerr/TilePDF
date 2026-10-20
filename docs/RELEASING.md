@@ -77,9 +77,11 @@ testers for 14 days before it can apply for production.
 
 1. Create the app in Play Console (free, default language English, tr-TR as a
    second listing). Texts are in `fastlane/metadata/android/`. The graphics
-   (icon, feature graphic, 8 phone and 4 tablet screenshots) are only in
-   `en-US/images/`; Play shows them for the Turkish listing too. They are
-   rebuilt from `fastlane/design/` (see its README).
+   (icon, feature graphic, 8 phone and 8 tablet screenshots) are only in
+   `en-US/images/`; Play shows them for the Turkish listing too. Upload them
+   in the order in [fastlane/design/UPLOAD.md](../fastlane/design/UPLOAD.md)
+   (frames 01–04 are the minimum set). They are rebuilt from
+   `fastlane/design/` (see its README).
 2. App content: privacy policy URL
    (<https://mustafakoceerr.github.io/TilePDF/privacy/>), no ads, Advertising
    ID **No**, content rating questionnaire, target audience 18+ (not

@@ -82,4 +82,15 @@ class StoreListingTest {
             assertTrue("$name is over 8 MB", file.length() <= 8L * 1_024 * 1_024)
         }
     }
+
+    @Test
+    fun screenshotsAreNumberedInUploadOrder() = listOf("phoneScreenshots", "sevenInchScreenshots", "tenInchScreenshots").forEach { dir ->
+        // Play and fastlane upload in name order, so the name says where each one goes.
+        val names = pngs(dir).map { it.name }.sorted()
+        names.forEachIndexed { i, name ->
+            val expected = "%02d_".format(i + 1)
+            assertTrue("$dir/$name should start with $expected", name.startsWith(expected))
+            assertTrue("$dir/$name should be NN_name.png", Regex("""\d\d_[a-z0-9-]+\.png""").matches(name))
+        }
+    }
 }
