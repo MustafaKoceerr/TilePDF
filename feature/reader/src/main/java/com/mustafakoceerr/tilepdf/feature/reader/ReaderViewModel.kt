@@ -4,6 +4,9 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.toRoute
+import com.mustafakoceerr.tilepdf.core.analytics.AnalyticsEvent
+import com.mustafakoceerr.tilepdf.core.analytics.AnalyticsHelper
+import com.mustafakoceerr.tilepdf.core.analytics.CrashReporter
 import com.mustafakoceerr.tilepdf.core.common.runCatchingCancellable
 import com.mustafakoceerr.tilepdf.core.pdf.PdfDocument
 import com.mustafakoceerr.tilepdf.core.render.PageRenderer
@@ -124,6 +127,8 @@ class ReaderViewModel @Inject constructor(
     private val signatureStore: SignatureStore,
     private val textRecognizer: TextRecognizer,
     private val documentSignatures: DocumentSignatures,
+    private val analytics: AnalyticsHelper,
+    private val crashReporter: CrashReporter,
     @param:ApplicationScope private val applicationScope: CoroutineScope,
 ) : ViewModel() {
 
@@ -291,6 +296,8 @@ class ReaderViewModel @Inject constructor(
         // The old document's scripts must not hold up its replacement.
         scriptHost.value?.close()
         documentState.value = DocumentState.Loading
+        // A reopen after a save is the same document, not another one opened.
+        val reopening = retiring != null
         openJob = viewModelScope.launch {
             documentState.value = try {
                 val opened = try {
@@ -329,13 +336,19 @@ class ReaderViewModel @Inject constructor(
                 val view = libraryRepository.documentView(opened.uri)
                 if (margins?.size != opened.document.pageCount) margins = null
                 if (view.cropMargins) findMargins(opened)
+                if (!reopening) {
+                    analytics.logEvent(documentOpenedEvent(opened.document.pageCount, documentHasForm, documentIsXfa, encrypted = password != null))
+                }
                 shown(opened, view).also(::startAnnotations)
             } catch (e: Throwable) {
                 // Throwable, not Exception: running out of memory is an Error.
                 if (e is CancellationException) throw e
                 when (val failure = openFailureFor(e) ?: throw e) {
                     is OpenFailure.NeedsPassword -> DocumentState.NeedsPassword(failure.wrongPassword)
-                    is OpenFailure.Failed -> DocumentState.Failed(failure.reason)
+                    is OpenFailure.Failed -> {
+                        if (!reopening) analytics.logEvent(openFailedEvent(failure.reason))
+                        DocumentState.Failed(failure.reason)
+                    }
                 }
             }
             loadFormFields(currentPage.value)
@@ -378,7 +391,9 @@ class ReaderViewModel @Inject constructor(
     }
 
     fun onOpenSignatures() {
-        if (signatures.value.checks.isNotEmpty()) signatures.update { it.copy(open = true) }
+        if (signatures.value.checks.isEmpty()) return
+        analytics.logEvent(readerActionEvent("signatures_opened"))
+        signatures.update { it.copy(open = true) }
     }
 
     fun onCloseSignatures() {
@@ -437,6 +452,7 @@ class ReaderViewModel @Inject constructor(
      */
     private fun setFormValue(name: String, value: String) {
         val state = documentState.value as? DocumentState.Opened ?: return
+        analytics.logEvent(readerActionEvent("form_field_filled"))
         val opened = state.opened
         viewModelScope.launch {
             annotationRepository.setFormValue(opened.uri, name, value)
@@ -480,6 +496,7 @@ class ReaderViewModel @Inject constructor(
 
     private fun writeXfa(focus: XfaEdit, text: String) {
         val opened = (documentState.value as? DocumentState.Opened)?.opened ?: return
+        analytics.logEvent(readerActionEvent("form_field_filled"))
         viewModelScope.launch {
             val written = runCatchingCancellable { opened.document.xfaWrite(focus.pageIndex, text) }.isSuccess
             if (!written) return@launch
@@ -622,6 +639,7 @@ class ReaderViewModel @Inject constructor(
     fun onSaveCopy(target: String) {
         val opened = (documentState.value as? DocumentState.Opened)?.opened ?: return
         val controller = controller.value ?: return
+        analytics.logEvent(readerActionEvent("document_saved_as_copy"))
         viewModelScope.launch {
             controller.flush()
             val result = saveAsCopy(opened.uri, target, opened.displayName, opened.document.pageCount)
@@ -634,10 +652,16 @@ class ReaderViewModel @Inject constructor(
     }
 
     /** Exports the annotated document for the share sheet. */
-    fun onShare() = handOff { uri, opened -> HandOff.Share(uri, opened.displayName) }
+    fun onShare() {
+        analytics.logEvent(readerActionEvent("document_shared"))
+        handOff { uri, opened -> HandOff.Share(uri, opened.displayName) }
+    }
 
     /** Exports the annotated document for the system print dialog. */
-    fun onPrint() = handOff { uri, opened -> HandOff.Print(uri, opened.displayName, opened.document.pageCount) }
+    fun onPrint() {
+        analytics.logEvent(readerActionEvent("document_printed"))
+        handOff { uri, opened -> HandOff.Print(uri, opened.displayName, opened.document.pageCount) }
+    }
 
     fun onHandOffHandled() {
         handOff.value = null
@@ -794,10 +818,12 @@ class ReaderViewModel @Inject constructor(
     }
 
     fun onPageThemeSelected(theme: PageTheme) {
+        analytics.logEvent(AnalyticsEvent("page_theme_selected", mapOf("theme" to theme.name)))
         viewModelScope.launch { preferencesRepository.setPageTheme(theme) }
     }
 
     fun onReadingModeSelected(mode: ReadingMode) {
+        analytics.logEvent(AnalyticsEvent("reading_mode_selected", mapOf("mode" to mode.name)))
         // The other page view starts where this one is now.
         (documentState.value as? DocumentState.Opened)?.opened?.let { opened ->
             startPosition.value = positionForModeSwitch(position ?: opened.position, opened.document.pageCount)
@@ -826,6 +852,7 @@ class ReaderViewModel @Inject constructor(
         val selected = selection.value ?: return
         val controller = controller.value?.takeIf { it.state.value.ready } ?: return
         selection.value = null
+        analytics.logEvent(annotationAddedEvent(kind.name.lowercase()))
         viewModelScope.launch {
             val color = preferencesRepository.preferences.first().markupColor
             val edit = toggleMarkup(selected.page, selected.range, kind, color, controller.state.value.own)
@@ -857,6 +884,7 @@ class ReaderViewModel @Inject constructor(
             edited != null && text.isBlank() -> controller.remove(edited.id)
             edited != null -> controller.replace(edited.id, edited.copy(id = newAnnotationId(), text = text))
             text.isNotBlank() -> viewModelScope.launch {
+                analytics.logEvent(annotationAddedEvent("note"))
                 val color = preferencesRepository.preferences.first().markupColor
                 controller.add(Note(newAnnotationId(), editor.pageIndex, color, editor.at, text))
             }
@@ -902,6 +930,7 @@ class ReaderViewModel @Inject constructor(
     fun onInkStroke(pageIndex: Int, points: List<PdfPoint>) {
         if (points.isEmpty()) return
         val controller = controller.value?.takeIf { it.state.value.ready } ?: return
+        analytics.logEvent(annotationAddedEvent("ink"))
         viewModelScope.launch {
             val preferences = preferencesRepository.preferences.first()
             controller.add(Ink(newAnnotationId(), pageIndex, preferences.penColor, preferences.penWidthPt, listOf(points)))
@@ -946,9 +975,11 @@ class ReaderViewModel @Inject constructor(
                     recognitionResult(allPages, pages.size, pagesWithText)
                 } catch (e: CancellationException) {
                     throw e
-                } catch (_: Exception) {
+                } catch (e: Exception) {
+                    crashReporter.recordNonFatal(e)
                     RecognitionResult.Failed
                 }
+                analytics.logEvent(textRecognitionEvent(allPages, result))
                 recognition.update { it.copy(result = result) }
             } finally {
                 recognition.update { it.copy(progress = null) }
@@ -1027,6 +1058,7 @@ class ReaderViewModel @Inject constructor(
     private fun placeSignature(signature: Signature, pageIndex: Int, centre: PdfPoint) {
         signatureStep.value = null
         val controller = controller.value?.takeIf { it.state.value.ready } ?: return
+        analytics.logEvent(annotationAddedEvent("signature"))
         controller.add(
             Ink(newAnnotationId(), pageIndex, SIGNATURE_COLOR, SIGNATURE_PEN_PT, signature.placedAround(centre, SIGNATURE_WIDTH_PT)),
         )
@@ -1082,6 +1114,7 @@ class ReaderViewModel @Inject constructor(
     }
 
     fun onOpenSearch() {
+        analytics.logEvent(readerActionEvent("search_opened"))
         fullScreen.value = false
         searchState.update { it.copy(isActive = true) }
     }

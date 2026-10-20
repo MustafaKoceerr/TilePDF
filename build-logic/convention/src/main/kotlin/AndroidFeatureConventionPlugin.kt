@@ -10,6 +10,7 @@ class AndroidFeatureConventionPlugin : Plugin<Project> {
             pluginManager.apply("tilepdf.hilt")
             pluginManager.apply("org.jetbrains.kotlin.plugin.serialization")
             with(dependencies) {
+                add("implementation", project(":core:analytics"))
                 add("implementation", project(":core:model"))
                 add("implementation", project(":core:data"))
                 add("implementation", project(":core:domain"))

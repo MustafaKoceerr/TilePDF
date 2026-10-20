@@ -18,6 +18,8 @@ sealed interface LibraryUiState {
         val hasDocuments: Boolean = items.isNotEmpty(),
         /** A removal waiting for its undo window to end; its row is hidden meanwhile. */
         val pendingRemoval: String? = null,
+        /** Ask once whether usage statistics may be sent. */
+        val askForStatistics: Boolean = false,
     ) : LibraryUiState
 }
 

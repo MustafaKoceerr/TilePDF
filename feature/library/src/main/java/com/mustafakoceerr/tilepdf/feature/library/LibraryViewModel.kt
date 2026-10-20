@@ -5,8 +5,10 @@ import androidx.lifecycle.viewModelScope
 import com.mustafakoceerr.tilepdf.data.document.DocumentRepository
 import com.mustafakoceerr.tilepdf.data.library.LibraryRepository
 import com.mustafakoceerr.tilepdf.data.preferences.LibraryPreferencesRepository
+import com.mustafakoceerr.tilepdf.data.preferences.TelemetryPreferencesRepository
 import com.mustafakoceerr.tilepdf.data.thumbnail.ThumbnailStore
 import com.mustafakoceerr.tilepdf.di.ApplicationScope
+import com.mustafakoceerr.tilepdf.model.AnalyticsConsent
 import com.mustafakoceerr.tilepdf.model.LibrarySort
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineScope
@@ -25,6 +27,7 @@ class LibraryViewModel @Inject constructor(
     private val documentRepository: DocumentRepository,
     private val libraryPreferences: LibraryPreferencesRepository,
     private val thumbnails: ThumbnailStore,
+    private val telemetryPreferences: TelemetryPreferencesRepository,
     @param:ApplicationScope private val applicationScope: CoroutineScope,
 ) : ViewModel() {
 
@@ -40,18 +43,22 @@ class LibraryViewModel @Inject constructor(
         libraryPreferences.sort,
         combine(query, searching, filter, ::Triple),
         pendingRemoval,
-    ) { documents, sort, (query, searching, filter), pending ->
+        telemetryPreferences.preferences,
+    ) { documents, sort, (query, searching, filter), pending, telemetry ->
         val accessible = documentRepository.accessibleUris()
         val rows = libraryRows(documents, accessible, query, filter, sort, hidden = setOfNotNull(pending))
         val pictures = thumbnails.find(rows.map { it.document.uri })
+        val hasDocuments = documents.any { it.uri != pending }
         LibraryUiState.Success(
             items = rows.map { it.copy(thumbnail = pictures[it.document.uri]) },
             query = query,
             searching = searching,
             filter = filter,
             sort = sort,
-            hasDocuments = documents.any { it.uri != pending },
+            hasDocuments = hasDocuments,
             pendingRemoval = pending,
+            // Not on the very first launch: by now TilePDF has shown what it's for.
+            askForStatistics = hasDocuments && telemetry.analyticsConsent == AnalyticsConsent.Unasked,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -62,6 +69,12 @@ class LibraryViewModel @Inject constructor(
     /** A file came back from the system picker. */
     fun onDocumentPicked(uri: String) {
         documentRepository.persistAccess(uri)
+    }
+
+    fun onStatisticsAnswered(allowed: Boolean) {
+        viewModelScope.launch {
+            telemetryPreferences.setAnalyticsConsent(if (allowed) AnalyticsConsent.Granted else AnalyticsConsent.Denied)
+        }
     }
 
     fun onSearchOpen() {

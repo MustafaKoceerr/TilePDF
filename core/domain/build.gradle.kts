@@ -4,6 +4,7 @@ plugins {
 }
 
 dependencies {
+    api(projects.core.analytics)
     api(projects.core.data)
     api(projects.core.model)
     api(projects.core.pdf)

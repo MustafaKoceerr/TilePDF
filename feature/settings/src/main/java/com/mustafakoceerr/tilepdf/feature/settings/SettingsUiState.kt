@@ -14,5 +14,8 @@ sealed interface SettingsUiState {
         val palette: AppPalette,
         /** Material You needs Android 12; below it the switch is hidden. */
         val dynamicColorAvailable: Boolean,
+        val crashReportsEnabled: Boolean = true,
+        /** On only once the user agreed to statistics. */
+        val analyticsEnabled: Boolean = false,
     ) : SettingsUiState
 }

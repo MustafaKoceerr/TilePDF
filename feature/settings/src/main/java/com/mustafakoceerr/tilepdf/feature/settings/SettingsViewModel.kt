@@ -7,7 +7,11 @@ import com.mustafakoceerr.thememanager.ThemeManager
 import com.mustafakoceerr.thememanager.ThemeMode
 import com.mustafakoceerr.thememanager.ThemeState
 import com.mustafakoceerr.thememanager.isDynamicColorAvailable
+import com.mustafakoceerr.tilepdf.core.analytics.AnalyticsEvent
+import com.mustafakoceerr.tilepdf.core.analytics.AnalyticsHelper
 import com.mustafakoceerr.tilepdf.data.preferences.AppPaletteRepository
+import com.mustafakoceerr.tilepdf.data.preferences.TelemetryPreferencesRepository
+import com.mustafakoceerr.tilepdf.model.AnalyticsConsent
 import com.mustafakoceerr.tilepdf.model.AppLanguage
 import com.mustafakoceerr.tilepdf.model.AppPalette
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -23,6 +27,8 @@ class SettingsViewModel @Inject constructor(
     private val themeManager: ThemeManager,
     private val languageManager: LanguageManager,
     private val paletteRepository: AppPaletteRepository,
+    private val telemetryPreferences: TelemetryPreferencesRepository,
+    private val analytics: AnalyticsHelper,
 ) : ViewModel() {
 
     /** The language follows the platform, so a change in system settings shows up too. */
@@ -30,7 +36,8 @@ class SettingsViewModel @Inject constructor(
         themeManager.themeState,
         languageManager.languageMode,
         paletteRepository.palette,
-    ) { theme, language, palette ->
+        telemetryPreferences.preferences,
+    ) { theme, language, palette, telemetry ->
         when (theme) {
             ThemeState.Loading -> SettingsUiState.Loading
             is ThemeState.Ready -> SettingsUiState.Success(
@@ -38,6 +45,8 @@ class SettingsViewModel @Inject constructor(
                 language = language.toAppLanguage(),
                 palette = palette,
                 dynamicColorAvailable = isDynamicColorAvailable,
+                crashReportsEnabled = telemetry.crashReportsEnabled,
+                analyticsEnabled = telemetry.analyticsConsent == AnalyticsConsent.Granted,
             )
         }
     }.stateIn(
@@ -47,6 +56,7 @@ class SettingsViewModel @Inject constructor(
     )
 
     fun onThemeModeSelected(mode: ThemeMode) {
+        analytics.logEvent(AnalyticsEvent("theme_selected", mapOf("mode" to mode.name)))
         viewModelScope.launch { themeManager.setThemeMode(mode) }
     }
 
@@ -56,9 +66,21 @@ class SettingsViewModel @Inject constructor(
 
     /** Material You would cover the palette, so choosing one turns it off. */
     fun onPaletteSelected(palette: AppPalette) {
+        analytics.logEvent(AnalyticsEvent("palette_selected", mapOf("palette" to palette.name)))
         viewModelScope.launch {
             paletteRepository.setPalette(palette)
             themeManager.setUseDynamicColor(false)
+        }
+    }
+
+    fun onCrashReportsChanged(enabled: Boolean) {
+        viewModelScope.launch { telemetryPreferences.setCrashReportsEnabled(enabled) }
+    }
+
+    /** Turning statistics off is a no: the library won't ask again. */
+    fun onAnalyticsChanged(enabled: Boolean) {
+        viewModelScope.launch {
+            telemetryPreferences.setAnalyticsConsent(if (enabled) AnalyticsConsent.Granted else AnalyticsConsent.Denied)
         }
     }
 

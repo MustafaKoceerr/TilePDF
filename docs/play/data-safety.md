@@ -5,36 +5,53 @@ permission or a library that sends data, update this file first. The build
 fails on any permission outside the allowlist in
 `build-logic/.../ReleasePermissions.kt`.
 
+## What sends data
+
+| Source | When | What |
+|---|---|---|
+| Firebase Crashlytics | On by default; off in *Settings → Privacy* | Crash and error reports, device and app state, Firebase installation ID |
+| Google Analytics for Firebase | Only after the user allows it (one-time card in the library, or *Settings → Privacy*) | Screen views and feature events with categories only, device model, OS and app version, country from IP, app instance ID |
+| Google ML Kit (text recognition) | Whenever text recognition runs; can't be turned off | ML Kit's own diagnostics: device model, app version, performance |
+
+Documents, their text, file names, paths and annotations are never sent. The
+advertising ID permission (`AD_ID`), Privacy Sandbox ad services and the
+install referrer are removed from the manifest, and ad personalization signals
+are off.
+
 ## Overview
 
 | Question | Answer |
 |---|---|
-| Does your app collect or share any of the required user data types? | **No** |
-| Is all of the user data collected by your app encrypted in transit? | Not applicable: nothing is collected or sent |
-| Do you provide a way for users to request that their data is deleted? | Not applicable: nothing is collected. All app data is deleted by uninstalling, or with *Settings → Apps → TilePDF → Clear storage* |
+| Does your app collect or share any of the required user data types? | **Yes** |
+| Is all of the user data collected by your app encrypted in transit? | **Yes** (Firebase and ML Kit use HTTPS) |
+| Do you provide a way for users to request that their data is deleted? | **Yes**: by email to the address in the privacy policy. Uninstalling or clearing storage also starts a new installation ID |
 
-TilePDF has **no network access**. The release manifest removes
-`android.permission.INTERNET`, and no analytics, crash reporting, ads or
-accounts are included.
+## Data types
 
-Text recognition uses Google ML Kit's bundled model, which runs on the device.
-ML Kit is built to send usage metrics to Google, which Play's guidance would
-count as data the app shares, but only over the network: without `INTERNET`
-it can't send anything, so the answers above still hold. If `INTERNET` is
-ever allowed, ML Kit's metrics must be declared here.
+"Shared" is **No** for every type: Google processes the data on the
+developer's behalf as a service provider, which Play doesn't count as sharing.
+None of it is processed ephemerally.
 
-## What stays on the device
+| Category → type | Collected | Optional? | Purposes |
+|---|---|---|---|
+| App info and performance → **Crash logs** | Yes | Yes (users can turn it off) | Analytics |
+| App info and performance → **Diagnostics** | Yes | No (ML Kit's diagnostics can't be turned off) | Analytics |
+| App activity → **App interactions** | Yes | Yes (only with consent) | Analytics |
+| Device or other IDs → **Device or other IDs** | Yes | No (Firebase installation ID used by Crashlytics and ML Kit) | Analytics |
+| Location → **Approximate location** | Yes | Yes (only with consent; country/city derived from IP by Google Analytics) | Analytics |
 
-- PDFs the user opens are read through Android's file picker, or through "Open
-  with" and "Share" from other apps. Files that can't be kept open later are
-  copied into the app's private storage.
-- Annotations are written into the PDF file itself. Until they are saved, a
-  draft stays in the app's private database.
-- The library list, reading positions and bookmarks live in the app's private
-  database.
-- Preferences: reading settings, theme and language.
+Not collected: personal info, financial info, health, messages, photos and
+videos, audio, files and docs, calendar, contacts, web browsing, precise
+location, installed apps, in-app search history.
 
-Google's data safety guidance doesn't count on-device processing as collection.
+Google's data safety guidance doesn't count on-device processing as
+collection, so the PDFs the app opens and annotates aren't "Files and docs":
+they never leave the device.
+
+## Advertising ID
+
+In Play Console → App content → Advertising ID: **No**, the app doesn't use an
+advertising ID. The merged manifest has no `com.google.android.gms.permission.AD_ID`.
 
 ## Android backup
 
@@ -48,8 +65,9 @@ receives it.
 
 | Permission | Requested by | Why |
 |---|---|---|
-| `ACCESS_NETWORK_STATE` | WorkManager | Part of WorkManager's scheduling; TilePDF's save work has no network constraint and never connects |
-| `WAKE_LOCK` | WorkManager | Keeps the CPU awake while annotations are saved in the background |
+| `INTERNET` | Firebase, ML Kit | Sends crash reports, consented statistics and ML Kit diagnostics |
+| `ACCESS_NETWORK_STATE` | WorkManager, Firebase | Scheduling; Firebase waits for a connection before sending |
+| `WAKE_LOCK` | WorkManager, Firebase | Keeps the CPU awake while annotations are saved in the background |
 | `RECEIVE_BOOT_COMPLETED` | WorkManager | Reschedules a pending annotation save after a reboot |
 | `FOREGROUND_SERVICE` | WorkManager | Lets WorkManager run long work in the foreground if needed |
 | `…DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION` | androidx.core | Signature permission that keeps the app's own broadcast receivers private |
@@ -57,5 +75,7 @@ receives it.
 ## Privacy policy URL
 
 The text is in `docs/play/privacy-policy.md` (English) and
-`privacy-policy-tr.md` (Turkish). Play Console needs a public URL for it, for
-example through GitHub Pages; publishing it is the developer's step.
+`privacy-policy-tr.md` (Turkish), published at
+<https://mustafakoceerr.github.io/tilepdf-privacy/> and
+<https://mustafakoceerr.github.io/tilepdf-privacy/tr/>. The app links to it
+from *Settings → Privacy*.

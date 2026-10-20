@@ -1,3 +1,4 @@
+import com.google.firebase.crashlytics.buildtools.gradle.CrashlyticsExtension
 import com.mustafakoceerr.tilepdf.ReleaseSigning
 import com.mustafakoceerr.tilepdf.releaseSigning
 
@@ -8,6 +9,15 @@ plugins {
     alias(libs.plugins.aboutlibraries.android)
 }
 
+// Firebase (crash reports, statistics) only in builds made with
+// google-services.json, which stays out of the repository; see
+// docs/RELEASING.md. Without it the app builds and sends nothing.
+val hasFirebaseConfig = file("google-services.json").isFile
+if (hasFirebaseConfig) {
+    apply(plugin = libs.plugins.google.services.get().pluginId)
+    apply(plugin = libs.plugins.firebase.crashlytics.get().pluginId)
+}
+
 android {
     namespace = "com.mustafakoceerr.tilepdf"
 
@@ -15,6 +25,8 @@ android {
         applicationId = "com.mustafakoceerr.tilepdf"
         versionCode = 1
         versionName = "1.0.0"
+        // Crashlytics' default before the app applies the user's setting.
+        manifestPlaceholders["crashReportsByDefault"] = "true"
     }
 
     androidResources {
@@ -37,11 +49,25 @@ android {
     }
 
     buildTypes {
+        debug {
+            manifestPlaceholders["crashReportsByDefault"] = "false"
+        }
         release {
             // Symbols of our native code go into the bundle, so Play shows
             // readable stack traces for PDFium crashes.
             ndk {
                 debugSymbolLevel = "SYMBOL_TABLE"
+            }
+            if (hasFirebaseConfig) {
+                configure<CrashlyticsExtension> {
+                    // R8's mapping and the native symbols go to Crashlytics with each
+                    // release build, so its stack traces are readable too. The .so
+                    // files come from library modules, so point at the merged ones
+                    // before they're stripped.
+                    mappingFileUploadEnabled = true
+                    nativeSymbolUploadEnabled = true
+                    unstrippedNativeLibsDir = layout.buildDirectory.dir("intermediates/merged_native_libs/release/mergeReleaseNativeLibs/out/lib")
+                }
             }
             optimization {
                 enable = true
@@ -57,6 +83,13 @@ android {
                 else -> null
             }
         }
+    }
+}
+
+// Crashlytics uploads native symbols only when asked; every release build asks.
+if (hasFirebaseConfig) {
+    tasks.matching { it.name == "assembleRelease" || it.name == "bundleRelease" }.configureEach {
+        finalizedBy("uploadCrashlyticsSymbolFileRelease")
     }
 }
 
@@ -76,6 +109,7 @@ aboutLibraries {
 }
 
 dependencies {
+    implementation(projects.core.analytics)
     implementation(projects.core.common)
     implementation(projects.core.data)
     implementation(projects.core.designsystem)

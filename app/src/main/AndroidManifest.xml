@@ -2,9 +2,20 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- TilePDF never goes online; drop INTERNET even if a library asks for it. -->
+    <!-- The network is used only by Firebase, for crash reports and, if the user
+         allows them, usage statistics. No advertising ID. -->
     <uses-permission
-        android:name="android.permission.INTERNET"
+        android:name="com.google.android.gms.permission.AD_ID"
+        tools:node="remove" />
+    <uses-permission
+        android:name="android.permission.ACCESS_ADSERVICES_AD_ID"
+        tools:node="remove" />
+    <uses-permission
+        android:name="android.permission.ACCESS_ADSERVICES_ATTRIBUTION"
+        tools:node="remove" />
+    <!-- The install referrer is for ad attribution. -->
+    <uses-permission
+        android:name="com.google.android.finsky.permission.BIND_GET_INSTALL_REFERRER_SERVICE"
         tools:node="remove" />
 
     <application
@@ -17,6 +28,19 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.TilePDF">
+        <!-- Statistics wait for the user's yes; TilePdfApp applies it. Nothing for ads. -->
+        <meta-data
+            android:name="firebase_analytics_collection_enabled"
+            android:value="false" />
+        <meta-data
+            android:name="google_analytics_adid_collection_enabled"
+            android:value="false" />
+        <meta-data
+            android:name="google_analytics_default_allow_ad_personalization_signals"
+            android:value="false" />
+        <meta-data
+            android:name="firebase_crashlytics_collection_enabled"
+            android:value="${crashReportsByDefault}" />
         <activity
             android:name=".MainActivity"
             android:exported="true"

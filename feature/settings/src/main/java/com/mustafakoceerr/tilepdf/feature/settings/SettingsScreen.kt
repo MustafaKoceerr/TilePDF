@@ -37,6 +37,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -69,6 +70,8 @@ fun SettingsScreen(
         onDynamicColorChanged = viewModel::onDynamicColorChanged,
         onPaletteSelected = viewModel::onPaletteSelected,
         onLanguageSelected = viewModel::onLanguageSelected,
+        onCrashReportsChanged = viewModel::onCrashReportsChanged,
+        onAnalyticsChanged = viewModel::onAnalyticsChanged,
         onOpenAbout = onOpenAbout,
     )
 }
@@ -82,8 +85,12 @@ internal fun SettingsScreen(
     onDynamicColorChanged: (Boolean) -> Unit = {},
     onPaletteSelected: (AppPalette) -> Unit = {},
     onLanguageSelected: (AppLanguage) -> Unit = {},
+    onCrashReportsChanged: (Boolean) -> Unit = {},
+    onAnalyticsChanged: (Boolean) -> Unit = {},
     onOpenAbout: () -> Unit = {},
 ) {
+    val uriHandler = LocalUriHandler.current
+    val privacyPolicyUrl = stringResource(R.string.privacy_policy_url)
     Scaffold(
         topBar = {
             TopAppBar(
@@ -143,6 +150,24 @@ internal fun SettingsScreen(
                             )
                         }
                     }
+                    HorizontalDivider(Modifier.padding(vertical = 8.dp))
+                    SectionTitle(R.string.settings_privacy)
+                    SwitchRow(
+                        title = stringResource(R.string.settings_crash_reports),
+                        summary = stringResource(R.string.settings_crash_reports_summary),
+                        checked = uiState.crashReportsEnabled,
+                        onCheckedChange = onCrashReportsChanged,
+                    )
+                    SwitchRow(
+                        title = stringResource(R.string.settings_analytics),
+                        summary = stringResource(R.string.settings_analytics_summary),
+                        checked = uiState.analyticsEnabled,
+                        onCheckedChange = onAnalyticsChanged,
+                    )
+                    ListItem(
+                        headlineContent = { Text(stringResource(R.string.settings_privacy_policy)) },
+                        modifier = Modifier.clickable { uriHandler.openUri(privacyPolicyUrl) },
+                    )
                     HorizontalDivider(Modifier.padding(vertical = 8.dp))
                     ListItem(
                         headlineContent = { Text(stringResource(R.string.settings_about)) },

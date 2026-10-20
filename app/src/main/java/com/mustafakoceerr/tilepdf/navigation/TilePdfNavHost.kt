@@ -6,6 +6,8 @@ import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.rememberNavController
 import com.mustafakoceerr.tilepdf.R
+import com.mustafakoceerr.tilepdf.core.analytics.AnalyticsEvent
+import com.mustafakoceerr.tilepdf.core.analytics.AnalyticsHelper
 import com.mustafakoceerr.tilepdf.feature.about.navigation.aboutScreen
 import com.mustafakoceerr.tilepdf.feature.about.navigation.navigateToAbout
 import com.mustafakoceerr.tilepdf.feature.library.navigation.LibraryRoute
@@ -24,9 +26,15 @@ import com.mustafakoceerr.tilepdf.feature.settings.navigation.settingsScreen
 fun TilePdfNavHost(
     openDocument: String?,
     onDocumentOpened: () -> Unit,
+    analytics: AnalyticsHelper,
     modifier: Modifier = Modifier,
 ) {
     val navController = rememberNavController()
+    LaunchedEffect(navController) {
+        navController.currentBackStackEntryFlow.collect { entry ->
+            screenNameOf(entry.destination.route)?.let { analytics.logEvent(AnalyticsEvent.screenView(it)) }
+        }
+    }
     LaunchedEffect(openDocument) {
         if (openDocument != null) {
             // A reader already showing another PDF must go: navigating single-top

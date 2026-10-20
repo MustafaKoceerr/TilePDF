@@ -15,4 +15,11 @@
     <string name="settings_language">Dil</string>
     <string name="language_system">Sistem varsayılanı</string>
     <string name="settings_about">TilePDF hakkında</string>
+    <string name="settings_privacy">Gizlilik</string>
+    <string name="settings_crash_reports">Çökme raporları gönder</string>
+    <string name="settings_crash_reports_summary">TilePDF çökerse, düzeltilebilmesi için teknik ayrıntıları gönderir. Dosyaların ve içerikleri asla gönderilmez.</string>
+    <string name="settings_analytics">Kullanım istatistiklerini paylaş</string>
+    <string name="settings_analytics_summary">Hangi özelliklerin kullanıldığına dair anonim sayılar. Dosyaların ve içerikleri asla gönderilmez.</string>
+    <string name="settings_privacy_policy">Gizlilik politikası</string>
+    <string name="privacy_policy_url">https://mustafakoceerr.github.io/tilepdf-privacy/tr/</string>
 </resources>
