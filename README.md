@@ -425,3 +425,13 @@ rerunning it reproduces them byte for byte.
 
 Cloud sync, accounts, payments and EPUB. The project is meant to go deep on
 rendering rather than wide on features.
+
+## License
+
+TilePDF's own code is licensed under the [Apache License 2.0](LICENSE)
+(see also [NOTICE](NOTICE)). Bundled third-party code keeps its own license:
+PDFium and its components (BSD-style and others, shipped with their texts),
+Google ML Kit (Google's ML Kit terms), the AndroidX and other Maven libraries
+(shown with their licenses under Settings → About), and Noto Sans (OFL). The
+store graphics' fonts are under the OFL and their sample books are in the
+public domain; see [fastlane/design](fastlane/design/README.md).

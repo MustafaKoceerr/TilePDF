@@ -229,3 +229,6 @@ fabric.properties
 !/gradle/wrapper/gradle-wrapper.jar
 
 # End of https://www.toptal.com/developers/gitignore/api/java,kotlin,android,androidstudio,git
+# Store graphics: downloaded sources and render scratch
+fastlane/design/.cache/
+fastlane/design/__pycache__/

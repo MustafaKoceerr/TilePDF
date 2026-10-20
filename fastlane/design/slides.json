@@ -1,0 +1,944 @@
+{
+  "phone": [
+    {
+      "file": "01_read",
+      "shot": "01-read",
+      "headline": "Read PDFs [comfortably]",
+      "subline": "Smooth scrolling and zoom, even in long books",
+      "badges": [
+        [
+          "sell",
+          "Free"
+        ],
+        [
+          "block",
+          "No ads"
+        ],
+        [
+          "cloud_off",
+          "Works offline"
+        ]
+      ],
+      "device": {
+        "x": 500,
+        "y": 520,
+        "w": 600,
+        "rot": -4
+      },
+      "lenses": [
+        {
+          "crop": [
+            540,
+            600,
+            230
+          ],
+          "at": [
+            840,
+            1520
+          ],
+          "size": 380
+        }
+      ],
+      "sparkles": [
+        [
+          930,
+          1270,
+          64
+        ],
+        [
+          690,
+          1700,
+          40
+        ],
+        [
+          80,
+          600,
+          48
+        ]
+      ]
+    },
+    {
+      "file": "02_markup",
+      "shot": "02-markup",
+      "headline": "[Mark up] as you read",
+      "subline": "Highlight, underline and add notes, saved into the PDF",
+      "device": {
+        "x": 470,
+        "y": 520,
+        "w": 600,
+        "rot": 3
+      },
+      "lenses": [
+        {
+          "crop": [
+            420,
+            1110,
+            250
+          ],
+          "at": [
+            850,
+            1440
+          ],
+          "size": 400
+        }
+      ],
+      "pops": [
+        {
+          "crop": [
+            40,
+            2228,
+            1000,
+            100
+          ],
+          "at": [
+            20,
+            1720
+          ],
+          "w": 600,
+          "rot": -5
+        }
+      ],
+      "sparkles": [
+        [
+          960,
+          1150,
+          48
+        ],
+        [
+          70,
+          1520,
+          40
+        ]
+      ]
+    },
+    {
+      "file": "03_forms",
+      "shot": "03-forms",
+      "headline": "Fill in forms and [sign]",
+      "subline": "Type in fields, tick boxes, sign with your finger",
+      "device": {
+        "x": 520,
+        "y": 520,
+        "w": 600,
+        "rot": -3
+      },
+      "pops": [
+        {
+          "crop": [
+            90,
+            1245,
+            640,
+            200
+          ],
+          "at": [
+            20,
+            1130
+          ],
+          "w": 470,
+          "rot": -5
+        },
+        {
+          "crop": [
+            200,
+            1495,
+            400,
+            110
+          ],
+          "at": [
+            480,
+            1560
+          ],
+          "w": 560,
+          "rot": 4
+        }
+      ],
+      "notes": [
+        {
+          "text": "with your finger",
+          "at": [
+            600,
+            1440
+          ],
+          "rot": -6,
+          "arrow": [
+            760,
+            1515,
+            820,
+            1590,
+            -30
+          ]
+        }
+      ],
+      "sparkles": [
+        [
+          950,
+          1400,
+          48
+        ]
+      ]
+    },
+    {
+      "file": "04_ocr",
+      "shot": "05-ocr",
+      "headline": "Make scans [searchable]",
+      "subline": "Recognise text right on your phone, then copy it",
+      "badges": [
+        [
+          "document_scanner",
+          "Text recognition"
+        ],
+        [
+          "smartphone",
+          "On the device"
+        ]
+      ],
+      "device": {
+        "x": 590,
+        "y": 540,
+        "w": 600,
+        "rot": 4
+      },
+      "lenses": [
+        {
+          "crop": [
+            290,
+            590,
+            175
+          ],
+          "at": [
+            250,
+            1380
+          ],
+          "size": 420
+        }
+      ],
+      "sparkles": [
+        [
+          80,
+          1650,
+          50
+        ],
+        [
+          420,
+          1660,
+          36
+        ]
+      ]
+    },
+    {
+      "file": "05_search",
+      "shot": "04-search",
+      "headline": "Find [any word]",
+      "subline": "Search the whole document and jump between results",
+      "device": {
+        "x": 500,
+        "y": 500,
+        "w": 600,
+        "rot": -3
+      },
+      "pops": [
+        {
+          "crop": [
+            700,
+            178,
+            350,
+            95
+          ],
+          "at": [
+            600,
+            1120
+          ],
+          "w": 440,
+          "rot": 4
+        }
+      ],
+      "lenses": [
+        {
+          "crop": [
+            600,
+            1080,
+            190
+          ],
+          "at": [
+            790,
+            1560
+          ],
+          "size": 380
+        }
+      ],
+      "icons": [
+        [
+          "search",
+          60,
+          1500,
+          70,
+          -12
+        ]
+      ]
+    },
+    {
+      "file": "06_themes",
+      "shot": "06-themes",
+      "headline": "Easy on the [eyes]",
+      "subline": "Six page colors and a dark theme",
+      "device": {
+        "x": 600,
+        "y": 520,
+        "w": 600,
+        "rot": 3
+      },
+      "pops": [
+        {
+          "crop": [
+            70,
+            1820,
+            215,
+            75
+          ],
+          "at": [
+            30,
+            1150
+          ],
+          "w": 300,
+          "rot": -9
+        },
+        {
+          "crop": [
+            285,
+            1820,
+            240,
+            75
+          ],
+          "at": [
+            60,
+            1300
+          ],
+          "w": 330,
+          "rot": -3
+        },
+        {
+          "crop": [
+            50,
+            1945,
+            340,
+            75
+          ],
+          "at": [
+            20,
+            1450
+          ],
+          "w": 420,
+          "rot": 4
+        },
+        {
+          "crop": [
+            390,
+            1945,
+            240,
+            75
+          ],
+          "at": [
+            80,
+            1610
+          ],
+          "w": 330,
+          "rot": -5
+        }
+      ],
+      "icons": [
+        [
+          "dark_mode",
+          880,
+          1270,
+          90,
+          18
+        ]
+      ],
+      "sparkles": [
+        [
+          960,
+          1450,
+          44
+        ]
+      ]
+    },
+    {
+      "file": "07_pages",
+      "shot": "07-pages",
+      "headline": "Jump to [any page]",
+      "subline": "Page grid, contents and bookmarks, with a way back",
+      "device": {
+        "x": 540,
+        "y": 520,
+        "w": 600,
+        "rot": -3
+      },
+      "pops": [
+        {
+          "crop": [
+            35,
+            342,
+            315,
+            487
+          ],
+          "at": [
+            770,
+            1110
+          ],
+          "w": 270,
+          "rot": 9
+        },
+        {
+          "crop": [
+            382,
+            932,
+            313,
+            484
+          ],
+          "at": [
+            20,
+            1250
+          ],
+          "w": 260,
+          "rot": -8
+        },
+        {
+          "crop": [
+            730,
+            1516,
+            315,
+            485
+          ],
+          "at": [
+            760,
+            1500
+          ],
+          "w": 260,
+          "rot": -4
+        }
+      ],
+      "sparkles": [
+        [
+          70,
+          1700,
+          50
+        ]
+      ]
+    },
+    {
+      "file": "08_library",
+      "shot": "08-library",
+      "headline": "Your library, [private]",
+      "subline": "Your files stay on your phone",
+      "badges": [
+        [
+          "person_off",
+          "No account"
+        ],
+        [
+          "code",
+          "Open source"
+        ]
+      ],
+      "device": {
+        "x": 540,
+        "y": 540,
+        "w": 600,
+        "rot": 3
+      },
+      "pops": [
+        {
+          "crop": [
+            20,
+            445,
+            1040,
+            185
+          ],
+          "at": [
+            120,
+            1220
+          ],
+          "w": 760,
+          "rot": -3
+        },
+        {
+          "crop": [
+            20,
+            650,
+            1040,
+            190
+          ],
+          "at": [
+            200,
+            1430
+          ],
+          "w": 760,
+          "rot": 2
+        }
+      ],
+      "icons": [
+        [
+          "lock",
+          900,
+          1640,
+          80,
+          10
+        ]
+      ]
+    }
+  ],
+  "tablet": [
+    {
+      "file": "01_contents",
+      "shot": "t1-contents",
+      "layout": "left",
+      "headline": "Contents [beside] the page",
+      "subline": "On tablets, the contents stay in a side panel",
+      "badges": [
+        [
+          "sell",
+          "Free"
+        ],
+        [
+          "block",
+          "No ads"
+        ],
+        [
+          "cloud_off",
+          "Works offline"
+        ]
+      ],
+      "device": {
+        "x": 1730,
+        "y": 360,
+        "w": 1420,
+        "rot": -3
+      },
+      "pops": [
+        {
+          "crop": [
+            0,
+            240,
+            717,
+            720
+          ],
+          "at": [
+            190,
+            820
+          ],
+          "w": 620,
+          "rot": -4
+        }
+      ],
+      "sparkles": [
+        [
+          120,
+          1420,
+          64
+        ]
+      ]
+    },
+    {
+      "file": "02_spread",
+      "shot": "t2-spread",
+      "layout": "left",
+      "headline": "Read like a [book]",
+      "subline": "Two pages side by side on wide screens",
+      "device": {
+        "x": 1730,
+        "y": 380,
+        "w": 1420,
+        "rot": 3
+      },
+      "lenses": [
+        {
+          "crop": [
+            1777,
+            400,
+            260
+          ],
+          "at": [
+            560,
+            1060
+          ],
+          "size": 560
+        }
+      ],
+      "sparkles": [
+        [
+          230,
+          1380,
+          56
+        ],
+        [
+          900,
+          860,
+          44
+        ]
+      ]
+    },
+    {
+      "file": "03_night",
+      "shot": "t4-night",
+      "layout": "left",
+      "headline": "Reading [late]?",
+      "subline": "Six page colors, from sepia to night",
+      "device": {
+        "x": 1730,
+        "y": 360,
+        "w": 1420,
+        "rot": -3
+      },
+      "lenses": [
+        {
+          "crop": [
+            760,
+            306,
+            290
+          ],
+          "at": [
+            560,
+            1060
+          ],
+          "size": 520
+        }
+      ],
+      "icons": [
+        [
+          "dark_mode",
+          160,
+          820,
+          110,
+          -15
+        ]
+      ],
+      "sparkles": [
+        [
+          880,
+          1360,
+          50
+        ]
+      ]
+    },
+    {
+      "file": "04_pages",
+      "shot": "t3-pages",
+      "layout": "left",
+      "headline": "See [every page]",
+      "subline": "Jump anywhere from the page grid",
+      "device": {
+        "x": 1730,
+        "y": 380,
+        "w": 1420,
+        "rot": 3
+      },
+      "pops": [
+        {
+          "crop": [
+            28,
+            219,
+            222,
+            350
+          ],
+          "at": [
+            170,
+            820
+          ],
+          "w": 300,
+          "rot": -9
+        },
+        {
+          "crop": [
+            1044,
+            219,
+            222,
+            350
+          ],
+          "at": [
+            500,
+            900
+          ],
+          "w": 300,
+          "rot": 5
+        },
+        {
+          "crop": [
+            2056,
+            219,
+            219,
+            350
+          ],
+          "at": [
+            330,
+            1120
+          ],
+          "w": 280,
+          "rot": -3
+        }
+      ]
+    },
+    {
+      "file": "05_form",
+      "shot": "t5-form",
+      "layout": "left",
+      "headline": "Fill in and [sign]",
+      "subline": "Forms, check boxes and your own signature",
+      "device": {
+        "x": 1730,
+        "y": 360,
+        "w": 1420,
+        "rot": -3
+      },
+      "pops": [
+        {
+          "crop": [
+            790,
+            1000,
+            680,
+            210
+          ],
+          "at": [
+            170,
+            830
+          ],
+          "w": 640,
+          "rot": 3
+        },
+        {
+          "crop": [
+            905,
+            1268,
+            380,
+            115
+          ],
+          "at": [
+            230,
+            1150
+          ],
+          "w": 680,
+          "rot": -4
+        }
+      ],
+      "notes": [
+        {
+          "text": "with your finger",
+          "at": [
+            180,
+            1430
+          ],
+          "rot": -4
+        }
+      ]
+    },
+    {
+      "file": "06_search",
+      "shot": "t6-search",
+      "layout": "left",
+      "headline": "Find [any word]",
+      "subline": "Every match, highlighted on both pages",
+      "device": {
+        "x": 1730,
+        "y": 380,
+        "w": 1420,
+        "rot": 3
+      },
+      "pops": [
+        {
+          "crop": [
+            2240,
+            92,
+            310,
+            85
+          ],
+          "at": [
+            170,
+            850
+          ],
+          "w": 560,
+          "rot": -4
+        }
+      ],
+      "lenses": [
+        {
+          "crop": [
+            760,
+            350,
+            230
+          ],
+          "at": [
+            600,
+            1060
+          ],
+          "size": 440
+        }
+      ],
+      "icons": [
+        [
+          "search",
+          160,
+          1240,
+          100,
+          -10
+        ]
+      ]
+    },
+    {
+      "file": "07_ocr",
+      "shot": "t7-ocr",
+      "layout": "left",
+      "headline": "Scans become [text]",
+      "subline": "Recognise, select and copy, on the device",
+      "badges": [
+        [
+          "document_scanner",
+          "Text recognition"
+        ]
+      ],
+      "device": {
+        "x": 1730,
+        "y": 360,
+        "w": 1420,
+        "rot": -3
+      },
+      "lenses": [
+        {
+          "crop": [
+            1060,
+            285,
+            170
+          ],
+          "at": [
+            560,
+            1060
+          ],
+          "size": 500
+        }
+      ],
+      "sparkles": [
+        [
+          180,
+          1350,
+          56
+        ]
+      ]
+    },
+    {
+      "file": "08_library",
+      "shot": "t8-library",
+      "layout": "left",
+      "headline": "Your library, [private]",
+      "subline": "Your files stay on your tablet",
+      "badges": [
+        [
+          "person_off",
+          "No account"
+        ],
+        [
+          "code",
+          "Open source"
+        ]
+      ],
+      "device": {
+        "x": 1730,
+        "y": 380,
+        "w": 1420,
+        "rot": 3
+      },
+      "pops": [
+        {
+          "crop": [
+            20,
+            295,
+            800,
+            145
+          ],
+          "at": [
+            150,
+            960
+          ],
+          "w": 820,
+          "rot": -3
+        },
+        {
+          "crop": [
+            870,
+            295,
+            800,
+            145
+          ],
+          "at": [
+            220,
+            1180
+          ],
+          "w": 820,
+          "rot": 2
+        }
+      ],
+      "icons": [
+        [
+          "lock",
+          900,
+          1400,
+          90,
+          10
+        ]
+      ]
+    }
+  ],
+  "feature": {
+    "shot": "02-markup",
+    "headline": "Read, [mark up] and fill in PDFs",
+    "badges": [
+      [
+        "sell",
+        "Free"
+      ],
+      [
+        "block",
+        "No ads"
+      ],
+      [
+        "cloud_off",
+        "Offline"
+      ],
+      [
+        "code",
+        "Open source"
+      ]
+    ],
+    "device": {
+      "x": 820,
+      "y": 40,
+      "w": 270,
+      "rot": -8
+    },
+    "pops": [
+      {
+        "crop": [
+          40,
+          2228,
+          1000,
+          100
+        ],
+        "at": [
+          600,
+          400
+        ],
+        "w": 360,
+        "rot": -4
+      }
+    ],
+    "sparkles": [
+      [
+        600,
+        40,
+        30
+      ],
+      [
+        575,
+        440,
+        22
+      ]
+    ]
+  }
+}
