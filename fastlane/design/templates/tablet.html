@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<style>
+  @font-face { font-family: Jakarta; src: url({{fonts}}/PlusJakartaSans.ttf); font-weight: 200 800; }
+  html, body { margin: 0; width: 2560px; height: 1600px; overflow: hidden; }
+  body {
+    font-family: Jakarta, sans-serif; color: #fff; position: relative;
+    background: radial-gradient(1600px 1200px at {{glow}}, rgba(255,255,255,.16), transparent 60%),
+                linear-gradient({{angle}}deg, #8B6BE8 0%, #6650A4 45%, #2F2A7A 100%);
+  }
+  .tile { position: absolute; border-radius: 64px; background: rgba(255,255,255,.07); }
+  .caption { position: absolute; top: 112px; left: 160px; right: 160px; text-align: center; }
+  h1 { margin: 0; font-weight: 800; font-size: 96px; line-height: 1.08; letter-spacing: -0.5px; }
+  p { margin: 26px 0 0; font-weight: 500; font-size: 46px; color: rgba(255,255,255,.86); }
+  .tablet {
+    position: absolute; left: 50%; top: 420px; transform: translateX(-50%);
+    width: 1760px; height: 1100px; padding: 30px; border-radius: 70px;
+    background: linear-gradient(145deg, #2b2733, #0d0b12); box-shadow: 0 60px 110px rgba(18,10,48,.55), inset 0 0 0 4px #3b3645;
+  }
+  .tablet img { display: block; width: 1760px; height: 1100px; border-radius: 42px; }
+</style>
+<body>
+  <div class="tile" style="width: 560px; height: 560px; left: -200px; top: 980px;"></div>
+  <div class="tile" style="width: 420px; height: 420px; right: -120px; top: 260px;"></div>
+  <div class="caption">
+    <h1>{{headline}}</h1>
+    <p>{{subline}}</p>
+  </div>
+  <div class="tablet"><img src="{{shot}}"></div>
+</body>
+</html>

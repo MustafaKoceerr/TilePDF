@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<style>
+  @font-face { font-family: Jakarta; src: url({{fonts}}/PlusJakartaSans.ttf); font-weight: 200 800; }
+  html, body { margin: 0; width: 1080px; height: 1920px; overflow: hidden; }
+  body {
+    font-family: Jakarta, sans-serif; color: #fff; position: relative;
+    background: radial-gradient(1200px 900px at {{glow}}, rgba(255,255,255,.16), transparent 60%),
+                linear-gradient({{angle}}deg, #8B6BE8 0%, #6650A4 45%, #2F2A7A 100%);
+  }
+  /* Soft tiles in the background, a nod to the icon. */
+  .tile { position: absolute; border-radius: 48px; background: rgba(255,255,255,.07); }
+  .caption { position: absolute; top: 92px; left: 80px; right: 80px; text-align: center; }
+  h1 { margin: 0; font-weight: 800; font-size: 74px; line-height: 1.08; letter-spacing: -0.5px; }
+  p { margin: 22px auto 0; max-width: 860px; font-weight: 500; font-size: 36px; line-height: 1.35; color: rgba(255,255,255,.86); }
+  .phone {
+    position: absolute; left: 50%; top: 392px; transform: translateX(-50%);
+    width: 660px; height: 1481px; padding: 18px; border-radius: 86px;
+    background: linear-gradient(145deg, #2b2733, #0d0b12); box-shadow: 0 50px 90px rgba(18,10,48,.55), inset 0 0 0 3px #3b3645;
+  }
+  .phone img { display: block; width: 660px; height: 1481px; border-radius: 70px; object-fit: cover; object-position: top; }
+</style>
+<body>
+  <div class="tile" style="width: 420px; height: 420px; left: -140px; top: 1180px;"></div>
+  <div class="tile" style="width: 300px; height: 300px; right: -90px; top: 640px;"></div>
+  <div class="tile" style="width: 180px; height: 180px; left: 60px; top: 520px; border-radius: 32px;"></div>
+  <div class="caption">
+    <h1>{{headline}}</h1>
+    <p>{{subline}}</p>
+  </div>
+  <div class="phone"><img src="{{shot}}"></div>
+</body>
+</html>

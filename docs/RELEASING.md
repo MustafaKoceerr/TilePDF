@@ -76,7 +76,10 @@ A new personal developer account must run a closed test with at least 12
 testers for 14 days before it can apply for production.
 
 1. Create the app in Play Console (free, default language English, tr-TR as a
-   second listing). Texts and graphics are in `fastlane/metadata/android/`.
+   second listing). Texts are in `fastlane/metadata/android/`. The graphics
+   (icon, feature graphic, 8 phone and 4 tablet screenshots) are only in
+   `en-US/images/`; Play shows them for the Turkish listing too. They are
+   rebuilt from `fastlane/design/` (see its README).
 2. App content: privacy policy URL
    (<https://mustafakoceerr.github.io/TilePDF/privacy/>), no ads, Advertising
    ID **No**, content rating questionnaire, target audience 18+ (not
