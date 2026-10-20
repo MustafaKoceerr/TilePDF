@@ -17,4 +17,11 @@
     <string name="language_english" translatable="false">English</string>
     <string name="language_turkish" translatable="false">Türkçe</string>
     <string name="settings_about">About TilePDF</string>
+    <string name="settings_privacy">Privacy</string>
+    <string name="settings_crash_reports">Send crash reports</string>
+    <string name="settings_crash_reports_summary">When TilePDF crashes, send technical details so it can be fixed. Never your files or their contents.</string>
+    <string name="settings_analytics">Share usage statistics</string>
+    <string name="settings_analytics_summary">Anonymous counts of which features are used. Never your files or their contents.</string>
+    <string name="settings_privacy_policy">Privacy policy</string>
+    <string name="privacy_policy_url">https://mustafakoceerr.github.io/TilePDF/privacy/</string>
 </resources>

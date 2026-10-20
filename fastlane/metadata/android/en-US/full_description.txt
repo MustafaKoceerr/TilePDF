@@ -1,4 +1,4 @@
-TilePDF is a fast PDF reader that keeps everything on your phone. It has no internet permission, no ads and no account, so your documents never leave your device.
+TilePDF is a fast PDF reader that keeps everything on your phone. No ads, no account, and your documents never leave your device.
 
 READ COMFORTABLY
 • Smooth scrolling and pinch zoom that follows your fingers, even on large documents
@@ -38,6 +38,6 @@ MADE FOR EVERY SCREEN
 • TalkBack labels and large touch targets
 
 PRIVATE BY DESIGN
-TilePDF works completely offline. It collects no data and sends nothing anywhere. Your files, notes and settings stay on your device.
+TilePDF works without an internet connection. Your files, notes and settings stay on your device; their contents are never sent anywhere. TilePDF only sends crash reports, which you can turn off, and anonymous usage statistics if you allow them.
 
 TilePDF uses the PDFium engine, the same engine that renders PDFs in Chrome.

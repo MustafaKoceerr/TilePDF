@@ -4,10 +4,13 @@ import com.mustafakoceerr.tilepdf.core.pdf.PdfDocument
 import com.mustafakoceerr.tilepdf.data.document.DocumentRepository
 import com.mustafakoceerr.tilepdf.data.library.LibraryRepository
 import com.mustafakoceerr.tilepdf.data.preferences.LibraryPreferencesRepository
+import com.mustafakoceerr.tilepdf.data.preferences.TelemetryPreferencesRepository
 import com.mustafakoceerr.tilepdf.data.thumbnail.ThumbnailStore
+import com.mustafakoceerr.tilepdf.model.AnalyticsConsent
 import com.mustafakoceerr.tilepdf.model.LibraryDocument
 import com.mustafakoceerr.tilepdf.model.LibrarySort
 import com.mustafakoceerr.tilepdf.model.ReadingPosition
+import com.mustafakoceerr.tilepdf.model.TelemetryPreferences
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -46,6 +49,15 @@ class LibraryViewModelTest {
         ),
     )
     private val preferences = Preferences()
+    private val telemetry = Telemetry()
+
+    private class Telemetry : TelemetryPreferencesRepository {
+        override val preferences = MutableStateFlow(TelemetryPreferences())
+        override suspend fun setCrashReportsEnabled(enabled: Boolean) =
+            preferences.update { it.copy(crashReportsEnabled = enabled) }
+        override suspend fun setAnalyticsConsent(consent: AnalyticsConsent) =
+            preferences.update { it.copy(analyticsConsent = consent) }
+    }
 
     @Before
     fun setUp() = Dispatchers.setMain(UnconfinedTestDispatcher())
@@ -57,7 +69,7 @@ class LibraryViewModelTest {
         LibraryDocument(if (name.startsWith("file://")) name else "content://$name", name, 10, ReadingPosition(), opened, opened, favorite)
 
     private fun TestScope.viewModel() =
-        LibraryViewModel(library, documents, preferences, thumbnails, CoroutineScope(UnconfinedTestDispatcher(testScheduler)))
+        LibraryViewModel(library, documents, preferences, thumbnails, telemetry, CoroutineScope(UnconfinedTestDispatcher(testScheduler)))
 
     /** Keeps the state flow collected, as the screen does. */
     private fun TestScope.collected(viewModel: LibraryViewModel) =
@@ -66,6 +78,34 @@ class LibraryViewModelTest {
     private suspend fun LibraryViewModel.success() = uiState.first { it is LibraryUiState.Success } as LibraryUiState.Success
 
     private fun LibraryUiState.Success.names() = items.map { it.document.displayName }
+
+    @Test
+    fun asksForStatisticsOnceThereAreDocuments() = runTest {
+        assertTrue(viewModel().also { collected(it) }.success().askForStatistics)
+    }
+
+    @Test
+    fun anEmptyLibraryDoesNotAskYet() = runTest {
+        // The first launch is about opening a PDF, not about statistics.
+        library.documents.value = emptyList()
+        assertEquals(false, viewModel().also { collected(it) }.success().askForStatistics)
+    }
+
+    @Test
+    fun allowingStatisticsStoresTheConsentAndStopsAsking() = runTest {
+        val viewModel = viewModel().also { collected(it) }
+        viewModel.onStatisticsAnswered(allowed = true)
+        assertEquals(AnalyticsConsent.Granted, telemetry.preferences.value.analyticsConsent)
+        assertEquals(false, viewModel.success().askForStatistics)
+    }
+
+    @Test
+    fun decliningStatisticsStoresTheNoAndStopsAsking() = runTest {
+        val viewModel = viewModel().also { collected(it) }
+        viewModel.onStatisticsAnswered(allowed = false)
+        assertEquals(AnalyticsConsent.Denied, telemetry.preferences.value.analyticsConsent)
+        assertEquals(false, viewModel.success().askForStatistics)
+    }
 
     @Test
     fun searchFilters() = runTest {

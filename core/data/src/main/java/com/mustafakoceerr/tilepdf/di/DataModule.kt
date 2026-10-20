@@ -18,6 +18,8 @@ import com.mustafakoceerr.tilepdf.data.preferences.DataStoreLibraryPreferencesRe
 import com.mustafakoceerr.tilepdf.data.preferences.AppPaletteRepository
 import com.mustafakoceerr.tilepdf.data.preferences.DataStoreAppPaletteRepository
 import com.mustafakoceerr.tilepdf.data.preferences.DataStoreReaderPreferencesRepository
+import com.mustafakoceerr.tilepdf.data.preferences.DataStoreTelemetryPreferencesRepository
+import com.mustafakoceerr.tilepdf.data.preferences.TelemetryPreferencesRepository
 import com.mustafakoceerr.tilepdf.data.preferences.LibraryPreferencesRepository
 import com.mustafakoceerr.tilepdf.data.preferences.ReaderPreferencesRepository
 import com.mustafakoceerr.tilepdf.data.text.CachingDocumentTextRepository
@@ -69,6 +71,9 @@ interface DataModule {
 
     @Binds
     fun bindsAppPaletteRepository(impl: DataStoreAppPaletteRepository): AppPaletteRepository
+
+    @Binds
+    fun bindsTelemetryPreferencesRepository(impl: DataStoreTelemetryPreferencesRepository): TelemetryPreferencesRepository
 
     @Binds
     fun bindsDocumentTextRepository(impl: CachingDocumentTextRepository): DocumentTextRepository

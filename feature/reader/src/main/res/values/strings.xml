@@ -101,7 +101,7 @@
     <string name="signature_trusted">The signer\'s certificate is trusted by this device.</string>
     <string name="signature_untrusted">The signer\'s certificate isn\'t trusted by this device, so who signed can\'t be confirmed.</string>
     <string name="signature_changed_after">Something was added after signing, such as an annotation; the signed version is unaffected.</string>
-    <string name="signatures_revocation_note">Whether a certificate was revoked isn\'t checked: TilePDF works offline.</string>
+    <string name="signatures_revocation_note">Whether a certificate was revoked isn\'t checked online.</string>
     <string name="script_ok">OK</string>
     <string name="script_yes">Yes</string>
     <string name="script_no">No</string>

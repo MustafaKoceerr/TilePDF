@@ -26,4 +26,8 @@
     <string name="library_empty_title">Your library is empty</string>
     <string name="library_no_favorites_hint">Tap the star on a PDF to keep it here.</string>
     <string name="library_no_results_hint">Try another word, or part of the file name.</string>
+    <string name="statistics_title">Help improve TilePDF?</string>
+    <string name="statistics_body">Share anonymous counts of which features you use. Your files and their contents are never sent. You can change this in Settings.</string>
+    <string name="statistics_allow">Share</string>
+    <string name="statistics_decline">No thanks</string>
 </resources>

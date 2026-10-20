@@ -19,20 +19,30 @@ class ReleasePermissionsTest {
     )
 
     @Test
-    fun internetIsReported() = assertEquals(
-        listOf("android.permission.INTERNET"),
-        unexpectedPermissions(manifest("android.permission.WAKE_LOCK", "android.permission.INTERNET"), RELEASE_PERMISSION_ALLOWLIST),
+    fun internetIsAllowedForFirebase() = assertEquals(
+        emptyList<String>(),
+        unexpectedPermissions(manifest("android.permission.INTERNET"), RELEASE_PERMISSION_ALLOWLIST),
+    )
+
+    @Test
+    fun advertisingPermissionsAreReported() = assertEquals(
+        listOf("com.google.android.gms.permission.AD_ID", "android.permission.ACCESS_ADSERVICES_AD_ID"),
+        unexpectedPermissions(
+            manifest("android.permission.WAKE_LOCK", "com.google.android.gms.permission.AD_ID", "android.permission.ACCESS_ADSERVICES_AD_ID"),
+            RELEASE_PERMISSION_ALLOWLIST,
+        ),
     )
 
     @Test
     fun sdk23PermissionsCountToo() = assertEquals(
-        listOf("android.permission.INTERNET"),
-        unexpectedPermissions(manifest("android.permission.INTERNET", tag = "uses-permission-sdk-23"), RELEASE_PERMISSION_ALLOWLIST),
+        listOf("com.google.android.gms.permission.AD_ID"),
+        unexpectedPermissions(manifest("com.google.android.gms.permission.AD_ID", tag = "uses-permission-sdk-23"), RELEASE_PERMISSION_ALLOWLIST),
     )
 
     @Test
     fun allowlistMatchesThePlan() = assertEquals(
         setOf(
+            "android.permission.INTERNET",
             "android.permission.ACCESS_NETWORK_STATE",
             "android.permission.WAKE_LOCK",
             "android.permission.RECEIVE_BOOT_COMPLETED",

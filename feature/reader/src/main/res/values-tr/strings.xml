@@ -97,7 +97,7 @@
     <string name="signature_trusted">İmzalayanın sertifikası bu cihazca güvenilir.</string>
     <string name="signature_untrusted">İmzalayanın sertifikası bu cihazca güvenilir değil; kimin imzaladığı doğrulanamıyor.</string>
     <string name="signature_changed_after">İmzadan sonra belgeye ekleme yapılmış (örneğin açıklama); imzalanan sürümü etkilemez.</string>
-    <string name="signatures_revocation_note">Sertifikanın iptal edilip edilmediği denetlenmez: TilePDF çevrimdışı çalışır.</string>
+    <string name="signatures_revocation_note">Sertifikanın iptal edilip edilmediği çevrimiçi denetlenmez.</string>
     <string name="script_ok">Tamam</string>
     <string name="script_yes">Evet</string>
     <string name="script_no">Hayır</string>

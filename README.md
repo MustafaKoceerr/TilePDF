@@ -368,8 +368,8 @@ rerunning it reproduces them byte for byte.
 - Signing reads the Play upload key from four environment variables and never
   from the repository; see [docs/RELEASING.md](docs/RELEASING.md).
 - Text recognition uses ML Kit's bundled Latin model (`core:ocr`), so it
-  needs no download and runs offline. ML Kit would send usage metrics to
-  Google when online; without the `INTERNET` permission it can't.
+  needs no download and runs offline. ML Kit sends its own usage metrics
+  to Google, which the Data safety answers declare.
   Recognised words wait per page in the `recognized_text` table (Room v8)
   and are saved as invisible text (render mode 3) in the Noto Sans subset,
   inside `TilePdfOcr` marked content, so a page is never recognised into the
@@ -388,9 +388,16 @@ rerunning it reproduces them byte for byte.
   way; the save checks the last text at each point by tapping it in the
   saved file. Whether a tap focused a text field comes from
   `FORM_TilePdfGetFocusedXfaWidgetType`, a patch in our PDFium build.
-- TilePDF stays offline: the manifest removes `INTERNET`, and
+- Documents never leave the device. The network is only for Firebase
+  (`core:analytics`): Crashlytics crash reports, on by default with an opt-out
+  in Settings, and Google Analytics events, off until the user allows them
+  (a one-time card in the library, or Settings). Events carry categories
+  only, never names, paths or text. The advertising ID, ad services and the
+  install referrer are removed from the manifest, and
   `checkReleasePermissions` fails the release build if the merged manifest
-  asks for any permission outside an allowlist.
+  asks for any permission outside an allowlist. Firebase is applied only when
+  `app/google-services.json` exists (it isn't in the repository); without it
+  the app builds and sends nothing.
 - Android backup keeps preferences only (reading settings, theme, language).
 - Settings → About shows the version and every third-party license: PDFium's
   components, copied from the pinned pdfium-binaries archive at build time,
@@ -407,11 +414,11 @@ rerunning it reproduces them byte for byte.
 - Forms: multi-select list boxes show only their first choice. XFA pages
   aren't PDF pages, so they take no annotations, signature or recognised
   text, and search finds nothing there; XFA support in PDFium is still
-  marked experimental. Scripts can't mail or submit a form (TilePDF is offline), and
+  marked experimental. Scripts can't mail or submit a form, and
   timers and page open/close scripts don't run.
 - Signatures: TilePDF checks digital signatures but doesn't make them;
   certificate signing is a desktop task. Revocation (OCSP, CRL) isn't
-  checked, since TilePDF is offline. Trust comes from Android's certificate
+  checked online. Trust comes from Android's certificate
   store: the system's CAs and the ones the user added.
 
 ## Out of scope, on purpose

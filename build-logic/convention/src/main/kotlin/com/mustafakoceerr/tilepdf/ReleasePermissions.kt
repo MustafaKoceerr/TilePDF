@@ -10,10 +10,13 @@ import org.gradle.api.tasks.TaskAction
 import javax.xml.parsers.DocumentBuilderFactory
 
 /**
- * Everything the release may ask for. TilePDF has no network access, so a new
- * permission (above all INTERNET) must be a deliberate change made here.
+ * Everything the release may ask for. A new permission must be a deliberate
+ * change made here, with docs/play/data-safety.md updated to match.
  */
 val RELEASE_PERMISSION_ALLOWLIST = setOf(
+    // Firebase only: crash reports and, if the user allows them, statistics.
+    // Its advertising permissions are removed in the app manifest.
+    "android.permission.INTERNET",
     // WorkManager, which saves annotations in the background.
     "android.permission.ACCESS_NETWORK_STATE",
     "android.permission.WAKE_LOCK",

@@ -37,6 +37,7 @@ import androidx.compose.material3.IconToggleButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
@@ -44,6 +45,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
@@ -113,6 +115,7 @@ fun LibraryScreen(
             onQueryChange = viewModel::onQueryChange,
             onFilterSelected = viewModel::onFilterSelected,
             onSortSelected = viewModel::onSortSelected,
+            onStatisticsAnswered = viewModel::onStatisticsAnswered,
             onOpenSettings = onOpenSettings,
         ),
     )
@@ -131,6 +134,7 @@ internal class LibraryActions(
     val onQueryChange: (String) -> Unit = {},
     val onFilterSelected: (LibraryFilter) -> Unit = {},
     val onSortSelected: (LibrarySort) -> Unit = {},
+    val onStatisticsAnswered: (allowed: Boolean) -> Unit = {},
     val onOpenSettings: () -> Unit = {},
 )
 
@@ -196,6 +200,7 @@ internal fun LibraryScreen(uiState: LibraryUiState, actions: LibraryActions) {
                 success == null -> CircularProgressIndicator()
                 !success.hasDocuments -> EmptyState(TilePdfIcons.Document, R.string.library_empty_title, R.string.library_empty)
                 else -> Column(Modifier.fillMaxSize()) {
+                    if (success.askForStatistics) StatisticsCard(actions.onStatisticsAnswered)
                     FilterChips(success.filter, actions.onFilterSelected)
                     when {
                         success.items.isNotEmpty() -> DocumentList(success.items, gridState, actions)
@@ -213,6 +218,30 @@ internal fun LibraryScreen(uiState: LibraryUiState, actions: LibraryActions) {
                         )
                     }
                 }
+            }
+        }
+    }
+}
+
+/** Asks once whether anonymous usage statistics may be sent; either answer hides it for good. */
+@Composable
+private fun StatisticsCard(onAnswer: (allowed: Boolean) -> Unit) {
+    OutlinedCard(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+        Column(Modifier.padding(start = 16.dp, end = 8.dp, top = 16.dp, bottom = 8.dp)) {
+            Text(
+                stringResource(R.string.statistics_title),
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(end = 8.dp).semantics { heading() },
+            )
+            Text(
+                stringResource(R.string.statistics_body),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 4.dp, end = 8.dp),
+            )
+            Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.End) {
+                TextButton(onClick = { onAnswer(false) }) { Text(stringResource(R.string.statistics_decline)) }
+                TextButton(onClick = { onAnswer(true) }) { Text(stringResource(R.string.statistics_allow)) }
             }
         }
     }

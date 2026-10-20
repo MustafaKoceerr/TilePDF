@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import com.mustafakoceerr.tilepdf.di.ApplicationScope
+import com.mustafakoceerr.tilepdf.domain.ApplyTelemetryPreferencesUseCase
 import com.mustafakoceerr.tilepdf.domain.CleanUpCopiesUseCase
 import com.mustafakoceerr.tilepdf.domain.ResumePendingSavesUseCase
 import dagger.hilt.android.HiltAndroidApp
@@ -19,6 +20,9 @@ class TilePdfApp : Application(), Configuration.Provider {
     lateinit var applicationScope: CoroutineScope
 
     @Inject
+    lateinit var applyTelemetryPreferences: ApplyTelemetryPreferencesUseCase
+
+    @Inject
     lateinit var cleanUpCopies: CleanUpCopiesUseCase
 
     @Inject
@@ -32,6 +36,8 @@ class TilePdfApp : Application(), Configuration.Provider {
 
     override fun onCreate() {
         super.onCreate()
+        // Crash reports and statistics follow the user's choices for as long as the app runs.
+        applicationScope.launch { applyTelemetryPreferences() }
         applicationScope.launch { runCatching { cleanUpCopies() } }
         // Annotations a killed process never got to write into their files.
         applicationScope.launch { runCatching { resumePendingSaves() } }

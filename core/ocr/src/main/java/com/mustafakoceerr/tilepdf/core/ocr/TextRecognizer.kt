@@ -19,8 +19,8 @@ interface TextRecognizer {
 
 /**
  * ML Kit's Latin recogniser, whose model ships inside the app: recognition
- * runs on the device and works offline. The manifest has no INTERNET
- * permission, so nothing ML Kit gathers can leave the device either.
+ * runs on the device and works offline. Pages never leave the device; ML
+ * Kit's own usage metrics may, which the Data safety answers declare.
  */
 @Singleton
 class MlKitTextRecognizer @Inject constructor() : TextRecognizer {

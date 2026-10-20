@@ -1,4 +1,4 @@
-TilePDF, her şeyi telefonunda tutan hızlı bir PDF okuyucudur. İnternet izni, reklamı ve hesabı yoktur; belgelerin cihazından hiç çıkmaz.
+TilePDF, her şeyi telefonunda tutan hızlı bir PDF okuyucudur. Reklamı ve hesabı yoktur; belgelerin cihazından hiç çıkmaz.
 
 RAHAT OKU
 • Büyük belgelerde bile akıcı kaydırma ve parmaklarını izleyen yakınlaştırma
@@ -38,6 +38,6 @@ HER EKRANA UYGUN
 • TalkBack etiketleri ve büyük dokunma alanları
 
 GİZLİLİK ESAS
-TilePDF tamamen çevrimdışı çalışır. Hiçbir veri toplamaz, hiçbir yere bir şey göndermez. Dosyaların, notların ve ayarların cihazında kalır.
+TilePDF internet bağlantısı olmadan çalışır. Dosyaların, notların ve ayarların cihazında kalır; içerikleri hiçbir yere gönderilmez. TilePDF yalnızca kapatabileceğin çökme raporlarını ve izin verirsen anonim kullanım istatistiklerini gönderir.
 
 TilePDF, Chrome'da PDF'leri gösteren motorun aynısı olan PDFium'u kullanır.

@@ -1,0 +1,5 @@
+# GitHub Pages (master, /docs) publishes only the privacy policy, which
+# Google Play and the app's Settings link to: /privacy/ and /privacy/tr/.
+title: TilePDF
+theme: jekyll-theme-primer
+exclude: [superpowers, RELEASING.md, play/data-safety.md]

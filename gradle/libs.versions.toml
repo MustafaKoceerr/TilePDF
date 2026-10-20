@@ -25,6 +25,9 @@ bouncycastle = "1.86"
 turbine = "1.2.1"
 room = "2.8.5"
 datastore = "1.2.1"
+firebaseBom = "35.0.2"
+googleServices = "4.5.0"
+firebaseCrashlyticsPlugin = "3.0.8"
 
 [libraries]
 theme-manager = { group = "com.github.MustafaKoceerr.compose-theme-manager", name = "theme-manager", version.ref = "themeManager" }
@@ -74,6 +77,9 @@ androidx-room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = 
 androidx-room-testing = { group = "androidx.room", name = "room-testing", version.ref = "room" }
 androidx-room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
 androidx-datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "datastore" }
+firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.ref = "firebaseBom" }
+firebase-analytics = { group = "com.google.firebase", name = "firebase-analytics" }
+firebase-crashlytics-ndk = { group = "com.google.firebase", name = "firebase-crashlytics-ndk" }
 androidx-test-core = { group = "androidx.test", name = "core", version = "1.7.0" }
 androidx-test-runner = { group = "androidx.test", name = "runner", version = "1.7.0" }
 
@@ -94,6 +100,8 @@ ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 hilt = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
 room = { id = "androidx.room", version.ref = "room" }
 aboutlibraries-android = { id = "com.mikepenz.aboutlibraries.plugin.android", version.ref = "aboutLibraries" }
+google-services = { id = "com.google.gms.google-services", version.ref = "googleServices" }
+firebase-crashlytics = { id = "com.google.firebase.crashlytics", version.ref = "firebaseCrashlyticsPlugin" }
 
 # Plugins defined by this project (build-logic)
 tilepdf-android-application = { id = "tilepdf.android.application" }

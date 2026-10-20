@@ -14,11 +14,13 @@ import com.mustafakoceerr.thememanager.ThemeState
 import com.mustafakoceerr.thememanager.settingsOrDefault
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.mustafakoceerr.tilepdf.core.analytics.AnalyticsHelper
 import com.mustafakoceerr.tilepdf.core.common.KeyEventHost
 import com.mustafakoceerr.tilepdf.model.AppPalette
 import com.mustafakoceerr.tilepdf.navigation.TilePdfNavHost
 import com.mustafakoceerr.tilepdf.ui.theme.TilePDFTheme
 import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 
 /** An AppCompatActivity so the in-app language applies on Android 12 and older too. */
 @AndroidEntryPoint
@@ -28,6 +30,9 @@ class MainActivity : AppCompatActivity(), KeyEventHost {
     private var pendingDocument by mutableStateOf<String?>(null)
 
     private val viewModel: MainActivityViewModel by viewModels()
+
+    @Inject
+    lateinit var analytics: AnalyticsHelper
 
     private var keyHandler: ((KeyEvent) -> Boolean)? = null
 
@@ -49,6 +54,7 @@ class MainActivity : AppCompatActivity(), KeyEventHost {
                 TilePdfNavHost(
                     openDocument = pendingDocument,
                     onDocumentOpened = { pendingDocument = null },
+                    analytics = analytics,
                 )
             }
         }

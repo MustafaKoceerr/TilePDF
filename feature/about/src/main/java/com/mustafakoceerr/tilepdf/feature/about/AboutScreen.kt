@@ -94,7 +94,7 @@ private fun AboutContent(onOpenLibraries: () -> Unit, modifier: Modifier = Modif
                     Text("TilePDF", style = MaterialTheme.typography.headlineMedium)
                     Text(stringResource(R.string.about_version, version), style = MaterialTheme.typography.bodyMedium)
                     Text(
-                        text = stringResource(R.string.about_offline),
+                        text = stringResource(R.string.about_privacy),
                         style = MaterialTheme.typography.bodyLarge,
                         modifier = Modifier.padding(top = 16.dp),
                     )

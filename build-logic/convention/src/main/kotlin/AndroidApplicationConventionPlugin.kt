@@ -23,7 +23,7 @@ class AndroidApplicationConventionPlugin : Plugin<Project> {
         }
     }
 
-    /** The release never ships a permission outside the allowlist; TilePDF stays offline. */
+    /** The release never ships a permission outside the allowlist. */
     private fun Project.checkReleasePermissions() {
         extensions.configure<ApplicationAndroidComponentsExtension> {
             onVariants(selector().withBuildType("release")) { variant ->
