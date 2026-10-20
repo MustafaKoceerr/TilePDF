@@ -33,7 +33,9 @@ uygulama Google Firebase Crashlytics'e bir çökme raporu gönderir. Rapor
 - cihaz modeli, Android sürümü, boş bellek ve depolama alanı, uygulamanın ön
   planda olup olmadığı;
 - Firebase'in oluşturduğu, adınıza, hesabınıza veya başka uygulamalara bağlı
-  olmayan rastgele bir kurulum kimliği.
+  olmayan rastgele bir kurulum kimliği;
+- kullanım istatistiklerine izin verdiyseniz, çökmeden hemen önceki birkaç
+  istatistik olayı (aşağıya bakın), örneğin "okuyucu açıldı".
 
 Çökme raporları belgelerinizi, metinlerini, dosya adlarını veya yollarını asla
 içermez. 90 gün saklanır ve yalnızca hataları bulup düzeltmek için kullanılır.

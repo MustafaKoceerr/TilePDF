@@ -30,7 +30,9 @@ sends a crash report to Google Firebase Crashlytics. A report contains:
 - the device model, Android version, available memory and storage, and whether
   the app was in the foreground;
 - a random installation ID created by Firebase, which isn't linked to your
-  name, account or other apps.
+  name, account or other apps;
+- if you allowed usage statistics, the last few statistics events before the
+  crash (see below), such as "the reader was opened".
 
 Crash reports never contain your documents, their text, file names or paths.
 They are kept for 90 days and used only to find and fix bugs. Crash reports are
