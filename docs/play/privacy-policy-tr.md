@@ -1,3 +1,9 @@
+---
+permalink: /privacy/tr/
+title: TilePDF Gizlilik Politikası
+lang: tr
+---
+
 # TilePDF Gizlilik Politikası
 
 *Yürürlük tarihi: 20 Ekim 2026*

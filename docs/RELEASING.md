@@ -78,7 +78,7 @@ testers for 14 days before it can apply for production.
 1. Create the app in Play Console (free, default language English, tr-TR as a
    second listing). Texts and graphics are in `fastlane/metadata/android/`.
 2. App content: privacy policy URL
-   (<https://mustafakoceerr.github.io/tilepdf-privacy/>), no ads, Advertising
+   (<https://mustafakoceerr.github.io/TilePDF/privacy/>), no ads, Advertising
    ID **No**, content rating questionnaire, target audience 18+ (not
    designed for children), and the Data safety answers in
    [docs/play/data-safety.md](play/data-safety.md).

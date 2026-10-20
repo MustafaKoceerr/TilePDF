@@ -76,6 +76,6 @@ receives it.
 
 The text is in `docs/play/privacy-policy.md` (English) and
 `privacy-policy-tr.md` (Turkish), published at
-<https://mustafakoceerr.github.io/tilepdf-privacy/> and
-<https://mustafakoceerr.github.io/tilepdf-privacy/tr/>. The app links to it
+<https://mustafakoceerr.github.io/TilePDF/privacy/> and
+<https://mustafakoceerr.github.io/TilePDF/privacy/tr/>. The app links to it
 from *Settings → Privacy*.

@@ -91,6 +91,10 @@ if (hasFirebaseConfig) {
     tasks.matching { it.name == "assembleRelease" || it.name == "bundleRelease" }.configureEach {
         finalizedBy("uploadCrashlyticsSymbolFileRelease")
     }
+    // It reads the merged libraries (unstrippedNativeLibsDir) without saying so.
+    tasks.matching { it.name == "generateCrashlyticsSymbolFileRelease" }.configureEach {
+        dependsOn("mergeReleaseNativeLibs")
+    }
 }
 
 // Licenses of every bundled library, shown on the About screen. The build may

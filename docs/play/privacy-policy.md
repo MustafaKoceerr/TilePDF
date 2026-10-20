@@ -1,3 +1,8 @@
+---
+permalink: /privacy/
+title: TilePDF Privacy Policy
+---
+
 # TilePDF Privacy Policy
 
 *Effective 20 October 2026*
