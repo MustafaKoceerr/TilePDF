@@ -2,7 +2,9 @@ package com.mustafakoceerr.tilepdf.feature.library
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -12,11 +14,14 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.CircularProgressIndicator
@@ -28,6 +33,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconToggleButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
@@ -40,8 +46,11 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -52,8 +61,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -126,13 +139,20 @@ internal fun LibraryScreen(uiState: LibraryUiState, actions: LibraryActions) {
     val success = uiState as? LibraryUiState.Success
     val snackbars = remember { SnackbarHostState() }
     RemovalSnackbarEffect(success?.pendingRemoval, snackbars, actions)
+    // The bar steps aside while scrolling down and comes back on the way up.
+    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
+    val gridState = rememberLazyGridState()
+    // At the top, or heading back up, the button says what it does; otherwise it's just the icon.
+    val fabExpanded by remember { derivedStateOf { gridState.firstVisibleItemIndex == 0 || gridState.lastScrolledBackward } }
 
     Scaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             if (success?.searching == true) {
-                SearchBar(success.query, actions)
+                SearchBar(success.query, actions, scrollBehavior)
             } else {
                 TopAppBar(
+                    scrollBehavior = scrollBehavior,
                     title = { Text(stringResource(R.string.library_title)) },
                     actions = {
                         if (success?.hasDocuments == true) {
@@ -147,10 +167,13 @@ internal fun LibraryScreen(uiState: LibraryUiState, actions: LibraryActions) {
             }
         },
         floatingActionButton = {
+            val label = stringResource(R.string.library_open_pdf)
             ExtendedFloatingActionButton(
                 onClick = { openDocument.launch(arrayOf(PDF_MIME_TYPE)) },
-                icon = { Icon(painterResource(TilePdfIcons.Add), contentDescription = null) },
-                text = { Text(stringResource(R.string.library_open_pdf)) },
+                expanded = fabExpanded,
+                // Folded, the icon alone has to name the button.
+                icon = { Icon(painterResource(TilePdfIcons.Add), contentDescription = if (fabExpanded) null else label) },
+                text = { Text(label) },
             )
         },
         snackbarHost = { SnackbarHost(snackbars) },
@@ -163,14 +186,23 @@ internal fun LibraryScreen(uiState: LibraryUiState, actions: LibraryActions) {
         ) {
             when {
                 success == null -> CircularProgressIndicator()
-                !success.hasDocuments -> EmptyText(R.string.library_empty)
+                !success.hasDocuments -> EmptyState(TilePdfIcons.Document, R.string.library_empty_title, R.string.library_empty)
                 else -> Column(Modifier.fillMaxSize()) {
                     FilterChips(success.filter, actions.onFilterSelected)
                     when {
-                        success.items.isNotEmpty() -> DocumentList(success.items, actions)
-                        success.filter == LibraryFilter.Favorites && success.query.isBlank() ->
-                            EmptyText(R.string.library_no_favorites, Modifier.fillMaxWidth())
-                        else -> EmptyText(R.string.library_no_results, Modifier.fillMaxWidth())
+                        success.items.isNotEmpty() -> DocumentList(success.items, gridState, actions)
+                        success.filter == LibraryFilter.Favorites && success.query.isBlank() -> EmptyState(
+                            TilePdfIcons.StarBorder,
+                            R.string.library_no_favorites,
+                            R.string.library_no_favorites_hint,
+                            Modifier.fillMaxWidth(),
+                        )
+                        else -> EmptyState(
+                            TilePdfIcons.Search,
+                            R.string.library_no_results,
+                            R.string.library_no_results_hint,
+                            Modifier.fillMaxWidth(),
+                        )
                     }
                 }
             }
@@ -196,10 +228,11 @@ private fun RemovalSnackbarEffect(pending: String?, snackbars: SnackbarHostState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun SearchBar(query: String, actions: LibraryActions) {
+private fun SearchBar(query: String, actions: LibraryActions, scrollBehavior: TopAppBarScrollBehavior) {
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { focus.requestFocus() }
     TopAppBar(
+        scrollBehavior = scrollBehavior,
         navigationIcon = {
             IconButton(onClick = actions.onSearchClose) {
                 Icon(painterResource(TilePdfIcons.ArrowBack), contentDescription = stringResource(R.string.library_search_close))
@@ -280,19 +313,43 @@ private fun FilterChips(selected: LibraryFilter, onSelect: (LibraryFilter) -> Un
     }
 }
 
+/** Why there is nothing to show and what to do about it, under an [icon] that sets the scene. */
 @Composable
-private fun EmptyText(@StringRes text: Int, modifier: Modifier = Modifier) {
-    Text(
-        text = stringResource(text),
-        style = MaterialTheme.typography.bodyLarge,
-        textAlign = TextAlign.Center,
-        modifier = modifier.padding(32.dp),
-    )
+private fun EmptyState(@DrawableRes icon: Int, @StringRes title: Int, @StringRes body: Int, modifier: Modifier = Modifier) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = modifier.padding(32.dp)) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .size(72.dp)
+                .background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
+        ) {
+            Icon(
+                painter = painterResource(icon),
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                modifier = Modifier.size(36.dp),
+            )
+        }
+        Text(
+            text = stringResource(title),
+            style = MaterialTheme.typography.titleMedium,
+            textAlign = TextAlign.Center,
+            modifier = Modifier
+                .padding(top = 16.dp)
+                .semantics { heading() },
+        )
+        Text(
+            text = stringResource(body),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(top = 4.dp),
+        )
+    }
 }
 
 @Composable
-private fun DocumentList(items: List<LibraryItem>, actions: LibraryActions) {
-    val gridState = rememberLazyGridState()
+private fun DocumentList(items: List<LibraryItem>, gridState: LazyGridState, actions: LibraryActions) {
     val top = items.firstOrNull()?.document?.uri
     var shownTop by remember { mutableStateOf(top) }
     LaunchedEffect(top) {
@@ -308,7 +365,19 @@ private fun DocumentList(items: List<LibraryItem>, actions: LibraryActions) {
                 leadingContent = { DocumentThumbnail(item.thumbnail, dimmed = !item.isAccessible) },
                 supportingContent = {
                     if (item.isAccessible) {
-                        Text(stringResource(R.string.library_page_progress, document.position.pageIndex + 1, document.pageCount))
+                        Column {
+                            Text(stringResource(R.string.library_page_progress, document.position.pageIndex + 1, document.pageCount))
+                            readingProgress(document.position.pageIndex, document.pageCount)?.let { progress ->
+                                LinearProgressIndicator(
+                                    progress = { progress },
+                                    modifier = Modifier
+                                        .padding(top = 8.dp)
+                                        .fillMaxWidth()
+                                        // The page line above already says it.
+                                        .clearAndSetSemantics {},
+                                )
+                            }
+                        }
                     } else {
                         Text(text = stringResource(R.string.library_no_access), color = MaterialTheme.colorScheme.error)
                     }

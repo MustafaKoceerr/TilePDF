@@ -3,6 +3,7 @@ package com.mustafakoceerr.tilepdf.feature.library
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
@@ -28,6 +29,8 @@ import kotlinx.coroutines.withContext
 /** Material's alpha for disabled content. */
 private const val DIMMED_ALPHA = 0.38f
 
+private val ThumbnailShape = RoundedCornerShape(4.dp)
+
 /**
  * A row's first-page picture, or a page icon until the reader has drawn one.
  * [dimmed] for a document that can't be opened now.
@@ -43,9 +46,11 @@ internal fun DocumentThumbnail(thumbnail: Thumbnail?, dimmed: Boolean, modifier:
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier
-            .size(width = 40.dp, height = 56.dp)
-            .clip(RoundedCornerShape(4.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant),
+            .size(width = 48.dp, height = 64.dp)
+            .clip(ThumbnailShape)
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            // A white page would melt into a light surface without an edge.
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, ThumbnailShape),
     ) {
         val bitmap = image
         if (bitmap != null) {
