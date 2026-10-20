@@ -101,6 +101,8 @@ internal fun PdfPagePager(
     drawingFor: ((pageIndex: Int) -> PageDrawing)? = null,
     /** Fillable form widgets by page. */
     formFields: Map<Int, List<FormField>> = emptyMap(),
+    /** Keeps the page number showing, not only while swiping. */
+    pinPageIndicator: Boolean = false,
     /** Two pages side by side, as [spreads] pairs them. */
     twoPageSpreads: Boolean = false,
 ) {
@@ -213,6 +215,7 @@ internal fun PdfPagePager(
             currentPage = groups.getOrNull(pagerState.currentPage)?.first() ?: 0,
             pageCount = pageSizes.size,
             scrolling = pagerState.isScrollInProgress,
+            pinned = pinPageIndicator,
             onClick = { onGoToPageOpenChange(true) },
             modifier = Modifier
                 .align(Alignment.BottomCenter)
@@ -304,12 +307,13 @@ private fun Modifier.pageGestures(
         }
 }
 
-/** "12 / 300", shown while swiping and for a moment after. */
+/** "12 / 300", shown while swiping and for a moment after, or all along while [pinned]. */
 @Composable
 private fun PagerPageIndicator(
     currentPage: Int,
     pageCount: Int,
     scrolling: Boolean,
+    pinned: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -321,7 +325,7 @@ private fun PagerPageIndicator(
             visible = false
         }
     }
-    AnimatedVisibility(visible = visible, enter = fadeIn(), exit = fadeOut(), modifier = modifier) {
+    AnimatedVisibility(visible = visible || pinned, enter = fadeIn(), exit = fadeOut(), modifier = modifier) {
         PageIndicator(currentPage + 1, pageCount, onClick = onClick)
     }
 }

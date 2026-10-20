@@ -43,6 +43,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.DropdownMenu
@@ -328,7 +329,8 @@ internal fun ReaderScreen(
     val saveCopyLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/pdf")) { target ->
         target?.let { annotationActions.onSaveCopy(it.toString()) }
     }
-    val saveCopy = { ready?.let { saveCopyLauncher.launch(copyName(it.title)) } }
+    val resources = LocalResources.current
+    val saveCopy = { ready?.let { saveCopyLauncher.launch(resources.getString(R.string.reader_copy_name, baseName(it.title))) } }
     SaveCopyResultEffect(ready?.saveCopyResult, onOpenDocument, annotationActions.onSaveCopyResultHandled)
     HandOffEffect(ready?.handOff, annotationActions.onHandOffHandled)
     RecognitionResultEffect(ready?.recognition?.result, recognitionActions.onResultShown)
@@ -481,6 +483,8 @@ internal fun ReaderScreen(
             }
             // The page pane: everything the reader showed before, now beside the panel.
             Box(Modifier.weight(1f).fillMaxHeight()) {
+                // Whether a chip or toolbar sits at the bottom, where the page number would go.
+                var bottomTaken by remember { mutableStateOf(false) }
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -515,6 +519,8 @@ internal fun ReaderScreen(
                                 onPositionChanged = onPositionChanged,
                                 onTapPage = onTapPage,
                                 onTapOutsidePage = onTapOutsidePage,
+                                // With the bars showing, so does where the reader is.
+                                pinPageIndicator = !fullScreen && !bottomTaken,
                                 annotationActions = annotationActions,
                                 selectionActions = SelectionActions(
                                     onLongPress = onLongPress,
@@ -527,7 +533,12 @@ internal fun ReaderScreen(
                         }
                     }
                 }
-                Column(Modifier.align(Alignment.BottomCenter), horizontalAlignment = Alignment.CenterHorizontally) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .onSizeChanged { bottomTaken = it.height > 0 },
+                ) {
                     if (ready?.signatureStep is SignatureStep.Place) {
                         SignatureHint(onCancel = onSignatureCancelled, modifier = Modifier.navigationBarsPadding())
                     }
@@ -698,6 +709,7 @@ private fun ReaderPages(
     onPositionChanged: (ReadingPosition) -> Unit,
     onTapPage: (pageIndex: Int, x: Float, y: Float) -> Unit,
     onTapOutsidePage: () -> Unit,
+    pinPageIndicator: Boolean,
     annotationActions: AnnotationActions,
     selectionActions: SelectionActions,
 ) {
@@ -757,6 +769,7 @@ private fun ReaderPages(
             selectionActions = selectionActions,
             annotations = annotations,
             drawingFor = drawingFor,
+            pinPageIndicator = pinPageIndicator,
         )
         ReadingMode.Horizontal -> PdfPagePager(
             pageSizes = ready.pageSizes,
@@ -781,6 +794,7 @@ private fun ReaderPages(
             selectionActions = selectionActions,
             annotations = annotations,
             drawingFor = drawingFor,
+            pinPageIndicator = pinPageIndicator,
         )
     }
 }
@@ -950,8 +964,8 @@ private fun print(context: Context, print: HandOff.Print) {
     printManager.print(print.title, PdfPrintAdapter(context.applicationContext, print.uri.toUri(), print.title, print.pageCount), null)
 }
 
-/** "report.pdf" → "report (açıklamalı).pdf", the name offered for a copy. */
-private fun copyName(title: String) = "${title.removeSuffix(".pdf").removeSuffix(".PDF")} (açıklamalı).pdf"
+/** "report.pdf" → "report", for the name offered for a copy. */
+private fun baseName(title: String) = title.removeSuffix(".pdf").removeSuffix(".PDF")
 
 /**
  * Room the bars take at the top and bottom, whether or not they are showing,
@@ -1052,7 +1066,10 @@ private fun JumpBackChip(pageNumber: Int, onClick: () -> Unit, modifier: Modifie
     )
 }
 
-/** Less frequent actions, so the title keeps its room in the top bar. */
+/**
+ * Less frequent actions, so the title keeps its room in the top bar; grouped
+ * as this page, the document, sending it on, and the reader's settings.
+ */
 @Composable
 private fun OverflowMenu(
     expanded: Boolean,
@@ -1107,6 +1124,34 @@ private fun OverflowMenu(
                 },
             )
             DropdownMenuItem(
+                text = { Text(stringResource(R.string.reader_rotate)) },
+                leadingIcon = { Icon(painterResource(TilePdfIcons.RotateRight), contentDescription = null) },
+                onClick = {
+                    // Stays open: turning again is one more tap.
+                    onRotate()
+                },
+            )
+            DropdownMenuItem(
+                text = {
+                    Column {
+                        Text(stringResource(R.string.reader_crop_margins))
+                        Text(
+                            stringResource(R.string.reader_crop_margins_recommended),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                },
+                leadingIcon = { Icon(painterResource(TilePdfIcons.Crop), contentDescription = null) },
+                trailingIcon = { Checkbox(checked = cropMargins, onCheckedChange = null) },
+                onClick = {
+                    onExpandedChange(false)
+                    onCropMarginsChange(!cropMargins)
+                },
+                modifier = Modifier.semantics { toggleableState = ToggleableState(cropMargins) },
+            )
+            HorizontalDivider()
+            DropdownMenuItem(
                 text = { Text(stringResource(R.string.reader_add_signature)) },
                 leadingIcon = { Icon(painterResource(TilePdfIcons.Signature), contentDescription = null) },
                 enabled = pagesArePdf,
@@ -1134,33 +1179,7 @@ private fun OverflowMenu(
                     onRecognizeText()
                 },
             )
-            DropdownMenuItem(
-                text = { Text(stringResource(R.string.reader_rotate)) },
-                leadingIcon = { Icon(painterResource(TilePdfIcons.RotateRight), contentDescription = null) },
-                onClick = {
-                    // Stays open: turning again is one more tap.
-                    onRotate()
-                },
-            )
-            DropdownMenuItem(
-                text = {
-                    Column {
-                        Text(stringResource(R.string.reader_crop_margins))
-                        Text(
-                            stringResource(R.string.reader_crop_margins_recommended),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                },
-                leadingIcon = { Icon(painterResource(TilePdfIcons.Crop), contentDescription = null) },
-                trailingIcon = { Checkbox(checked = cropMargins, onCheckedChange = null) },
-                onClick = {
-                    onExpandedChange(false)
-                    onCropMarginsChange(!cropMargins)
-                },
-                modifier = Modifier.semantics { toggleableState = ToggleableState(cropMargins) },
-            )
+            HorizontalDivider()
             DropdownMenuItem(
                 text = { Text(stringResource(R.string.reader_share)) },
                 leadingIcon = { Icon(painterResource(TilePdfIcons.Share), contentDescription = null) },
@@ -1185,6 +1204,7 @@ private fun OverflowMenu(
                     onSaveCopy()
                 },
             )
+            HorizontalDivider()
             DropdownMenuItem(
                 text = { Text(stringResource(R.string.reader_settings)) },
                 leadingIcon = { Icon(painterResource(TilePdfIcons.Tune), contentDescription = null) },
